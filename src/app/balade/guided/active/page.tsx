@@ -66,9 +66,9 @@ export default function GuidedActivePage() {
     setStep("place");
   }
 
-  function pickZone(zone: BodyZone) {
+  function pickZone(zone: BodyZone, position: [number, number, number]) {
     if (!current) return;
-    placeOnBody(zone, current.key);
+    placeOnBody(zone, current.key, position);
     setZonePicker(false);
   }
 
@@ -286,17 +286,28 @@ function ZonePickerSheet({
   onClose,
 }: {
   fragrance: Fragrance;
-  existingPlacements: { zone: BodyZone; fragranceId: string }[];
+  existingPlacements: {
+    zone: BodyZone;
+    fragranceId: string;
+    position?: [number, number, number];
+  }[];
   fragrances: Fragrance[];
-  onPick: (zone: BodyZone) => void;
+  onPick: (zone: BodyZone, position: [number, number, number]) => void;
   onClose: () => void;
 }) {
-  const filledZones: Partial<Record<BodyZone, string>> = {};
-  for (const p of existingPlacements) {
-    if (p.fragranceId === fragrance.key) continue;
-    const f = fragrances.find((x) => x.key === p.fragranceId);
-    if (f) filledZones[p.zone] = fragranceInitials(f.name);
-  }
+  const filledMarkers = existingPlacements
+    .filter((p) => p.fragranceId !== fragrance.key)
+    .map((p) => {
+      const f = fragrances.find((x) => x.key === p.fragranceId);
+      if (!f) return null;
+      return {
+        fragranceId: p.fragranceId,
+        zone: p.zone,
+        label: fragranceInitials(f.name),
+        position: p.position,
+      };
+    })
+    .filter((m): m is NonNullable<typeof m> => Boolean(m));
 
   return (
     <div
@@ -328,9 +339,12 @@ function ZonePickerSheet({
           </button>
         </div>
         <div className="px-6 py-6">
-          <BodySilhouette filledZones={filledZones} onZoneClick={onPick} />
+          <BodySilhouette
+            filledMarkers={filledMarkers}
+            onBodyClick={onPick}
+          />
           <p className="text-center text-[10px] uppercase tracking-widest text-outline mt-2">
-            Touche une zone du corps
+            Touche n&apos;importe où sur le corps
           </p>
         </div>
       </div>

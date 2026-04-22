@@ -30,14 +30,20 @@ export default function EndOfBaladePage() {
     }
   }, [activeBalade, archived, history.length, router]);
 
-  const filledZones = useMemo(() => {
-    const map: Partial<Record<BodyZone, string>> = {};
-    if (!balade) return map;
-    for (const p of balade.placements) {
-      const f = fragrances.find((x) => x.key === p.fragranceId);
-      if (f) map[p.zone] = fragranceInitials(f.name);
-    }
-    return map;
+  const filledMarkers = useMemo(() => {
+    if (!balade) return [];
+    return balade.placements
+      .map((p) => {
+        const f = fragrances.find((x) => x.key === p.fragranceId);
+        if (!f) return null;
+        return {
+          fragranceId: p.fragranceId,
+          zone: p.zone,
+          label: fragranceInitials(f.name),
+          position: p.position,
+        };
+      })
+      .filter((m): m is NonNullable<typeof m> => Boolean(m));
   }, [balade, fragrances]);
 
   if (!balade) return null;
@@ -70,7 +76,7 @@ export default function EndOfBaladePage() {
       </header>
 
       <section className="bg-surface-container-low border border-outline-variant py-6 mb-8">
-        <BodySilhouette filledZones={filledZones} readOnly />
+        <BodySilhouette filledMarkers={filledMarkers} readOnly />
       </section>
 
       <section className="mb-8">

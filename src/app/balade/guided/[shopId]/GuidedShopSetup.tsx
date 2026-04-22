@@ -6,12 +6,19 @@ import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
 import {
-  generateGuidedRoute,
   shopOpenNow,
   useData,
+  useFragrances,
   useShop,
   useShopStock,
 } from "@/lib/data";
+import { useAuth } from "@/lib/auth";
+import { readProfileFromUser } from "@/lib/profile";
+import {
+  recommendBaladeRoute,
+  topReasons,
+  type Recommendation,
+} from "@/lib/recommendation";
 import { useStore } from "@/lib/store";
 
 const TIME_OPTIONS = [5, 10, 20, 30] as const;
@@ -21,22 +28,33 @@ export function GuidedShopSetup({ shopId }: { shopId: string }) {
   const { loading, error } = useData();
   const shop = useShop(shopId);
   const stock = useShopStock(shopId);
-  const { startBalade } = useStore();
+  const allFragrances = useFragrances();
+  const { user } = useAuth();
+  const { wishlist, startBalade } = useStore();
   const [selected, setSelected] = useState<(typeof TIME_OPTIONS)[number] | null>(
     null,
   );
 
-  const previewRoute = useMemo(() => {
-    if (!selected) return [];
-    return generateGuidedRoute(stock, selected);
-  }, [stock, selected]);
+  const profile = readProfileFromUser(user);
+
+  const recommendations: Recommendation[] = useMemo(() => {
+    if (!selected || !shop) return [];
+    return recommendBaladeRoute({
+      shopFragrances: stock,
+      profile,
+      wishlist,
+      timeBudgetMin: selected,
+      allFragrances,
+      shopName: shop.name,
+    });
+  }, [selected, shop, stock, profile, wishlist, allFragrances]);
 
   function start() {
-    if (!selected || !shop) return;
+    if (!selected || !shop || recommendations.length === 0) return;
     startBalade({
       mode: "guided",
       shopId: shop.id,
-      route: previewRoute,
+      route: recommendations.map((r) => r.fragrance.key),
       timeBudget: selected,
     });
     router.push("/balade/guided/active");
@@ -113,7 +131,8 @@ export function GuidedShopSetup({ shopId }: { shopId: string }) {
         </section>
       ) : (
         <>
-          <section className="mb-10">
+          {/* Concierge prompt */}
+          <section className="mb-8">
             <div className="flex items-center gap-3 mb-3">
               <Icon name="face_6" size={16} />
               <span className="text-[10px] uppercase tracking-widest font-bold">
@@ -125,6 +144,7 @@ export function GuidedShopSetup({ shopId }: { shopId: string }) {
             </p>
           </section>
 
+          {/* Time picker */}
           <section className="mb-10">
             <div className="grid grid-cols-2 gap-2">
               {TIME_OPTIONS.map((t) => {
@@ -159,36 +179,54 @@ export function GuidedShopSetup({ shopId }: { shopId: string }) {
             </div>
           </section>
 
-          {selected && previewRoute.length > 0 && (
+          {/* Profile reminder (or banner to complete it) */}
+          {selected && !profile && user && (
+            <section className="mb-8 border border-outline-variant/40 bg-surface-container-low p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-outline mb-1">
+                    Parcours générique
+                  </p>
+                  <p className="text-xs text-on-surface-variant">
+                    Complète ton ADN olfactif pour que ton parcours soit nické
+                    sur tes goûts.
+                  </p>
+                </div>
+                <Link
+                  href="/onboarding"
+                  className="text-[10px] uppercase tracking-widest font-bold border-b border-primary pb-0.5 whitespace-nowrap"
+                >
+                  Démarrer
+                </Link>
+              </div>
+            </section>
+          )}
+
+          {/* Recommendations preview */}
+          {selected && recommendations.length > 0 && (
             <section className="mb-10 border border-outline-variant p-5">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-outline mb-2">
-                Parcours suggéré
-              </p>
-              <p className="text-2xl font-bold tracking-tight mb-4">
-                {previewRoute.length} parfum
-                {previewRoute.length > 1 ? "s" : ""} · ~{selected}min
-              </p>
-              <ol className="space-y-2">
-                {previewRoute.map((id, i) => {
-                  const f = stock.find((s) => s.key === id);
-                  if (!f) return null;
-                  return (
-                    <li
-                      key={id}
-                      className="flex items-center gap-3 text-sm border-t border-outline-variant/40 pt-2 first:border-0 first:pt-0"
-                    >
-                      <span className="text-[10px] font-mono text-outline w-6">
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
-                      <span className="font-medium flex-1 truncate">
-                        {f.name}
-                      </span>
-                      <span className="text-[10px] uppercase tracking-widest text-outline">
-                        {f.brand}
-                      </span>
-                    </li>
-                  );
-                })}
+              <div className="flex justify-between items-end mb-4">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-outline">
+                    {profile
+                      ? "Parcours nické sur ton ADN"
+                      : "Parcours suggéré"}
+                  </p>
+                  <p className="text-2xl font-bold tracking-tight">
+                    {recommendations.length} parfum
+                    {recommendations.length > 1 ? "s" : ""} · ~{selected}min
+                  </p>
+                </div>
+                <Icon
+                  name="auto_awesome"
+                  size={18}
+                  className="text-primary"
+                />
+              </div>
+              <ol className="space-y-4">
+                {recommendations.map((r, i) => (
+                  <RecommendationRow key={r.fragrance.key} rec={r} rank={i + 1} />
+                ))}
               </ol>
             </section>
           )}
@@ -196,7 +234,7 @@ export function GuidedShopSetup({ shopId }: { shopId: string }) {
           <button
             type="button"
             onClick={start}
-            disabled={!selected || previewRoute.length === 0}
+            disabled={!selected || recommendations.length === 0}
             className="w-full py-4 bg-primary text-on-primary rounded-full text-xs uppercase tracking-[0.2em] font-bold active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-2"
           >
             <Icon name="play_arrow" size={16} />
@@ -205,5 +243,65 @@ export function GuidedShopSetup({ shopId }: { shopId: string }) {
         </>
       )}
     </div>
+  );
+}
+
+function RecommendationRow({
+  rec,
+  rank,
+}: {
+  rec: Recommendation;
+  rank: number;
+}) {
+  const reasons = topReasons(rec, 2).filter((r) => r.weight > 0);
+  const matchPct = Math.round(rec.matchScore * 100);
+
+  return (
+    <li className="border-t border-outline-variant/40 pt-4 first:border-0 first:pt-0">
+      <div className="flex items-start gap-3">
+        <span className="text-[10px] font-mono text-outline w-6 pt-0.5 flex-shrink-0">
+          {String(rank).padStart(2, "0")}
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <p className="font-medium truncate">{rec.fragrance.name}</p>
+            <span className="text-[10px] font-mono text-outline whitespace-nowrap">
+              {matchPct}%
+            </span>
+          </div>
+          <p className="text-[10px] uppercase tracking-widest text-outline mb-2">
+            {rec.fragrance.brand}
+            {rec.fragrance.bestPrice != null &&
+              ` · ${rec.fragrance.bestPrice.toFixed(0)} €`}
+          </p>
+          {rec.llm?.reason ? (
+            <p className="text-xs text-on-surface-variant italic leading-relaxed">
+              &laquo;&nbsp;{rec.llm.reason}&nbsp;&raquo;
+            </p>
+          ) : reasons.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {reasons.map((r, i) => (
+                <span
+                  key={`${r.kind}-${i}`}
+                  className="text-[10px] uppercase tracking-widest px-2 py-0.5 bg-surface-container-high rounded-full"
+                >
+                  {r.label}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[10px] uppercase tracking-widest text-outline italic">
+              Sélection neutre
+            </p>
+          )}
+          {rec.llm?.smellInvitation && (
+            <p className="text-[10px] uppercase tracking-widest text-primary mt-2 flex items-center gap-1">
+              <Icon name="air" size={12} />
+              {rec.llm.smellInvitation}
+            </p>
+          )}
+        </div>
+      </div>
+    </li>
   );
 }

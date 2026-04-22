@@ -29,24 +29,40 @@ export type ScentFamily =
   | "Smoky";
 
 export type BodyZone =
+  // Head / neck
+  | "behind-ear-left"
+  | "behind-ear-right"
   | "neck-left"
   | "neck-right"
-  | "wrist-left"
-  | "wrist-right"
+  | "throat"
+  | "nape"
+  // Torso
   | "chest"
+  // Arms
   | "inner-elbow-left"
   | "inner-elbow-right"
-  | "behind-ear-left"
-  | "behind-ear-right";
+  | "outer-elbow-left"
+  | "outer-elbow-right"
+  // Hands
+  | "wrist-left"
+  | "wrist-right"
+  | "back-of-hand-left"
+  | "back-of-hand-right";
 
 export const BODY_ZONE_LABELS: Record<BodyZone, string> = {
+  "behind-ear-left": "Derrière l'oreille — gauche",
+  "behind-ear-right": "Derrière l'oreille — droite",
   "neck-left": "Cou — gauche",
   "neck-right": "Cou — droite",
-  "wrist-left": "Poignet — gauche",
-  "wrist-right": "Poignet — droite",
+  throat: "Creux du cou",
+  nape: "Nuque",
   chest: "Buste",
   "inner-elbow-left": "Pli du coude — gauche",
   "inner-elbow-right": "Pli du coude — droite",
-  "behind-ear-left": "Derrière l'oreille — gauche",
-  "behind-ear-right": "Derrière l'oreille — droite",
+  "outer-elbow-left": "Dos du coude — gauche",
+  "outer-elbow-right": "Dos du coude — droite",
+  "wrist-left": "Poignet — gauche",
+  "wrist-right": "Poignet — droite",
+  "back-of-hand-left": "Dos de la main — gauche",
+  "back-of-hand-right": "Dos de la main — droite",
 };

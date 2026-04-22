@@ -23,8 +23,14 @@ export type WishlistEntry = {
 export type BaladeMode = "free" | "guided";
 
 export type BodyPlacement = {
+  /** Anatomical region used for labeling, recommendation, and summary stats.
+   *  Derived from `position` (closest predefined region) when the user places
+   *  by clicking an arbitrary point on the 3D body. */
   zone: BodyZone;
   fragranceId: string;
+  /** Exact world-space point on the body where the perfume was placed. When
+   *  absent, the marker falls back to the predefined anchor for `zone`. */
+  position?: [number, number, number];
 };
 
 export type TestedFragrance = {
@@ -78,9 +84,32 @@ type StoreActions = {
   cancelBalade: () => void;
 
   // Balade interactions
-  placeOnBody: (zone: BodyZone, fragranceId: string) => void;
-  movePlacement: (fragranceId: string, newZone: BodyZone) => void;
+  /** Replace any existing placement at this zone with the new fragrance.
+   *  Same fragrance is allowed at multiple zones. Optional `position` stores
+   *  the exact 3D hit point on the body (for drawing a precise marker). */
+  placeOnBody: (
+    zone: BodyZone,
+    fragranceId: string,
+    position?: [number, number, number],
+  ) => void;
+  /** Add a fragrance on top of existing placements at the same zone (layering).
+   *  No-op if the same (zone, fragranceId) tuple already exists. */
+  layerOnBody: (
+    zone: BodyZone,
+    fragranceId: string,
+    position?: [number, number, number],
+  ) => void;
+  /** Move the FIRST placement of `fragranceId` to a new zone. */
+  movePlacement: (
+    fragranceId: string,
+    newZone: BodyZone,
+    position?: [number, number, number],
+  ) => void;
+  /** Remove ALL placements of `fragranceId` (useful when a fragrance is
+   *  cleared). When you want per-tuple removal, use `removePlacementAt`. */
   removePlacement: (fragranceId: string) => void;
+  /** Remove a single placement matching exactly (zone, fragranceId). */
+  removePlacementAt: (zone: BodyZone, fragranceId: string) => void;
 
   recordTest: (fragranceId: string, feedback: WishlistStatus | null) => void;
   advanceRoute: () => void;
@@ -214,17 +243,38 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const placeOnBody = useCallback<StoreActions["placeOnBody"]>(
-    (zone, fragranceId) => {
+    (zone, fragranceId, position) => {
       setState((s) => {
         if (!s.activeBalade) return s;
-        const others = s.activeBalade.placements.filter(
-          (p) => p.fragranceId !== fragranceId && p.zone !== zone,
-        );
+        const keep = s.activeBalade.placements.filter((p) => p.zone !== zone);
         return {
           ...s,
           activeBalade: {
             ...s.activeBalade,
-            placements: [...others, { zone, fragranceId }],
+            placements: [...keep, { zone, fragranceId, position }],
+          },
+        };
+      });
+    },
+    [],
+  );
+
+  const layerOnBody = useCallback<StoreActions["layerOnBody"]>(
+    (zone, fragranceId, position) => {
+      setState((s) => {
+        if (!s.activeBalade) return s;
+        const exists = s.activeBalade.placements.some(
+          (p) => p.zone === zone && p.fragranceId === fragranceId,
+        );
+        if (exists) return s;
+        return {
+          ...s,
+          activeBalade: {
+            ...s.activeBalade,
+            placements: [
+              ...s.activeBalade.placements,
+              { zone, fragranceId, position },
+            ],
           },
         };
       });
@@ -233,18 +283,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const movePlacement = useCallback<StoreActions["movePlacement"]>(
-    (fragranceId, newZone) => {
+    (fragranceId, newZone, position) => {
       setState((s) => {
         if (!s.activeBalade) return s;
-        const others = s.activeBalade.placements.filter(
-          (p) => p.fragranceId !== fragranceId && p.zone !== newZone,
+        const placements = s.activeBalade.placements;
+        const idx = placements.findIndex((p) => p.fragranceId === fragranceId);
+        if (idx < 0) return s;
+        const next = placements.map((p, i) =>
+          i === idx ? { ...p, zone: newZone, position } : p,
         );
         return {
           ...s,
-          activeBalade: {
-            ...s.activeBalade,
-            placements: [...others, { zone: newZone, fragranceId }],
-          },
+          activeBalade: { ...s.activeBalade, placements: next },
         };
       });
     },
@@ -261,6 +311,24 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ...s.activeBalade,
             placements: s.activeBalade.placements.filter(
               (p) => p.fragranceId !== fragranceId,
+            ),
+          },
+        };
+      });
+    },
+    [],
+  );
+
+  const removePlacementAt = useCallback<StoreActions["removePlacementAt"]>(
+    (zone, fragranceId) => {
+      setState((s) => {
+        if (!s.activeBalade) return s;
+        return {
+          ...s,
+          activeBalade: {
+            ...s.activeBalade,
+            placements: s.activeBalade.placements.filter(
+              (p) => !(p.zone === zone && p.fragranceId === fragranceId),
             ),
           },
         };
@@ -314,8 +382,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       endBalade,
       cancelBalade,
       placeOnBody,
+      layerOnBody,
       movePlacement,
       removePlacement,
+      removePlacementAt,
       recordTest,
       advanceRoute,
     }),
@@ -328,8 +398,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       endBalade,
       cancelBalade,
       placeOnBody,
+      layerOnBody,
       movePlacement,
       removePlacement,
+      removePlacementAt,
       recordTest,
       advanceRoute,
     ],

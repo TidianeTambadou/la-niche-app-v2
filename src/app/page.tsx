@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { PerfumeCard } from "@/components/PerfumeCard";
+import { NewsRail } from "@/components/NewsRail";
+import { latestNews } from "@/lib/news";
 import {
-  scentOfTheDay,
   shopOpenNow,
   useData,
   useFragrances,
@@ -15,10 +16,8 @@ export default function HomePage() {
   const { loading, error } = useData();
   const shops = useShops();
   const fragrances = useFragrances();
-  const today = scentOfTheDay(fragrances);
-  const suggestions = today
-    ? fragrances.filter((f) => f.key !== today.key).slice(0, 6)
-    : fragrances.slice(0, 6);
+  const news = latestNews(6);
+  const suggestions = fragrances.slice(0, 6);
 
   return (
     <div className="px-6 pt-4 pb-12">
@@ -40,11 +39,11 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Scent of the Day */}
+      {/* Actualité parfum de niche */}
       <section className="mb-12">
         <div className="flex justify-between items-end mb-4">
           <h2 className="text-[10px] uppercase tracking-[0.2em] font-bold">
-            Scent of the day
+            Actualité
           </h2>
           <span className="text-[10px] font-mono text-outline">
             {new Date().toLocaleDateString("fr-FR", {
@@ -54,13 +53,7 @@ export default function HomePage() {
             })}
           </span>
         </div>
-        {loading ? (
-          <SkeletonFeature />
-        ) : today ? (
-          <PerfumeCard fragrance={today} variant="feature" origin="manual" />
-        ) : (
-          <EmptyBlock label="Aucun parfum dans le catalogue. Ajoute du stock depuis le CRM." />
-        )}
+        <NewsRail items={news} />
       </section>
 
       {/* Quick actions */}
@@ -213,12 +206,6 @@ function QuickAction({
         </p>
       </div>
     </Link>
-  );
-}
-
-function SkeletonFeature() {
-  return (
-    <div className="aspect-[4/5] bg-surface-container-low animate-pulse" />
   );
 }
 
