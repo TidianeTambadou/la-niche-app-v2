@@ -1,26 +1,166 @@
 @import "tailwindcss";
 
+/*
+  Design system: "Clinical Atelier" (template/stitch_olfactive_silence/visual_silence/DESIGN.md)
+  - Monochromatic: pure white background, absolute black primary
+  - Sharp corners on layout, full rounding on buttons/chips
+  - Glassmorphism for floating nav (white at 70% + 20px blur)
+  - Inter for everything; JetBrains Mono for technical data
+*/
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --surface: #f9f9f9;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f3f3f4;
+  --surface-container: #eeeeee;
+  --surface-container-high: #e8e8e8;
+  --surface-container-highest: #e2e2e2;
+
+  --on-background: #1a1c1c;
+  --on-surface: #1a1c1c;
+  --on-surface-variant: #474747;
+
+  --primary: #000000;
+  --on-primary: #e2e2e2;
+  --secondary: #5e5e5e;
+  --tertiary: #3a3c3c;
+
+  --outline: #777777;
+  --outline-variant: #c6c6c6;
+
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+  --on-error: #ffffff;
+
+  /* Compatibility tokens (used by base layout/skeleton) */
+  --foreground: var(--on-background);
+  --primary-foreground: var(--on-primary);
+  --muted: var(--surface-container-low);
+  --muted-foreground: var(--on-surface-variant);
+  --accent: var(--surface-container-low);
+  --border: var(--outline-variant);
+}
+
+.dark {
+  --background: #0a0a0a;
+  --surface: #121212;
+  --surface-container-lowest: #0f0f0f;
+  --surface-container-low: #161616;
+  --surface-container: #1c1c1c;
+  --surface-container-high: #232323;
+  --surface-container-highest: #2a2a2a;
+
+  --on-background: #fafafa;
+  --on-surface: #fafafa;
+  --on-surface-variant: #a1a1aa;
+
+  --primary: #fafafa;
+  --on-primary: #0a0a0a;
+  --secondary: #c6c6c6;
+  --tertiary: #c0c2c2;
+
+  --outline: #6b6b6b;
+  --outline-variant: #2a2a2a;
+
+  --error: #ffb4ab;
+  --error-container: #93000a;
+  --on-error: #690005;
+
+  --foreground: var(--on-background);
+  --primary-foreground: var(--on-primary);
+  --muted: var(--surface-container-low);
+  --muted-foreground: var(--on-surface-variant);
+  --accent: var(--surface-container-low);
+  --border: var(--outline-variant);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+
+  --color-on-background: var(--on-background);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-secondary: var(--secondary);
+  --color-tertiary: var(--tertiary);
+
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+
+  --color-error: var(--error);
+  --color-error-container: var(--error-container);
+  --color-on-error: var(--on-error);
+
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  background: var(--background);
+  color: var(--on-background);
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+  letter-spacing: -0.01em;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100dvh;
+}
+
+@supports (-webkit-touch-callout: none) {
+  body {
+    min-height: -webkit-fill-available;
+  }
+}
+
+button,
+a {
+  touch-action: manipulation;
+}
+
+/* Material Symbols configuration: thin clinical weight */
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24;
+  font-feature-settings: "liga";
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.material-symbols-outlined.filled {
+  font-variation-settings: "FILL" 1, "wght" 300, "GRAD" 0, "opsz" 24;
+}
+
+/* Hide scrollbars on horizontal scrollers */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Fixed bottom-nav safe area helper (iOS notch / home indicator) */
+.safe-bottom {
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+.safe-top {
+  padding-top: max(1rem, env(safe-area-inset-top));
 }

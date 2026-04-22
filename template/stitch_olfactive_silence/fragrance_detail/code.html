@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Anatomie du parfum | ATELIER</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;700;900&amp;family=JetBrains+Mono:wght@300;400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "tertiary-fixed-dim": "#454747",
+                        "secondary-container": "#d6d4d4",
+                        "inverse-surface": "#2f3131",
+                        "on-tertiary-fixed": "#ffffff",
+                        "tertiary-fixed": "#5d5f5f",
+                        "inverse-primary": "#c6c6c6",
+                        "on-primary-fixed": "#ffffff",
+                        "secondary-fixed-dim": "#acabab",
+                        "on-tertiary-fixed-variant": "#e2e2e2",
+                        "on-surface": "#1a1c1c",
+                        "on-secondary": "#ffffff",
+                        "surface-dim": "#dadada",
+                        "surface-container-low": "#f3f3f4",
+                        "outline": "#777777",
+                        "primary": "#000000",
+                        "surface-bright": "#f9f9f9",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-surface-variant": "#474747",
+                        "surface-container-high": "#e8e8e8",
+                        "outline-variant": "#c6c6c6",
+                        "on-secondary-fixed": "#1b1c1c",
+                        "primary-fixed-dim": "#474747",
+                        "primary-container": "#3b3b3b",
+                        "error": "#ba1a1a",
+                        "background": "#f9f9f9",
+                        "on-background": "#1a1c1c",
+                        "surface": "#f9f9f9",
+                        "on-secondary-fixed-variant": "#3b3b3b",
+                        "on-primary": "#e2e2e2",
+                        "surface-container-highest": "#e2e2e2",
+                        "on-tertiary-container": "#ffffff",
+                        "on-error": "#ffffff",
+                        "inverse-on-surface": "#f0f1f1",
+                        "on-secondary-container": "#1b1c1c",
+                        "secondary": "#5e5e5e",
+                        "tertiary": "#3a3c3c",
+                        "tertiary-container": "#737575",
+                        "on-primary-fixed-variant": "#e2e2e2",
+                        "on-error-container": "#410002",
+                        "surface-tint": "#5e5e5e",
+                        "surface-variant": "#e2e2e2",
+                        "on-primary-container": "#ffffff",
+                        "surface-container": "#eeeeee"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    },
+                    letterSpacing: {
+                        "tighter": "-0.02em",
+                        "widest-label": "0.05em",
+                        "brand": "0.2em"
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .scent-line {
+            width: 1px;
+            background: linear-gradient(to bottom, #000 0%, transparent 100%);
+        }
+        .backdrop-blur-xl {
+            backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body selection:bg-primary selection:text-on-primary">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-white/70 dark:bg-black/70 backdrop-blur-xl border-b border-zinc-100 dark:border-zinc-900">
+<nav class="flex justify-between items-center px-6 py-4 w-full max-w-screen-2xl mx-auto">
+<button class="active:scale-95 transition-transform hover:opacity-70 transition-opacity duration-300">
+<span class="material-symbols-outlined text-zinc-900 dark:text-zinc-50" data-icon="menu">menu</span>
+</button>
+<h1 class="text-xl font-bold tracking-[0.2em] text-zinc-900 dark:text-zinc-50 font-inter uppercase">ATELIER</h1>
+<button class="active:scale-95 transition-transform hover:opacity-70 transition-opacity duration-300">
+<span class="material-symbols-outlined text-zinc-900 dark:text-zinc-50" data-icon="shopping_bag">shopping_bag</span>
+</button>
+</nav>
+</header>
+<main class="pt-24 pb-32">
+<!-- Hero Section: The Clinical Focus -->
+<section class="max-w-screen-2xl mx-auto px-6 mb-24 lg:mb-40 grid grid-cols-1 md:grid-cols-12 gap-12 items-start">
+<div class="md:col-span-7 relative group">
+<div class="aspect-[4/5] bg-surface-container-low overflow-hidden rounded-sm">
+<img alt="minimalist perfume bottle" class="w-full h-full object-cover grayscale contrast-110" data-alt="minimalist perfume bottle made of clear glass with black liquid inside on a pure white clinical background with sharp shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOTiTFmMlGC0dRRoAiAA1sWz7-Y2ZtAjKAEXfOkQ9IR7h4F3oM8_Q4hL0TE1Wxkx78GrB1mzcj9034jOYErWQnIPOlDTTSzZkqR0u8r1yeWkA4mqpsxeUF1nAPOaTnfmdfSHFQP3ldgE2PU8wt8TcWkVgpFfWOiFHj_JGyh0255_kHZwaCoxwGwfRACsFl3Dwwy-GbqKO58KJP2kt_rq7jqJOjJBW-LKUUHiLsHlLiPMAo741QOAenE0ZUcFck6g4dgEqnnx9xCA"/>
+</div>
+<div class="absolute top-4 right-4 flex flex-col gap-1 items-end">
+<span class="text-[10px] font-mono uppercase tracking-widest-label bg-white/80 px-2 py-1">Batch: 092-A</span>
+<span class="text-[10px] font-mono uppercase tracking-widest-label bg-white/80 px-2 py-1">Conc: 24% VOL</span>
+</div>
+</div>
+<div class="md:col-span-5 pt-8">
+<label class="text-[10px] uppercase font-bold tracking-widest-label text-primary mb-4 block">Fragrance Detail</label>
+<h2 class="text-6xl lg:text-8xl font-black tracking-tighter text-primary leading-none mb-8">Anatomie du parfum.</h2>
+<p class="text-on-surface-variant leading-relaxed text-sm max-w-sm mb-12">
+                    A clinical dissection of olfactory resonance. This composition explores the structural integrity of scent through a technical lens, balancing volatility with permanence.
+                </p>
+<div class="flex flex-col gap-4">
+<div class="flex items-end justify-between border-b border-outline-variant pb-2">
+<span class="text-[10px] uppercase font-bold tracking-widest-label">Format</span>
+<span class="font-mono text-sm">75ML / 2.5 FL.OZ</span>
+</div>
+<div class="flex items-end justify-between border-b border-outline-variant pb-2">
+<span class="text-[10px] uppercase font-bold tracking-widest-label">Origin</span>
+<span class="font-mono text-sm">GRASSE, FR</span>
+</div>
+</div>
+<button class="mt-12 bg-primary text-on-primary px-12 py-4 rounded-full text-[12px] font-bold uppercase tracking-widest-label hover:opacity-90 active:scale-95 transition-all w-full md:w-auto">
+                    Shop Component
+                </button>
+</div>
+</section>
+<!-- Scent Architecture: Asymmetric Precision Grid -->
+<section class="max-w-screen-2xl mx-auto px-6 mb-24">
+<div class="flex items-center gap-4 mb-20">
+<span class="text-primary font-mono text-sm">01</span>
+<div class="h-[1px] flex-1 bg-outline-variant"></div>
+<h3 class="text-[10px] uppercase font-bold tracking-widest-label text-primary">Technical Decomposition</h3>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-0">
+<!-- Top Note -->
+<div class="p-12 lg:border-r border-outline-variant relative group bg-white hover:bg-surface-container-low transition-colors duration-500">
+<div class="mb-16">
+<span class="text-[10px] font-mono block mb-2">EVAPORATION: RAPID</span>
+<h4 class="text-4xl font-bold tracking-tighter mb-6">Top Notes</h4>
+<ul class="space-y-4">
+<li class="flex items-center gap-4">
+<div class="w-2 h-2 rounded-full border border-primary"></div>
+<span class="text-[12px] uppercase font-bold tracking-widest-label">Bergamot</span>
+</li>
+<li class="flex items-center gap-4">
+<div class="w-2 h-2 rounded-full border border-primary"></div>
+<span class="text-[12px] uppercase font-bold tracking-widest-label">Pink Pepper</span>
+</li>
+<li class="flex items-center gap-4">
+<div class="w-2 h-2 rounded-full border border-primary"></div>
+<span class="text-[12px] uppercase font-bold tracking-widest-label">Aldehydes</span>
+</li>
+</ul>
+</div>
+<!-- Minimalist Diagram -->
+<div class="flex justify-center items-end h-32 relative">
+<div class="w-[1px] h-full bg-primary/20 absolute left-1/2 -translate-x-1/2"></div>
+<div class="w-8 h-8 rounded-full border border-primary flex items-center justify-center animate-pulse">
+<div class="w-1 h-1 bg-primary rounded-full"></div>
+</div>
+</div>
+<p class="mt-8 text-[11px] text-on-surface-variant font-mono uppercase tracking-tighter">Impact: T+0m to T+15m</p>
+</div>
+<!-- Heart Note -->
+<div class="p-12 lg:border-r border-outline-variant relative group bg-white hover:bg-surface-container-low transition-colors duration-500">
+<div class="mb-16">
+<span class="text-[10px] font-mono block mb-2">EVAPORATION: MODERATE</span>
+<h4 class="text-4xl font-bold tracking-tighter mb-6">Heart Notes</h4>
+<ul class="space-y-4">
+<li class="flex items-center gap-4">
+<div class="w-2 h-2 bg-primary"></div>
+<span class="text-[12px] uppercase font-bold tracking-widest-label">Concrete Iris</span>
+</li>
+<li class="flex items-center gap-4">
+<div class="w-2 h-2 bg-primary"></div>
+<span class="text-[12px] uppercase font-bold tracking-widest-label">Black Tea</span>
+</li>
+<li class="flex items-center gap-4">
+<div class="w-2 h-2 bg-primary"></div>
+<span class="text-[12px] uppercase font-bold tracking-widest-label">Violet Leaf</span>
+</li>
+</ul>
+</div>
+<!-- Minimalist Diagram -->
+<div class="flex justify-center items-center h-32 relative">
+<div class="w-[1px] h-full bg-primary/20 absolute left-1/2 -translate-x-1/2"></div>
+<div class="grid grid-cols-2 gap-2">
+<div class="w-4 h-4 bg-primary/10"></div>
+<div class="w-4 h-4 bg-primary"></div>
+<div class="w-4 h-4 bg-primary"></div>
+<div class="w-4 h-4 bg-primary/10"></div>
+</div>
+</div>
+<p class="mt-8 text-[11px] text-on-surface-variant font-mono uppercase tracking-tighter">Impact: T+30m to T+4h</p>
+</div>
+<!-- Base Note -->
+<div class="p-12 relative group bg-white hover:bg-surface-container-low transition-colors duration-500">
+<div class="mb-16">
+<span class="text-[10px] font-mono block mb-2">EVAPORATION: SLOW</span>
+<h4 class="text-4xl font-bold tracking-tighter mb-6">Base Notes</h4>
+<ul class="space-y-4">
+<li class="flex items-center gap-4">
+<div class="w-2 h-4 bg-primary rounded-sm"></div>
+<span class="text-[12px] uppercase font-bold tracking-widest-label">Sandalwood</span>
+</li>
+<li class="flex items-center gap-4">
+<div class="w-2 h-4 bg-primary rounded-sm"></div>
+<span class="text-[12px] uppercase font-bold tracking-widest-label">Ambroxan</span>
+</li>
+<li class="flex items-center gap-4">
+<div class="w-2 h-4 bg-primary rounded-sm"></div>
+<span class="text-[12px] uppercase font-bold tracking-widest-label">Cetalox</span>
+</li>
+</ul>
+</div>
+<!-- Minimalist Diagram -->
+<div class="flex justify-center items-start h-32 relative">
+<div class="w-[1px] h-full bg-primary/20 absolute left-1/2 -translate-x-1/2"></div>
+<div class="flex flex-col gap-1 items-center">
+<div class="w-12 h-[2px] bg-primary"></div>
+<div class="w-8 h-[2px] bg-primary"></div>
+<div class="w-4 h-[2px] bg-primary"></div>
+</div>
+</div>
+<p class="mt-8 text-[11px] text-on-surface-variant font-mono uppercase tracking-tighter">Impact: T+6h to T+24h</p>
+</div>
+</div>
+</section>
+<!-- Visual Silence: Experimental Section -->
+<section class="bg-surface-container-low py-24 mb-24 overflow-hidden">
+<div class="max-w-screen-2xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
+<div class="relative">
+<div class="text-[200px] font-black leading-none opacity-5 absolute -left-10 -top-20 pointer-events-none select-none">SENS</div>
+<div class="relative z-10 aspect-square rounded-sm overflow-hidden border border-outline-variant">
+<img alt="scent molecule abstract" class="w-full h-full object-cover grayscale opacity-90" data-alt="abstract close-up of crystal structures under microscopic light, cold clinical lighting, sharp white textures" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7HElqsaSD_7lYXUi5n6MU8C4Y0ZKGeZDk7En6qb-20OFeu3f9dCeuP-GMZI0wYIQhyYXizdnKjuevO_AwHvvrUJ9JI4ky_dzo4paJrpDiFvjWm08BuJoxKm2wgu1utEb3ROdAZ21FuwhVcVb3sY-PGsG8c-iyxJfos8cZVBje0oplpbd52hm9Ydbpna-JBofHNGCQEwRtxhKiGlKLB3humUcxrValewnmKAqwqmhbtvnUnNzu7ctYAObFpth5gAjlcujZbFKMiw"/>
+</div>
+<div class="mt-8 flex justify-between items-start">
+<div>
+<p class="text-[10px] uppercase font-bold tracking-widest-label">Phase Shift</p>
+<p class="text-sm font-mono mt-2">Liquid to Atmospheric Vapor</p>
+</div>
+<div class="text-right">
+<p class="text-[10px] uppercase font-bold tracking-widest-label">Stability</p>
+<p class="text-sm font-mono mt-2">High Retention (98.2%)</p>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-8">
+<h5 class="text-3xl font-bold tracking-tighter max-w-xs">The architecture of an invisible object.</h5>
+<div class="h-[1px] w-24 bg-primary"></div>
+<p class="text-on-surface-variant leading-relaxed text-sm max-w-sm">
+                        Our extraction processes are optimized for molecular preservation. By utilizing supercritical CO2 extraction at clinical temperatures, we ensure the integrity of the iris concrete remains untarnished by thermal stress.
+                    </p>
+<div class="grid grid-cols-2 gap-4 pt-8">
+<div class="border border-outline-variant p-4">
+<span class="block font-mono text-xl mb-1">0.12μm</span>
+<span class="text-[10px] uppercase font-bold tracking-widest-label text-on-surface-variant">Filtration</span>
+</div>
+<div class="border border-outline-variant p-4">
+<span class="block font-mono text-xl mb-1">100%</span>
+<span class="text-[10px] uppercase font-bold tracking-widest-label text-on-surface-variant">Synthetic Free</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Final CTA: The Clinical Bag -->
+<section class="max-w-screen-2xl mx-auto px-6 flex flex-col items-center text-center">
+<h6 class="text-[10px] uppercase font-bold tracking-widest-label mb-6">Inventory Status: Limited Release</h6>
+<div class="relative inline-block mb-12">
+<div class="text-8xl font-black tracking-tighter text-primary">Add to Bag</div>
+<div class="absolute -right-12 -top-4 font-mono text-2xl">€215</div>
+</div>
+<button class="bg-primary text-on-primary rounded-full px-20 py-6 text-[14px] font-bold uppercase tracking-widest-label active:scale-95 transition-all">
+                Purchase Formulation
+            </button>
+</section>
+</main>
+<!-- BottomNavBar: Suppressed on focused detail views based on "The Destination Rule" -->
+<!-- However, providing the Shop link as a floating indicator for UX consistency -->
+<div class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 md:hidden">
+<div class="bg-white/90 backdrop-blur-md px-8 py-4 rounded-full border border-outline-variant flex items-center gap-8">
+<button class="flex flex-col items-center gap-1 text-zinc-400">
+<span class="material-symbols-outlined text-xl" data-icon="home">home</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-zinc-900 scale-105">
+<span class="material-symbols-outlined text-xl" data-icon="shopping_cart" style="font-variation-settings: 'FILL' 1;">shopping_cart</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-zinc-400">
+<span class="material-symbols-outlined text-xl" data-icon="face_6">face_6</span>
+</button>
+</div>
+</div>
+<!-- Background Decoration: Grid Lines -->
+<div class="fixed inset-0 pointer-events-none z-[-1] opacity-[0.03]">
+<div class="grid grid-cols-12 h-full w-full max-w-screen-2xl mx-auto px-6">
+<div class="border-l border-primary h-full"></div>
+<div class="border-l border-primary h-full"></div>
+<div class="border-l border-primary h-full"></div>
+<div class="border-l border-primary h-full"></div>
+<div class="border-l border-primary h-full"></div>
+<div class="border-l border-primary h-full"></div>
+<div class="border-l border-primary h-full"></div>
+<div class="border-l border-primary h-full"></div>
+<div class="border-l border-primary h-full"></div>
+<div class="border-l border-primary h-full"></div>
+<div class="border-l border-primary h-full"></div>
+<div class="border-l border-primary h-full border-r"></div>
+</div>
+</div>
+</body></html>
