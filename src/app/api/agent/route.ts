@@ -4,10 +4,12 @@ import {
   ANALYZER_SYSTEM_PROMPT,
   CURATOR_SYSTEM_PROMPT,
   IDENTIFY_SYSTEM_PROMPT,
+  REPORT_SYSTEM_PROMPT,
   SEARCH_SYSTEM_PROMPT,
   extractJson,
   type AgentRequest,
   type AgentResponse,
+  type FriendReport,
   type IdentifyResult,
   type OlfactiveDNA,
   type RecommendationCandidate,
@@ -425,6 +427,7 @@ Sélectionne EXACTEMENT ${safeCount} parfums DIFFÉRENTS des parfums aimés/reje
           family: r.family ?? "—",
           notes_brief: r.notes_brief ?? "",
           reason: r.reason ?? "",
+          projection: r.projection ?? "",
           match_score: Math.min(
             99,
             Math.max(50, Math.round(r.match_score ?? 75)),
@@ -444,6 +447,87 @@ Sélectionne EXACTEMENT ${safeCount} parfums DIFFÉRENTS des parfums aimés/reje
         mode: "recommend",
         recommendations,
         dna,
+      } satisfies AgentResponse);
+    } catch (e) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "upstream_error",
+          detail: e instanceof Error ? e.message : String(e),
+        } satisfies AgentResponse,
+        { status: 502 },
+      );
+    }
+  }
+
+  /* ── FRIEND_REPORT (sales-staff brief after "pour un ami" session) ── */
+  if (body.mode === "friend_report") {
+    const { profileContext, dna, matchedCards, dislikedCards } = body.payload;
+
+    const fmt = (
+      cards: typeof matchedCards,
+    ): string =>
+      cards.length
+        ? cards
+            .map(
+              (c) =>
+                `• ${c.brand} — ${c.name} [${c.family}] · notes : ${c.notes_brief} · raison match : ${c.reason}`,
+            )
+            .join("\n")
+        : "(aucun)";
+
+    try {
+      const raw = await openRouterCall(
+        apiKey,
+        [
+          { role: "system", content: REPORT_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: `${profileContext}
+
+ADN OLFACTIF extrait :
+- Accords dominants : ${dna.dominant_accords.join(", ") || "—"}
+- Notes clés : ${dna.key_notes.join(", ") || "—"}
+- Notes à éviter : ${dna.avoid_notes.join(", ") || "—"}
+- Personnalité : ${dna.personality || "—"}
+
+Parfums MATCHÉS durant la session :
+${fmt(matchedCards)}
+
+Parfums REJETÉS :
+${fmt(dislikedCards)}
+
+Rédige le rapport JSON pour le vendeur.`,
+          },
+        ],
+        1800,
+      );
+
+      const parsed = extractJson(raw) as Partial<FriendReport>;
+      const report: FriendReport = {
+        summary: parsed.summary ?? "",
+        signature: parsed.signature ?? "",
+        loved_references: (parsed.loved_references ?? []).slice(0, 3).map((r) => ({
+          brand: r.brand ?? "",
+          name: r.name ?? "",
+          family: r.family ?? "",
+          why: r.why ?? "",
+        })),
+        rejected_references: (parsed.rejected_references ?? [])
+          .slice(0, 3)
+          .map((r) => ({
+            brand: r.brand ?? "",
+            name: r.name ?? "",
+            family: r.family ?? "",
+            why: r.why ?? "",
+          })),
+        sales_advice: parsed.sales_advice ?? "",
+      };
+
+      return NextResponse.json({
+        ok: true,
+        mode: "friend_report",
+        report,
       } satisfies AgentResponse);
     } catch (e) {
       return NextResponse.json(

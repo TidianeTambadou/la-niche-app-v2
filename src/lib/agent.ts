@@ -74,12 +74,35 @@ CONTRAINTES ABSOLUES — toute violation invalide la recommandation :
    - NE JAMAIS être générique ("correspond à ton profil" est INTERDIT)
    - Maximum 140 caractères
 6. match_score (50-98) reflète la proximité RÉELLE avec l'ADN. Un match sur 3+ notes clés = 85-95. Sur 1-2 notes = 65-85.
+7. projection (OBLIGATOIRE) : UNE phrase courte (max 110 caractères) qui fait SE PROJETER le porteur dans une scène concrète. Format impératif : "Si tu veux [effet / scène / sensation]…". C'est la promesse émotionnelle, pas la description technique. Exemples :
+   - "Si tu veux qu'on te demande ce que tu portes dès que tu entres dans un bar"
+   - "Si tu veux donner l'impression que tu contrôles tout, même quand c'est pas vrai"
+   - "Si tu veux que son cou sente encore toi le lendemain matin"
+   - "Si tu veux ressembler au mec le plus cool de la salle sans le montrer"
 
 Retourne UNIQUEMENT ce JSON :
-{"recommendations":[{"name":"","brand":"","family":"","notes_brief":"note1, note2, note3","reason":"","match_score":0,"image_url":"(optionnel)","source_url":""}]}`;
+{"recommendations":[{"name":"","brand":"","family":"","notes_brief":"note1, note2, note3","reason":"","projection":"Si tu veux ...","match_score":0,"image_url":"(optionnel)","source_url":""}]}`;
 
 /** Legacy single-shot prompt — kept for backwards compat if needed. */
 export const RECOMMEND_SYSTEM_PROMPT = CURATOR_SYSTEM_PROMPT;
+
+/** Sales-report agent — writes a plain-language brief for a perfume seller
+ *  after the "pour un ami" swipe session. */
+export const REPORT_SYSTEM_PROMPT = `Tu rédiges un RAPPORT SIMPLE ET ACTIONNABLE pour un VENDEUR de parfumerie qui va accueillir cette personne. Pas de jargon, pas de poésie — langage direct, utile, factuel. Un vendeur doit comprendre en 10 secondes ce que le client cherche.
+
+TON OBJECTIF :
+1. summary — 1 phrase claire : "Cherche un parfum X pour Y"
+2. signature — 2-3 lignes : accords, notes phares, personnalité
+3. loved_references — 3 parfums max que la personne a aimés, avec 1 phrase expliquant POURQUOI (quelle note, quel aspect)
+4. rejected_references — 3 max rejetés, avec 1 phrase expliquant ce qui a coincé (pour guider le vendeur à éviter les similaires)
+5. sales_advice — 1 paragraphe concret : quelles directions proposer en priorité (style, maisons, gamme de prix, éviter tel type de parfum)
+
+RÈGLES :
+- Vouvoies pas, tutoies le vendeur. Direct, pro.
+- Cite les NOTES et les MAISONS dans le texte
+- Pas de "peut-être" / "possiblement" — sois affirmé
+- JSON STRICT uniquement :
+{"summary":"","signature":"","loved_references":[{"brand":"","name":"","family":"","why":""}],"rejected_references":[{"brand":"","name":"","family":"","why":""}],"sales_advice":""}`;
 
 /** Full expert prompt — used only for the free-form "ask the expert" mode. */
 export const AGENT_SYSTEM_PROMPT = `Tu es un expert en parfumerie de niche et grand public, avec une connaissance approfondie des matières premières, des pyramides olfactives, des maisons de parfum, des parfumeurs et des tendances du marché.
@@ -158,6 +181,8 @@ export type RecommendationCandidate = {
   notes_brief: string;
   /** ≤ 140 char explanation of WHY this fits the user's profile. */
   reason: string;
+  /** "Si tu veux ..." — emotional projection hook shown on the swipe card. */
+  projection: string;
   /** 0..100 */
   match_score: number;
   /** Optional Fragrantica image. */
@@ -165,7 +190,32 @@ export type RecommendationCandidate = {
   source_url: string;
 };
 
-export type AgentMode = "search" | "identify" | "ask" | "recommend";
+export type FriendReportRef = {
+  brand: string;
+  name: string;
+  family: string;
+  why: string;
+};
+
+export type FriendReport = {
+  /** 1 sentence — direct, what this person is after. */
+  summary: string;
+  /** 2-3 lines — accords, key notes, personality. */
+  signature: string;
+  /** Up to 3 parfums the friend liked during the session, with reason. */
+  loved_references: FriendReportRef[];
+  /** Up to 3 parfums the friend rejected. */
+  rejected_references: FriendReportRef[];
+  /** 1 paragraph — actionable advice for the seller. */
+  sales_advice: string;
+};
+
+export type AgentMode =
+  | "search"
+  | "identify"
+  | "ask"
+  | "recommend"
+  | "friend_report";
 
 export type AgentRequest =
   | { mode: "search"; payload: { query: string } }
@@ -195,6 +245,26 @@ export type AgentRequest =
         /** Fragrances the user has disliked. Signal what to avoid. */
         dislikedFragrances: Array<{ name: string; brand: string }>;
       };
+    }
+  | {
+      mode: "friend_report";
+      payload: {
+        /** Profile context assembled from the friend quiz answers. */
+        profileContext: string;
+        dna: OlfactiveDNA;
+        matchedCards: Array<
+          Pick<
+            RecommendationCandidate,
+            "name" | "brand" | "family" | "notes_brief" | "reason" | "projection"
+          >
+        >;
+        dislikedCards: Array<
+          Pick<
+            RecommendationCandidate,
+            "name" | "brand" | "family" | "notes_brief" | "reason" | "projection"
+          >
+        >;
+      };
     };
 
 export type AgentResponse =
@@ -209,6 +279,7 @@ export type AgentResponse =
        *  so they understand WHY these parfums were picked. */
       dna: OlfactiveDNA;
     }
+  | { ok: true; mode: "friend_report"; report: FriendReport }
   | { ok: false; error: string; detail?: string };
 
 /* -------------------------------------------------------------------------

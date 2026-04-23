@@ -220,6 +220,34 @@ a {
   animation: bubble-in 0.22s ease-out;
 }
 
+/* Report reveal — sections stagger-fade when report screen mounts */
+@keyframes report-section-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.report-section {
+  opacity: 0;
+  animation: report-section-rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Report panel slides up from bottom */
+@keyframes report-slide-up {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.report-panel {
+  animation: report-slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Quiz question crossfade */
+@keyframes quiz-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.quiz-in {
+  animation: quiz-in 0.35s ease-out forwards;
+}
+
 /* Tinder-style swipe exit for recommendations cards */
 @keyframes swipe-exit-left {
   to { transform: translateX(-140%) rotate(-18deg); opacity: 0; }
@@ -254,8 +282,12 @@ a {
   .celebration-in,
   .celebration-out,
   .swipe-exit-left,
-  .swipe-exit-right {
+  .swipe-exit-right,
+  .report-section,
+  .report-panel,
+  .quiz-in {
     animation: none;
+    opacity: 1;
   }
   .shimmer-bar {
     background: var(--surface-container-low);

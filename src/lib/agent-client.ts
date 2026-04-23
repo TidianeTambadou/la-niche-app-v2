@@ -5,6 +5,7 @@
 
 import type {
   AgentResponse,
+  FriendReport,
   IdentifyResult,
   OlfactiveDNA,
   RecommendationCandidate,
@@ -170,6 +171,42 @@ export async function agentRecommend(
       wear_context: "",
     },
   };
+}
+
+export async function agentFriendReport(
+  profileContext: string,
+  dna: OlfactiveDNA,
+  matchedCards: RecommendationCandidate[],
+  dislikedCards: RecommendationCandidate[],
+  signal?: AbortSignal,
+): Promise<FriendReport> {
+  const trim = (cards: RecommendationCandidate[]) =>
+    cards.map((c) => ({
+      name: c.name,
+      brand: c.brand,
+      family: c.family,
+      notes_brief: c.notes_brief,
+      reason: c.reason,
+      projection: c.projection,
+    }));
+  const res = await call({
+    mode: "friend_report",
+    payload: {
+      profileContext,
+      dna,
+      matchedCards: trim(matchedCards),
+      dislikedCards: trim(dislikedCards),
+    },
+  }, signal);
+  if (res.ok && res.mode === "friend_report") return res.report;
+  if (!res.ok) {
+    throw new Error(
+      res.error === "agent_disabled"
+        ? "Agent IA désactivé"
+        : `Erreur rapport : ${res.detail ?? res.error}`,
+    );
+  }
+  throw new Error("Réponse rapport invalide");
 }
 
 export type AskHistoryTurn = { role: "user" | "assistant"; content: string };

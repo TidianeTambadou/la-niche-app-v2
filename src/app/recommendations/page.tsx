@@ -13,11 +13,199 @@ import {
   BUDGET_VULGAR,
   type OlfactiveProfile,
 } from "@/lib/profile";
-import { agentRecommend } from "@/lib/agent-client";
-import type { OlfactiveDNA, RecommendationCandidate } from "@/lib/agent";
+import { agentFriendReport, agentRecommend } from "@/lib/agent-client";
+import type {
+  FriendReport,
+  OlfactiveDNA,
+  RecommendationCandidate,
+} from "@/lib/agent";
 
-type Phase = "configure" | "loading" | "swiping" | "done";
+type Phase =
+  | "mode-picker"
+  | "quiz"
+  | "configure"
+  | "loading"
+  | "swiping"
+  | "done"
+  | "report-loading"
+  | "report";
+type Mode = "self" | "friend";
 type Count = 5 | 10 | 20;
+
+/* -------------------------------------------------------------------------
+ * "Pour un ami" quiz — ultra-vulgarized, no taboo. Each answer value gets
+ * mapped back into a French profile context string passed to the Analyst.
+ * --------------------------------------------------------------------- */
+
+type QuizOption = { value: string; label: string };
+type QuizQuestion = {
+  id: string;
+  question: string;
+  subtitle?: string;
+  options: QuizOption[];
+};
+
+const FRIEND_QUIZ: QuizQuestion[] = [
+  {
+    id: "vibe",
+    question: "Ton pote a quelle vibe générale ?",
+    subtitle: "Le style global, pas le parfum",
+    options: [
+      { value: "fresh-young", label: "Jeune frais — street, décontracté" },
+      { value: "classy-pro", label: "Classique distingué — homme d'affaires" },
+      { value: "rock-nightlife", label: "Rockstar — ambiance nuit, clubbing" },
+      { value: "bohemian", label: "Bohème, naturel, zéro prise de tête" },
+    ],
+  },
+  {
+    id: "target",
+    question: "Il veut plaire à qui surtout ?",
+    options: [
+      { value: "women", label: "Les meufs — faire tourner la tête" },
+      { value: "men", label: "Les mecs" },
+      { value: "everyone", label: "Tout le monde, bonne vibe globale" },
+      { value: "self", label: "Lui-même — faut qu'il kiffe avant tout" },
+    ],
+  },
+  {
+    id: "temperature",
+    question: "Plutôt chaud ou plutôt frais ?",
+    options: [
+      { value: "cool", label: "Frais — agrumes, menthe, marin" },
+      { value: "warm", label: "Chaud — cuir, épices, vanille" },
+      { value: "balanced", label: "Entre les deux, selon l'humeur" },
+    ],
+  },
+  {
+    id: "taste",
+    question: "Qu'est-ce qui le fait kiffer ?",
+    options: [
+      { value: "sweet", label: "Sucré / gourmand (vanille, caramel)" },
+      { value: "woody", label: "Boisé / sec (cèdre, santal)" },
+      { value: "floral", label: "Floral (rose, jasmin, iris)" },
+      { value: "citrus", label: "Citrus / frais (bergamote, citron)" },
+      { value: "smoky", label: "Fumé / mystérieux (oud, encens, tabac)" },
+      { value: "leather", label: "Cuir, musqué, animal" },
+    ],
+  },
+  {
+    id: "intensity",
+    question: "Il veut sentir comment ?",
+    options: [
+      { value: "subtle", label: "Discret — juste pour lui" },
+      { value: "moderate", label: "Présent — sentu à 1 mètre" },
+      { value: "projective", label: "Marquant — on se retourne" },
+    ],
+  },
+  {
+    id: "budget",
+    question: "Budget max pour un parfum ?",
+    options: [
+      { value: "u100", label: "Moins de 100 €" },
+      { value: "100_200", label: "Entre 100 et 200 €" },
+      { value: "o200", label: "Plus de 200 € — il a les moyens" },
+      { value: "any", label: "Aucune limite" },
+    ],
+  },
+  {
+    id: "occasion",
+    question: "Il le portera surtout pour quoi ?",
+    options: [
+      { value: "daily", label: "Tous les jours / casual" },
+      { value: "work", label: "Bosser, réunions, pro" },
+      { value: "date", label: "Dates, séduire" },
+      { value: "night", label: "Soirées, clubs, la nuit" },
+    ],
+  },
+  {
+    id: "nope",
+    question: "Qu'est-ce qu'il DÉTESTE ?",
+    subtitle: "Pour éviter les cata au comptoir",
+    options: [
+      { value: "too_sweet", label: "Trop sucré / écœurant" },
+      { value: "too_floral", label: "Trop fleuri / mémé" },
+      { value: "too_aquatic", label: "Trop marin / savonneux / eau de bébé" },
+      { value: "too_animal", label: "Trop animal / cuir lourd" },
+      { value: "none", label: "Rien — il est chill" },
+    ],
+  },
+];
+
+const QUIZ_LABEL: Record<string, Record<string, string>> = {
+  vibe: {
+    "fresh-young": "jeune frais, ambiance street décontractée",
+    "classy-pro": "classique distingué, homme d'affaires",
+    "rock-nightlife": "rockstar nocturne, clubbing",
+    bohemian: "bohème, naturel, effortless",
+  },
+  target: {
+    women: "séduire les femmes, faire tourner la tête",
+    men: "plaire aux hommes",
+    everyone: "dégager une bonne vibe générale",
+    self: "se plaire à lui-même avant tout",
+  },
+  temperature: {
+    cool: "frais (agrumes, menthe, marin)",
+    warm: "chaud (cuir, épices, vanille)",
+    balanced: "équilibré chaud/frais selon le jour",
+  },
+  taste: {
+    sweet: "gourmand sucré (vanille, caramel)",
+    woody: "boisé sec (cèdre, santal)",
+    floral: "floral (rose, jasmin, iris)",
+    citrus: "citrus frais (bergamote, citron)",
+    smoky: "fumé mystérieux (oud, encens, tabac)",
+    leather: "cuir, musqué, animal",
+  },
+  intensity: {
+    subtle: "discret, sillage intime",
+    moderate: "présent, sillage modéré",
+    projective: "projectif, marquant à distance",
+  },
+  budget: {
+    u100: "moins de 100 €",
+    "100_200": "100 à 200 €",
+    o200: "plus de 200 €",
+    any: "sans limite",
+  },
+  occasion: {
+    daily: "usage quotidien, casual",
+    work: "bureau, rendez-vous professionnels",
+    date: "dates, séduction",
+    night: "soirées, clubs, nuit",
+  },
+  nope: {
+    too_sweet: "trop sucré, écœurant, gourmand envahissant",
+    too_floral: "trop fleuri, style mémé",
+    too_aquatic: "trop marin, savonneux, eau de bébé",
+    too_animal: "trop animal, cuir lourd",
+    none: "aucun tabou particulier",
+  },
+};
+
+function buildFriendProfileContext(
+  answers: Record<string, string>,
+): string {
+  const lines: string[] = [
+    "PROFIL OLFACTIF DE LA PERSONNE (quiz réalisé par un proche, mode « pour un ami ») :",
+  ];
+  const keys: Array<[string, string]> = [
+    ["vibe", "Vibe générale"],
+    ["target", "Veut plaire à"],
+    ["temperature", "Préférence température"],
+    ["taste", "Goûts olfactifs clés"],
+    ["intensity", "Sillage recherché"],
+    ["budget", "Budget max"],
+    ["occasion", "Occasion principale"],
+    ["nope", "À éviter absolument"],
+  ];
+  for (const [k, label] of keys) {
+    const v = answers[k];
+    const readable = v ? QUIZ_LABEL[k]?.[v] : undefined;
+    if (readable) lines.push(`- ${label} : ${readable}`);
+  }
+  return lines.join("\n");
+}
 
 /* -------------------------------------------------------------------------
  * Profile → prompt context. Same shape as ConciergeWidget so the recs feel
@@ -62,7 +250,9 @@ export default function RecommendationsPage() {
   const { user } = useAuth();
   const { wishlist, addToWishlist } = useStore();
 
-  const [phase, setPhase] = useState<Phase>("configure");
+  const [phase, setPhase] = useState<Phase>("mode-picker");
+  const [mode, setMode] = useState<Mode>("self");
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [count, setCount] = useState<Count>(10);
   const [recs, setRecs] = useState<RecommendationCandidate[]>([]);
   const [dna, setDna] = useState<OlfactiveDNA | null>(null);
@@ -72,6 +262,8 @@ export default function RecommendationsPage() {
   const [liked, setLiked] = useState(0);
   const [passed, setPassed] = useState(0);
   const [matchedCards, setMatchedCards] = useState<RecommendationCandidate[]>([]);
+  const [dislikedCards, setDislikedCards] = useState<RecommendationCandidate[]>([]);
+  const [report, setReport] = useState<FriendReport | null>(null);
 
   // Drag state
   const [dragX, setDragX] = useState(0);
@@ -93,26 +285,38 @@ export default function RecommendationsPage() {
     return { likedFragrances: liked, dislikedFragrances: disliked };
   }, [wishlist]);
 
-  async function generate() {
+  async function generate(forMode: Mode, answers?: Record<string, string>) {
     setPhase("loading");
     setError(null);
     setIdx(0);
     setLiked(0);
     setPassed(0);
     setMatchedCards([]);
+    setDislikedCards([]);
     setDna(null);
+    setReport(null);
     try {
+      const profileCtx =
+        forMode === "friend"
+          ? buildFriendProfileContext(answers ?? {})
+          : buildProfileContext(profile);
+      // Friend mode ignores the logged-in user's wishlist — it's for someone else.
+      const likedArg = forMode === "friend" ? [] : likedFragrances;
+      const dislikedArg = forMode === "friend" ? [] : dislikedFragrances;
+      const desiredCount = forMode === "friend" ? 10 : count;
       const result = await agentRecommend(
-        count,
-        buildProfileContext(profile),
-        likedFragrances,
-        dislikedFragrances,
+        desiredCount,
+        profileCtx,
+        likedArg,
+        dislikedArg,
       );
       if (result.recommendations.length === 0) {
         setError(
-          "Aucune recommandation générée. Essaie de compléter ton profil ou d'ajouter quelques parfums en wishlist.",
+          forMode === "friend"
+            ? "Aucune recommandation générée. Relance le quiz."
+            : "Aucune recommandation. Complète ton profil ou ajoute des parfums en wishlist.",
         );
-        setPhase("configure");
+        setPhase(forMode === "friend" ? "mode-picker" : "configure");
         return;
       }
       setRecs(result.recommendations);
@@ -120,7 +324,26 @@ export default function RecommendationsPage() {
       setPhase("swiping");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
-      setPhase("configure");
+      setPhase(forMode === "friend" ? "mode-picker" : "configure");
+    }
+  }
+
+  async function generateReport() {
+    if (!dna) return;
+    setPhase("report-loading");
+    setError(null);
+    try {
+      const r = await agentFriendReport(
+        buildFriendProfileContext(quizAnswers),
+        dna,
+        matchedCards,
+        dislikedCards,
+      );
+      setReport(r);
+      setPhase("report");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur rapport");
+      setPhase("done");
     }
   }
 
@@ -131,18 +354,23 @@ export default function RecommendationsPage() {
 
     setCardExiting(decision === "liked" ? "right" : "left");
 
-    const fragranceId = recFragranceId(card);
-    addToWishlist(fragranceId, decision, "search", {
-      name: card.name,
-      brand: card.brand,
-      imageUrl: card.image_url ?? null,
-    });
+    // Only persist to the logged-in user's wishlist in "pour moi" mode.
+    // Friend mode is for someone else — those decisions go into the report only.
+    if (mode === "self") {
+      const fragranceId = recFragranceId(card);
+      addToWishlist(fragranceId, decision, "search", {
+        name: card.name,
+        brand: card.brand,
+        imageUrl: card.image_url ?? null,
+      });
+    }
 
     if (decision === "liked") {
       setLiked((n) => n + 1);
       setMatchedCards((prev) => [...prev, card]);
     } else {
       setPassed((n) => n + 1);
+      setDislikedCards((prev) => [...prev, card]);
     }
 
     window.setTimeout(() => {
@@ -180,13 +408,56 @@ export default function RecommendationsPage() {
 
   /* -------------------------------- Phases ------------------------------ */
 
+  function restart() {
+    setPhase("mode-picker");
+    setRecs([]);
+    setDna(null);
+    setError(null);
+    setReport(null);
+    setQuizAnswers({});
+    setMatchedCards([]);
+    setDislikedCards([]);
+    setLiked(0);
+    setPassed(0);
+    setIdx(0);
+  }
+
+  if (phase === "mode-picker") {
+    return (
+      <ModePickerView
+        hasProfile={!!profile}
+        error={error}
+        onPick={(m) => {
+          setMode(m);
+          setError(null);
+          if (m === "self") setPhase("configure");
+          else setPhase("quiz");
+        }}
+      />
+    );
+  }
+
+  if (phase === "quiz") {
+    return (
+      <QuizView
+        answers={quizAnswers}
+        setAnswers={setQuizAnswers}
+        onComplete={(finalAnswers) => {
+          void generate("friend", finalAnswers);
+        }}
+        onBack={() => setPhase("mode-picker")}
+      />
+    );
+  }
+
   if (phase === "configure") {
     return (
       <ConfigureView
         profile={profile}
         count={count}
         setCount={setCount}
-        onGenerate={generate}
+        onGenerate={() => void generate("self")}
+        onBack={() => setPhase("mode-picker")}
         error={error}
         likedCount={likedFragrances.length}
       />
@@ -200,16 +471,29 @@ export default function RecommendationsPage() {
   if (phase === "done") {
     return (
       <DoneView
+        mode={mode}
         liked={liked}
         passed={passed}
         matchedCards={matchedCards}
         dna={dna}
-        onRestart={() => {
-          setPhase("configure");
-          setRecs([]);
-          setDna(null);
-          setError(null);
-        }}
+        error={error}
+        onRestart={restart}
+        onSeeReport={generateReport}
+      />
+    );
+  }
+
+  if (phase === "report-loading") {
+    return <ReportLoadingView />;
+  }
+
+  if (phase === "report" && report) {
+    return (
+      <ReportView
+        report={report}
+        dna={dna}
+        onBack={() => setPhase("done")}
+        onRestart={restart}
       />
     );
   }
@@ -373,6 +657,7 @@ function ConfigureView({
   count,
   setCount,
   onGenerate,
+  onBack,
   error,
   likedCount,
 }: {
@@ -380,11 +665,21 @@ function ConfigureView({
   count: Count;
   setCount: (c: Count) => void;
   onGenerate: () => void;
+  onBack: () => void;
   error: string | null;
   likedCount: number;
 }) {
   return (
     <div className="px-6 pt-4 pb-12">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-outline hover:text-on-background mb-6 transition-colors"
+      >
+        <Icon name="arrow_back" size={14} />
+        Retour
+      </button>
+
       <header className="mb-10">
         <p className="text-[10px] uppercase tracking-[0.3em] text-outline mb-2">
           Archives &amp; aspirations
@@ -679,18 +974,25 @@ function LoadingView() {
  * ====================================================================== */
 
 function DoneView({
+  mode,
   liked,
   passed,
   matchedCards,
   dna,
+  error,
   onRestart,
+  onSeeReport,
 }: {
+  mode: Mode;
   liked: number;
   passed: number;
   matchedCards: RecommendationCandidate[];
   dna: OlfactiveDNA | null;
+  error: string | null;
   onRestart: () => void;
+  onSeeReport: () => void;
 }) {
+  const isFriend = mode === "friend";
   return (
     <div className="px-6 pt-4 pb-12">
       <header className="mb-10">
@@ -698,9 +1000,19 @@ function DoneView({
           Session terminée
         </p>
         <h1 className="text-5xl font-medium leading-[0.9] tracking-tighter">
-          Ta signature
-          <br />
-          s&apos;affine.
+          {isFriend ? (
+            <>
+              Ton pote
+              <br />
+              est cerné.
+            </>
+          ) : (
+            <>
+              Ta signature
+              <br />
+              s&apos;affine.
+            </>
+          )}
         </h1>
       </header>
 
@@ -819,21 +1131,51 @@ function DoneView({
         </section>
       )}
 
+      {error && (
+        <p className="mb-4 text-[11px] text-error border border-error/40 bg-error/5 px-4 py-3">
+          {error}
+        </p>
+      )}
+
       <div className="flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={onRestart}
-          className="w-full py-4 bg-primary text-on-primary rounded-full text-xs uppercase tracking-[0.25em] font-bold active:scale-95 transition-all flex items-center justify-center gap-2"
-        >
-          <Icon name="refresh" size={16} />
-          Nouvelle session
-        </button>
-        <Link
-          href="/wishlist"
-          className="w-full py-3 border border-outline-variant rounded-full text-[10px] uppercase tracking-widest font-bold text-center hover:border-primary transition-all"
-        >
-          Voir la wishlist
-        </Link>
+        {isFriend && liked + passed > 0 ? (
+          <>
+            <button
+              type="button"
+              onClick={onSeeReport}
+              className="w-full py-4 bg-primary text-on-primary rounded-full text-xs uppercase tracking-[0.25em] font-bold active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              <Icon name="description" size={16} />
+              Voir le rapport
+            </button>
+            <button
+              type="button"
+              onClick={onRestart}
+              className="w-full py-3 border border-outline-variant rounded-full text-[10px] uppercase tracking-widest font-bold hover:border-primary transition-all"
+            >
+              Nouvelle session
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={onRestart}
+              className="w-full py-4 bg-primary text-on-primary rounded-full text-xs uppercase tracking-[0.25em] font-bold active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              <Icon name="refresh" size={16} />
+              Nouvelle session
+            </button>
+            {!isFriend && (
+              <Link
+                href="/wishlist"
+                className="w-full py-3 border border-outline-variant rounded-full text-[10px] uppercase tracking-widest font-bold text-center hover:border-primary transition-all"
+              >
+                Voir la wishlist
+              </Link>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -915,6 +1257,12 @@ function SwipeCard({
           </span>
         )}
 
+        {card.projection && (
+          <p className="text-[13px] italic text-white font-medium leading-snug mb-3 drop-shadow">
+            &ldquo;{card.projection}&rdquo;
+          </p>
+        )}
+
         {card.notes_brief && (
           <p className="text-[11px] text-white/75 mb-3 leading-relaxed">
             {card.notes_brief}
@@ -946,6 +1294,528 @@ function SwipeCard({
             {card.match_score}%
           </span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========================================================================
+ * Mode picker — "Pour moi" vs "Pour un ami"
+ * ====================================================================== */
+
+function ModePickerView({
+  hasProfile,
+  error,
+  onPick,
+}: {
+  hasProfile: boolean;
+  error: string | null;
+  onPick: (m: Mode) => void;
+}) {
+  return (
+    <div className="px-6 pt-4 pb-12 min-h-screen flex flex-col">
+      <header className="mb-10">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-outline mb-2">
+          Agent personnel
+        </p>
+        <h1 className="text-5xl font-medium leading-[0.9] tracking-tighter">
+          Pour qui
+          <br />
+          on cherche ?
+        </h1>
+        <p className="text-sm text-on-surface-variant mt-4 leading-relaxed">
+          Soit tu découvres tes propres parfums, soit tu aides un pote à
+          trouver le sien — avec un rapport à transmettre à son vendeur.
+        </p>
+      </header>
+
+      <div className="flex flex-col gap-3 flex-1">
+        {/* Pour moi */}
+        <button
+          type="button"
+          onClick={() => onPick("self")}
+          className="group relative border border-outline-variant bg-background p-6 text-left hover:border-primary transition-all active:scale-[0.98] overflow-hidden"
+        >
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 flex-shrink-0 bg-primary text-on-primary flex items-center justify-center">
+              <Icon name="fingerprint" size={22} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[9px] uppercase tracking-[0.3em] text-outline mb-1">
+                Option 01
+              </p>
+              <h2 className="text-2xl font-semibold tracking-tight mb-2">
+                Pour moi
+              </h2>
+              <p className="text-[12px] text-on-surface-variant leading-relaxed">
+                {hasProfile
+                  ? "Basé sur ton ADN olfactif et ta wishlist. Les matchs vont directement dans ta wishlist."
+                  : "Profil olfactif pas encore rempli — les recommandations seront moins précises."}
+              </p>
+            </div>
+            <Icon
+              name="arrow_forward"
+              size={18}
+              className="text-outline group-hover:text-primary flex-shrink-0 mt-2"
+            />
+          </div>
+        </button>
+
+        {/* Pour un ami */}
+        <button
+          type="button"
+          onClick={() => onPick("friend")}
+          className="group relative border border-outline-variant bg-background p-6 text-left hover:border-primary transition-all active:scale-[0.98] overflow-hidden"
+        >
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 flex-shrink-0 bg-surface-container-high text-on-background border border-outline-variant flex items-center justify-center">
+              <Icon name="groups" size={22} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[9px] uppercase tracking-[0.3em] text-outline mb-1">
+                Option 02
+              </p>
+              <h2 className="text-2xl font-semibold tracking-tight mb-2">
+                Pour un ami
+              </h2>
+              <p className="text-[12px] text-on-surface-variant leading-relaxed">
+                Quiz ultra-direct sur ses goûts, sa vibe, son budget. On te
+                génère des parfums à swiper, puis un rapport clair à
+                transmettre à un vendeur.
+              </p>
+            </div>
+            <Icon
+              name="arrow_forward"
+              size={18}
+              className="text-outline group-hover:text-primary flex-shrink-0 mt-2"
+            />
+          </div>
+        </button>
+      </div>
+
+      {error && (
+        <p className="mt-4 text-[11px] text-error border border-error/40 bg-error/5 px-4 py-3">
+          {error}
+        </p>
+      )}
+
+      <p className="text-[10px] uppercase tracking-[0.2em] text-outline text-center mt-8">
+        Agents · Analyste · Chercheur · Curator
+      </p>
+    </div>
+  );
+}
+
+/* ========================================================================
+ * Friend quiz — one question at a time, auto-advance on answer
+ * ====================================================================== */
+
+function QuizView({
+  answers,
+  setAnswers,
+  onComplete,
+  onBack,
+}: {
+  answers: Record<string, string>;
+  setAnswers: (a: Record<string, string>) => void;
+  onComplete: (answers: Record<string, string>) => void;
+  onBack: () => void;
+}) {
+  const [step, setStep] = useState(0);
+  const q = FRIEND_QUIZ[step];
+  const progress = (step + 1) / FRIEND_QUIZ.length;
+
+  function answer(value: string) {
+    const next = { ...answers, [q.id]: value };
+    setAnswers(next);
+    if (step + 1 >= FRIEND_QUIZ.length) {
+      onComplete(next);
+    } else {
+      setStep(step + 1);
+    }
+  }
+
+  function back() {
+    if (step === 0) onBack();
+    else setStep((s) => s - 1);
+  }
+
+  return (
+    <div className="px-6 pt-4 pb-12 min-h-screen flex flex-col">
+      {/* Progress strip */}
+      <div className="flex items-center gap-3 mb-8">
+        <button
+          type="button"
+          onClick={back}
+          aria-label="Retour"
+          className="w-8 h-8 flex items-center justify-center text-outline hover:text-on-background transition-colors"
+        >
+          <Icon name="arrow_back" size={18} />
+        </button>
+        <div className="flex-1 h-[3px] bg-outline-variant/40 relative overflow-hidden">
+          <div
+            className="absolute inset-y-0 left-0 bg-primary transition-all duration-300"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
+        <span className="text-[10px] font-mono font-bold text-outline min-w-[36px] text-right">
+          {String(step + 1).padStart(2, "0")}/
+          {String(FRIEND_QUIZ.length).padStart(2, "0")}
+        </span>
+      </div>
+
+      {/* Question */}
+      <div
+        key={q.id}
+        className="quiz-in flex-1 flex flex-col"
+      >
+        <p className="text-[10px] uppercase tracking-[0.3em] text-outline mb-3">
+          Pour un ami · question {step + 1}
+        </p>
+        <h1 className="text-3xl font-medium leading-[1.05] tracking-tighter mb-3">
+          {q.question}
+        </h1>
+        {q.subtitle && (
+          <p className="text-sm text-on-surface-variant mb-8">{q.subtitle}</p>
+        )}
+
+        <div className="flex flex-col gap-2 mt-4">
+          {q.options.map((opt) => {
+            const picked = answers[q.id] === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => answer(opt.value)}
+                className={clsx(
+                  "w-full py-4 px-5 text-left border transition-all active:scale-[0.98]",
+                  picked
+                    ? "bg-primary text-on-primary border-primary"
+                    : "bg-background border-outline-variant hover:border-primary hover:bg-surface-container-low",
+                )}
+              >
+                <span className="text-sm font-medium leading-relaxed">
+                  {opt.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========================================================================
+ * Report loading
+ * ====================================================================== */
+
+function ReportLoadingView() {
+  return (
+    <div className="px-6 pt-16 pb-12 min-h-screen flex flex-col items-center text-center">
+      <div className="w-16 h-16 border-2 border-outline-variant flex items-center justify-center mb-6">
+        <Icon name="description" size={24} className="text-primary" />
+      </div>
+      <p className="text-[10px] uppercase tracking-[0.3em] text-outline mb-2">
+        Rapport en cours
+      </p>
+      <h1 className="text-3xl font-medium tracking-tighter max-w-xs">
+        Rédaction du brief pour le vendeur…
+      </h1>
+      <div className="mt-8 flex items-center gap-2">
+        <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
+        <span
+          className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"
+          style={{ animationDelay: "0.15s" }}
+        />
+        <span
+          className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"
+          style={{ animationDelay: "0.3s" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ========================================================================
+ * Report view — fullscreen sliding panel with stagger-fade sections
+ * ====================================================================== */
+
+function ReportView({
+  report,
+  dna,
+  onBack,
+  onRestart,
+}: {
+  report: FriendReport;
+  dna: OlfactiveDNA | null;
+  onBack: () => void;
+  onRestart: () => void;
+}) {
+  function share() {
+    const parts: string[] = [];
+    parts.push("RAPPORT PARFUM — La Niche");
+    parts.push("");
+    parts.push(`RÉSUMÉ : ${report.summary}`);
+    parts.push("");
+    parts.push(`SIGNATURE : ${report.signature}`);
+    if (report.loved_references.length) {
+      parts.push("");
+      parts.push("PARFUMS AIMÉS :");
+      report.loved_references.forEach((r) => {
+        parts.push(`• ${r.brand} — ${r.name} [${r.family}]`);
+        parts.push(`  → ${r.why}`);
+      });
+    }
+    if (report.rejected_references.length) {
+      parts.push("");
+      parts.push("PARFUMS REJETÉS (à éviter) :");
+      report.rejected_references.forEach((r) => {
+        parts.push(`• ${r.brand} — ${r.name} [${r.family}]`);
+        parts.push(`  → ${r.why}`);
+      });
+    }
+    parts.push("");
+    parts.push("CONSEIL DE VENTE :");
+    parts.push(report.sales_advice);
+    const text = parts.join("\n");
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      navigator.share({ title: "Rapport parfum", text }).catch(() => {});
+    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+  }
+
+  return (
+    <div className="report-panel fixed inset-0 z-50 bg-background overflow-y-auto">
+      {/* Header bar */}
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-outline-variant/40 px-6 py-4 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Fermer"
+          className="w-8 h-8 flex items-center justify-center text-on-background hover:text-primary transition-colors"
+        >
+          <Icon name="close" size={22} />
+        </button>
+        <span className="text-[10px] uppercase tracking-[0.3em] text-outline font-mono">
+          Rapport · Vendeur
+        </span>
+        <button
+          type="button"
+          onClick={share}
+          aria-label="Partager"
+          className="w-8 h-8 flex items-center justify-center text-on-background hover:text-primary transition-colors"
+        >
+          <Icon name="ios_share" size={20} />
+        </button>
+      </header>
+
+      <div className="px-6 pt-8 pb-28 max-w-xl mx-auto">
+        {/* 00 — title */}
+        <section
+          className="report-section mb-10"
+          style={{ animationDelay: "0ms" }}
+        >
+          <p className="text-[10px] uppercase tracking-[0.3em] text-outline mb-3">
+            Brief actionnable
+          </p>
+          <h1 className="text-4xl font-medium leading-[0.95] tracking-tighter">
+            Rapport olfactif.
+          </h1>
+        </section>
+
+        {/* 01 — summary */}
+        <section
+          className="report-section mb-10"
+          style={{ animationDelay: "120ms" }}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-primary font-mono text-[11px]">01</span>
+            <div className="h-px flex-1 bg-outline-variant" />
+            <h2 className="text-[10px] uppercase font-bold tracking-widest">
+              Résumé
+            </h2>
+          </div>
+          <p className="text-2xl font-medium tracking-tight leading-snug">
+            {report.summary || "—"}
+          </p>
+        </section>
+
+        {/* 02 — signature */}
+        <section
+          className="report-section mb-10"
+          style={{ animationDelay: "240ms" }}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-primary font-mono text-[11px]">02</span>
+            <div className="h-px flex-1 bg-outline-variant" />
+            <h2 className="text-[10px] uppercase font-bold tracking-widest">
+              Signature olfactive
+            </h2>
+          </div>
+          <p className="text-sm text-on-background leading-relaxed italic border-l-2 border-primary pl-4">
+            {report.signature || "—"}
+          </p>
+          {dna && dna.key_notes.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {dna.dominant_accords.slice(0, 3).map((a) => (
+                <span
+                  key={a}
+                  className="text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 bg-primary text-on-primary"
+                >
+                  {a}
+                </span>
+              ))}
+              {dna.key_notes.slice(0, 6).map((n) => (
+                <span
+                  key={n}
+                  className="text-[10px] uppercase tracking-widest px-2 py-0.5 border border-outline-variant text-on-surface-variant"
+                >
+                  {n}
+                </span>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* 03 — loved references */}
+        <section
+          className="report-section mb-10"
+          style={{ animationDelay: "360ms" }}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-primary font-mono text-[11px]">03</span>
+            <div className="h-px flex-1 bg-outline-variant" />
+            <h2 className="text-[10px] uppercase font-bold tracking-widest">
+              Aimés · proposer des similaires
+            </h2>
+          </div>
+          {report.loved_references.length === 0 ? (
+            <p className="text-sm italic text-outline">
+              Aucun parfum matché pendant la session.
+            </p>
+          ) : (
+            <ul className="flex flex-col">
+              {report.loved_references.map((r) => (
+                <li
+                  key={`${r.brand}-${r.name}`}
+                  className="py-4 border-b border-outline-variant/40 last:border-0"
+                >
+                  <div className="flex items-start gap-3 mb-1.5">
+                    <div className="w-6 h-6 bg-primary text-on-primary flex items-center justify-center flex-shrink-0">
+                      <Icon name="favorite" filled size={14} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-outline">
+                        {r.brand}
+                      </p>
+                      <p className="text-lg font-semibold tracking-tight leading-tight">
+                        {r.name}
+                      </p>
+                      <p className="text-[10px] uppercase tracking-widest text-outline mt-0.5">
+                        {r.family}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-[12px] text-on-surface-variant leading-relaxed pl-9">
+                    {r.why}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* 04 — rejected references */}
+        <section
+          className="report-section mb-10"
+          style={{ animationDelay: "480ms" }}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-primary font-mono text-[11px]">04</span>
+            <div className="h-px flex-1 bg-outline-variant" />
+            <h2 className="text-[10px] uppercase font-bold tracking-widest">
+              Rejetés · à éviter
+            </h2>
+          </div>
+          {report.rejected_references.length === 0 ? (
+            <p className="text-sm italic text-outline">
+              Aucun parfum rejeté — ouvert à tout.
+            </p>
+          ) : (
+            <ul className="flex flex-col">
+              {report.rejected_references.map((r) => (
+                <li
+                  key={`${r.brand}-${r.name}`}
+                  className="py-4 border-b border-outline-variant/40 last:border-0"
+                >
+                  <div className="flex items-start gap-3 mb-1.5">
+                    <div className="w-6 h-6 border border-outline-variant flex items-center justify-center flex-shrink-0 text-outline">
+                      <Icon name="close" size={14} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-outline">
+                        {r.brand}
+                      </p>
+                      <p className="text-base font-semibold tracking-tight leading-tight text-on-surface-variant line-through">
+                        {r.name}
+                      </p>
+                      <p className="text-[10px] uppercase tracking-widest text-outline mt-0.5">
+                        {r.family}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-[12px] text-on-surface-variant leading-relaxed pl-9">
+                    {r.why}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* 05 — sales advice */}
+        <section
+          className="report-section mb-10"
+          style={{ animationDelay: "600ms" }}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-primary font-mono text-[11px]">05</span>
+            <div className="h-px flex-1 bg-outline-variant" />
+            <h2 className="text-[10px] uppercase font-bold tracking-widest">
+              Conseil pour le vendeur
+            </h2>
+          </div>
+          <div className="bg-surface-container-low border border-outline-variant p-5">
+            <p className="text-[13px] text-on-background leading-relaxed">
+              {report.sales_advice || "—"}
+            </p>
+          </div>
+        </section>
+
+        {/* Actions */}
+        <section
+          className="report-section flex flex-col gap-2"
+          style={{ animationDelay: "720ms" }}
+        >
+          <button
+            type="button"
+            onClick={share}
+            className="w-full py-4 bg-primary text-on-primary rounded-full text-xs uppercase tracking-[0.25em] font-bold active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            <Icon name="ios_share" size={16} />
+            Partager le rapport
+          </button>
+          <button
+            type="button"
+            onClick={onRestart}
+            className="w-full py-3 border border-outline-variant rounded-full text-[10px] uppercase tracking-widest font-bold hover:border-primary transition-all"
+          >
+            Nouvelle session
+          </button>
+        </section>
       </div>
     </div>
   );
