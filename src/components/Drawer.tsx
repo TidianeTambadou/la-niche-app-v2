@@ -83,9 +83,12 @@ export function Drawer({ open, onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <header className="px-6 py-5 border-b border-outline-variant/40 flex items-center justify-between safe-top">
-          <span className="text-xl font-semibold tracking-[0.2em] uppercase">
-            LA NICHE
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-laniche.png"
+            alt="La Niche"
+            className="h-6 w-auto object-contain dark:invert"
+          />
           <button
             type="button"
             onClick={onClose}

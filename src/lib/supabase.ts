@@ -11,20 +11,16 @@ import { createClient } from "@supabase/supabase-js";
  * below should make the misconfiguration visible.
  */
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!url || !anon) {
-  // eslint-disable-next-line no-console
-  console.warn(
-    "[la-niche] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. " +
-      "Set both in .env.local for dev and in Vercel project settings for production.",
-  );
-}
+const url =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ??
+  "https://nmcsfdgqnttanufydjer.supabase.co";
+const anon =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  "sb_publishable_bld-zRED6KZAPIJIvf66Ew_DPVrtW-9";
 
 export const supabase = createClient(
-  url ?? "https://placeholder.supabase.co",
-  anon ?? "placeholder-anon-key",
+  url,
+  anon,
   {
     auth: {
       persistSession: true,

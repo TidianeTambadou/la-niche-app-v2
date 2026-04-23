@@ -48,11 +48,13 @@ export function TopHeader() {
             </button>
           )}
 
-          <Link
-            href="/"
-            className="text-xl font-semibold tracking-[0.2em] text-on-background uppercase"
-          >
-            LA NICHE
+          <Link href="/" aria-label="Accueil">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo-laniche.png"
+              alt="La Niche"
+              className="h-6 w-auto object-contain dark:invert"
+            />
           </Link>
 
           <Link

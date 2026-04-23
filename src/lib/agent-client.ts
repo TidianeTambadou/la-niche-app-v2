@@ -76,11 +76,11 @@ export async function agentSearch(
   if (!res.ok) {
     const msg =
       res.error === "agent_disabled"
-        ? "Agent IA désactivé (ANTHROPIC_API_KEY non configurée)"
+        ? "Agent IA désactivé (OPENROUTER_API_KEY non configurée)"
         : res.error === "upstream_error" && res.detail?.startsWith("429")
-          ? "Limite de débit Anthropic atteinte. Patiente une minute."
+          ? "Limite de débit atteinte. Patiente une minute."
           : res.error === "upstream_error"
-            ? `Erreur Anthropic : ${res.detail ?? "?"}`
+            ? `Erreur IA : ${res.detail ?? "?"}`
             : `${res.error}${res.detail ? ` — ${res.detail}` : ""}`;
     throw new Error(msg);
   }
@@ -99,11 +99,11 @@ export async function agentIdentify(
   if (!res.ok) {
     const msg =
       res.error === "agent_disabled"
-        ? "Agent IA désactivé (ANTHROPIC_API_KEY non configurée)"
+        ? "Agent IA désactivé (OPENROUTER_API_KEY non configurée)"
         : res.error === "upstream_error" && res.detail?.startsWith("429")
-          ? "Limite de débit Anthropic atteinte. Patiente une minute."
+          ? "Limite de débit atteinte. Patiente une minute."
           : res.error === "upstream_error"
-            ? `Erreur Anthropic : ${res.detail ?? "?"}`
+            ? `Erreur IA : ${res.detail ?? "?"}`
             : `${res.error}${res.detail ? ` — ${res.detail}` : ""}`;
     throw new Error(msg);
   }
@@ -124,7 +124,7 @@ export async function agentAsk(
   if (res.ok && res.mode === "ask") return res.answer;
   if (!res.ok) {
     if (res.error === "agent_disabled") {
-      return `Agent désactivé — ${res.detail ?? "ANTHROPIC_API_KEY manquante"}`;
+      return `Agent désactivé — ${res.detail ?? "OPENROUTER_API_KEY manquante"}`;
     }
     const msg =
       res.error === "upstream_error" && res.detail?.startsWith("429")

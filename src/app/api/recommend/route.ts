@@ -65,8 +65,8 @@ export async function POST(req: Request) {
   });
 
   // LLM enrichment — opt-in via env var.
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey && recommendations.length > 0) {
+  const openrouterKey = process.env.OPENROUTER_API_KEY;
+  if (openrouterKey && recommendations.length > 0) {
     try {
       const prompt = buildRecommendationPrompt({
         shopFragrances: body.shopFragrances,
@@ -77,15 +77,16 @@ export async function POST(req: Request) {
         shopName: body.shopName,
       });
 
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-api-key": anthropicKey,
-          "anthropic-version": "2023-06-01",
+          authorization: `Bearer ${openrouterKey}`,
+          "http-referer": "https://laniche.app",
+          "x-title": "La Niche",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-6",
+          model: "google/gemini-2.0-flash-001",
           max_tokens: 1200,
           temperature: 0.4,
           messages: [{ role: "user", content: prompt }],
@@ -94,21 +95,16 @@ export async function POST(req: Request) {
 
       if (res.ok) {
         const data = (await res.json()) as {
-          content?: { type: string; text?: string }[];
+          choices?: { message?: { content?: string } }[];
         };
-        const text =
-          data.content?.find((c) => c.type === "text")?.text ?? "";
+        const text = data.choices?.[0]?.message?.content ?? "";
         if (text) {
           const parsed = parseLlmResponse(text);
           recommendations = mergeLlm(recommendations, parsed);
         }
       } else {
         // eslint-disable-next-line no-console
-        console.warn(
-          "[recommend] Anthropic call failed:",
-          res.status,
-          await res.text().catch(() => ""),
-        );
+        console.warn("[recommend] OpenRouter call failed:", res.status);
       }
     } catch (e: unknown) {
       // eslint-disable-next-line no-console
