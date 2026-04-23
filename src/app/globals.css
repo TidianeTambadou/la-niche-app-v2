@@ -164,3 +164,60 @@ a {
 .safe-top {
   padding-top: max(1rem, env(safe-area-inset-top));
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   Concierge loading — clinical shimmer skeleton + caption swap.
+   Used in <ConciergeWidget /> while waiting on /api/agent ask.
+   ───────────────────────────────────────────────────────────────────── */
+
+@keyframes shimmer-sweep {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.shimmer-bar {
+  background: linear-gradient(
+    90deg,
+    var(--surface-container-low) 0%,
+    var(--surface-container-high) 35%,
+    var(--surface-container-highest) 50%,
+    var(--surface-container-high) 65%,
+    var(--surface-container-low) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-sweep 1.8s ease-in-out infinite;
+}
+
+@keyframes caption-rise {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.caption-rise {
+  animation: caption-rise 380ms ease-out;
+}
+
+@keyframes ring-pulse {
+  0%   { box-shadow: 0 0 0 0   var(--on-background); opacity: 0.55; }
+  70%  { box-shadow: 0 0 0 6px var(--on-background); opacity: 0; }
+  100% { box-shadow: 0 0 0 6px var(--on-background); opacity: 0; }
+}
+
+.ring-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  animation: ring-pulse 1.6s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-bar,
+  .caption-rise,
+  .ring-pulse::after {
+    animation: none;
+  }
+  .shimmer-bar {
+    background: var(--surface-container-low);
+  }
+}

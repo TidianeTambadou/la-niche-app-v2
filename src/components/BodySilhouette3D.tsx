@@ -32,6 +32,7 @@ import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
 import { CameraControls, Html, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { clsx } from "clsx";
+import { useTheme } from "next-themes";
 import { Icon } from "@/components/Icon";
 import type { BodyZone } from "@/lib/fragrances";
 
@@ -109,23 +110,25 @@ type Props = {
 function Mannequin({
   onBodyClick,
   readOnly,
+  isDark,
 }: {
   onBodyClick?: (zone: BodyZone, position: [number, number, number]) => void;
   readOnly: boolean;
+  isDark: boolean;
 }) {
   const { scene } = useGLTF(MODEL_URL);
 
-  // Apply a single matte clay material to every mesh — gives the abstract
-  // anatomical-reference look that fits the ATELIER design system.
   const clayMaterial = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: "#d8d5d0",
+        color: isDark ? "#3a3632" : "#d8d5d0",
         roughness: 0.82,
         metalness: 0.02,
       }),
-    [],
+    [isDark],
   );
+
+  useEffect(() => () => { clayMaterial.dispose(); }, [clayMaterial]);
 
   useEffect(() => {
     scene.traverse((obj) => {
@@ -190,11 +193,14 @@ function Marker({
   position,
   label,
   highlighted,
+  isDark,
 }: {
   position: [number, number, number];
   label: string;
   highlighted: boolean;
+  isDark: boolean;
 }) {
+  const color = isDark ? "#f0ede8" : "#000";
   const haloRef = useRef<THREE.Mesh>(null);
   const spotRef = useRef<THREE.Mesh>(null);
 
@@ -213,7 +219,7 @@ function Marker({
       <mesh ref={haloRef} renderOrder={2}>
         <sphereGeometry args={[0.05, 12, 12]} />
         <meshBasicMaterial
-          color="#000"
+          color={color}
           transparent
           opacity={0.22}
           depthTest={false}
@@ -221,7 +227,7 @@ function Marker({
       </mesh>
       <mesh ref={spotRef} renderOrder={3}>
         <sphereGeometry args={[0.025, 12, 12]} />
-        <meshBasicMaterial color="#000" depthTest={false} />
+        <meshBasicMaterial color={color} depthTest={false} />
       </mesh>
       {label && highlighted && (
         <Html
@@ -243,10 +249,12 @@ function Marker({
 /** "Drawn" preview marker shown while the user is about to commit a placement. */
 function PreviewMarker({
   position,
+  isDark,
 }: {
   position: [number, number, number];
+  isDark: boolean;
 }) {
-  const color = "#000";
+  const color = isDark ? "#f0ede8" : "#000";
   const haloRef = useRef<THREE.Mesh>(null);
   const ring1Ref = useRef<THREE.Mesh>(null);
   const ring2Ref = useRef<THREE.Mesh>(null);
@@ -435,6 +443,9 @@ export function BodySilhouette3D({
   readOnly = false,
   className,
 }: Props) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+
   const [focusPoint, setFocusPoint] = useState<[number, number, number] | null>(
     null,
   );
@@ -508,25 +519,22 @@ export function BodySilhouette3D({
         }}
         onPointerMissed={() => !readOnly && resetView()}
       >
-        <color attach="background" args={["#ece8e2"]} />
+        <color attach="background" args={[isDark ? "#0f0f0e" : "#ece8e2"]} />
 
-        {/* Single ambient + 2 directionals — key + rim — instead of 4 lights.
-            Each light costs a render pass for shadows, plus per-fragment math. */}
-        <ambientLight intensity={0.55} />
+        <ambientLight intensity={isDark ? 0.35 : 0.55} />
         <StaticShadowKey />
         <directionalLight
           position={[0, 2.5, -2.5]}
-          intensity={0.6}
+          intensity={isDark ? 0.4 : 0.6}
           color="#ffffff"
         />
 
         <Suspense fallback={null}>
-          <Mannequin onBodyClick={handleBodyClick} readOnly={readOnly} />
+          <Mannequin onBodyClick={handleBodyClick} readOnly={readOnly} isDark={isDark} />
         </Suspense>
 
         <ShadowFloor />
 
-        {/* Permanent markers */}
         {filledMarkers.map((m, i) => {
           const pos: [number, number, number] = m.position ?? [
             ZONE_ANCHORS[m.zone].x,
@@ -540,12 +548,12 @@ export function BodySilhouette3D({
               position={pos}
               label={m.label}
               highlighted={isHighlighted}
+              isDark={isDark}
             />
           );
         })}
 
-        {/* Preview marker (drawn while user picks a spot, before commit). */}
-        {previewPoint && <PreviewMarker position={previewPoint} />}
+        {previewPoint && <PreviewMarker position={previewPoint} isDark={isDark} />}
 
         {/* ContactShadows removed — adds a per-frame FBO render pass.
             The directional shadow on the floor handles ground anchoring. */}

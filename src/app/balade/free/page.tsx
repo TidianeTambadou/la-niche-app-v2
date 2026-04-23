@@ -30,11 +30,6 @@ export default function FreeBaladePage() {
   } = useStore();
 
   const [selectedZone, setSelectedZone] = useState<BodyZone | null>(null);
-  /** Last clicked point on the body — kept for camera focus continuity after
-   *  a placement so the user keeps seeing the spot they just drew. */
-  const [selectedPosition, setSelectedPosition] = useState<
-    [number, number, number] | null
-  >(null);
   /**
    * Free-balade flow state machine. Reflects the real perfumery sequence:
    * smell first (search OR scan a perfume), THEN decide where on the body
@@ -102,7 +97,6 @@ export default function FreeBaladePage() {
       movePlacement(editingFragranceId, zone, position);
       setEditingFragranceId(null);
       setSelectedZone(zone);
-      setSelectedPosition(position);
       return;
     }
 
@@ -114,26 +108,42 @@ export default function FreeBaladePage() {
         flow.kind === "placing" ? flow.fragrance : flow.fragrance;
       setFlow({ kind: "confirming", fragrance, zone, position });
       setSelectedZone(zone);
-      setSelectedPosition(position);
       return;
     }
 
     // 3) IDLE: tap only zooms (handled internally by BodySilhouette3D).
   }
 
+  /** Last successful placement — drives the success toast that briefly shows
+   *  before returning to the question screen. */
+  const [lastPlaced, setLastPlaced] = useState<{
+    name: string;
+    zone: BodyZone;
+    imageUrl: string | null;
+  } | null>(null);
+
   function confirmPlacement() {
     if (flow.kind !== "confirming") return;
-    // Snapshot the fragrance meta (incl. image URL) so the marker/list/banner
-    // keep rendering proper data even for external Fragrantica candidates
-    // that aren't in the local shop_stock catalog.
     const meta: BodyPlacement["fragranceMeta"] = {
       name: flow.fragrance.name,
       brand: flow.fragrance.brand,
       imageUrl: flow.fragrance.imageUrl,
     };
     layerOnBody(flow.zone, flow.fragrance.key, flow.position, meta);
+    setLastPlaced({
+      name: flow.fragrance.name,
+      zone: flow.zone,
+      imageUrl: flow.fragrance.imageUrl,
+    });
     setFlow({ kind: "idle" });
   }
+
+  // Auto-dismiss the success toast after 3 s.
+  useEffect(() => {
+    if (!lastPlaced) return;
+    const id = setTimeout(() => setLastPlaced(null), 3000);
+    return () => clearTimeout(id);
+  }, [lastPlaced]);
 
   /** Called by SearchSheet / ScanSheet when the user picks a fragrance from
    *  the local catalog. */
@@ -164,7 +174,6 @@ export default function FreeBaladePage() {
     setFlow({ kind: "idle" });
     setEditingFragranceId(null);
     setSelectedZone(null);
-    setSelectedPosition(null);
   }
 
   function startMove(fragranceId: string) {
@@ -173,41 +182,116 @@ export default function FreeBaladePage() {
     setSelectedZone(null);
   }
 
+  // Resolve the perfume currently in flight (placing/confirming OR moving an
+  // existing one) so we can show its image + name above the mannequin.
+  const inFlightFragrance =
+    flow.kind === "placing" || flow.kind === "confirming"
+      ? {
+          name: flow.fragrance.name,
+          brand: flow.fragrance.brand,
+          imageUrl: flow.fragrance.imageUrl,
+        }
+      : editingFragranceId
+        ? (() => {
+            const f = fragrances.find((x) => x.key === editingFragranceId);
+            const meta = placements.find(
+              (p) => p.fragranceId === editingFragranceId,
+            )?.fragranceMeta;
+            return f
+              ? { name: f.name, brand: f.brand, imageUrl: f.imageUrl }
+              : meta
+                ? {
+                    name: meta.name,
+                    brand: meta.brand,
+                    imageUrl: meta.imageUrl ?? null,
+                  }
+                : null;
+          })()
+        : null;
+
+  const showMannequin =
+    flow.kind === "placing" ||
+    flow.kind === "confirming" ||
+    Boolean(editingFragranceId);
+
   return (
-    <div className="px-6 pt-4 pb-12">
-      <header className="mb-6 flex items-end justify-between gap-4">
-        <div>
+    <div className="px-6 pt-4 pb-32">
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div className="min-w-0">
           <span className="text-[10px] uppercase tracking-[0.3em] text-outline block mb-2">
             Balade libre
           </span>
-          <h1 className="text-3xl font-bold tracking-tighter leading-none">
-            Carte du corps
+          <h1 className="text-2xl font-bold tracking-tighter leading-tight">
+            {showMannequin && inFlightFragrance
+              ? editingFragranceId
+                ? `Déplace ${inFlightFragrance.name}`
+                : flow.kind === "confirming"
+                  ? "C'est bien ici ?"
+                  : `Où as-tu mis ce parfum ?`
+              : placements.length === 0
+                ? "Démarre ta balade"
+                : "Encore un parfum ?"}
           </h1>
         </div>
         <Link
           href="/balade/end"
-          className="text-[10px] uppercase tracking-widest font-bold border-b border-primary pb-0.5"
+          className="text-[10px] uppercase tracking-widest font-bold border-b border-primary pb-0.5 flex-shrink-0 mt-2"
         >
           Terminer
         </Link>
       </header>
 
-      {/* Conditional view: question screen by default, mannequin only when
-          something is in progress (placing/confirming/editing). */}
-      {flow.kind === "placing" ||
-      flow.kind === "confirming" ||
-      editingFragranceId ? (
+      {/* Always-visible recent poses rail (compact thumbnails) — gives the
+          user a sense of progress + quick access to edit/delete. */}
+      {placements.length > 0 && !showMannequin && (
+        <PoseRail
+          placements={placements}
+          fragrances={fragrances}
+          onSelect={(fragranceId) => startMove(fragranceId)}
+        />
+      )}
+
+      {/* Conditional view: mannequin only when something is in progress. */}
+      {showMannequin ? (
         <>
-          <p className="text-xs text-on-surface-variant mb-4">
+          {/* Big perfume context card — keeps the user oriented on what they
+              are placing while they tap on the body. */}
+          {inFlightFragrance && (
+            <section className="mb-4 border border-primary bg-surface-container-low p-2 flex items-center gap-3">
+              <PlacementThumbnail
+                imageUrl={inFlightFragrance.imageUrl}
+                name={inFlightFragrance.name}
+                size="sm"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-outline">
+                  {inFlightFragrance.brand}
+                </p>
+                <p className="text-sm font-semibold tracking-tight truncate">
+                  {inFlightFragrance.name}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={cancelFlow}
+                aria-label="Annuler"
+                className="text-outline hover:text-on-background flex-shrink-0 p-1"
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </section>
+          )}
+
+          <p className="text-xs text-on-surface-variant mb-3 text-center">
             {editingFragranceId
-              ? "Touche un nouveau point sur le corps pour déplacer la pose."
+              ? "Touche un nouveau point sur le corps."
               : flow.kind === "placing"
-                ? `Où as-tu mis ${flow.fragrance.name} ? Touche le corps pour positionner.`
+                ? "Touche la zone du corps où tu l'as appliqué."
                 : flow.kind === "confirming"
-                  ? `Re-touche pour ajuster, ou confirme la pose en bas.`
+                  ? "Re-touche pour ajuster, ou confirme en bas."
                   : null}
           </p>
-          <section className="bg-surface-container-low border border-primary py-6 mb-8 transition-colors">
+          <section className="bg-surface-container-low border border-primary py-4 mb-8 transition-colors">
             <BodySilhouette
               filledMarkers={filledMarkers}
               highlightedZone={selectedZone}
@@ -218,7 +302,7 @@ export default function FreeBaladePage() {
         </>
       ) : (
         <QuestionScreen
-          step={placements.length + 1}
+          poseCount={placements.length}
           onScan={() => setFlow({ kind: "scanning" })}
           onCandidatePicked={onCandidatePicked}
         />
@@ -355,6 +439,26 @@ export default function FreeBaladePage() {
         );
       })()}
 
+      {/* Sticky bottom bar — visible only in idle state when at least one
+          pose exists. Two equal-weight CTAs: continue (do nothing, just close
+          the bar visually) OR finish the balade. */}
+      {!showMannequin &&
+        flow.kind === "idle" &&
+        placements.length > 0 && (
+          <FinishStickyBar count={placements.length} />
+        )}
+
+      {/* Success toast shown briefly after each placement commits. Auto-
+          dismisses after 3 s; user gets visual confirmation before the page
+          swaps back to the question screen. */}
+      {lastPlaced && (
+        <SuccessToast
+          name={lastPlaced.name}
+          zone={lastPlaced.zone}
+          imageUrl={lastPlaced.imageUrl}
+        />
+      )}
+
       {/* SearchSheet removed — search is now an inline autocomplete in
           QuestionScreen, hitting the AI agent (Fragrantica web_search).
           Only Scan still needs a fullscreen sheet (camera). */}
@@ -376,44 +480,209 @@ export default function FreeBaladePage() {
 function PlacementThumbnail({
   imageUrl,
   name,
-  size = "md",
+  size = "sm",
 }: {
   imageUrl: string | null | undefined;
   name: string;
-  size?: "sm" | "md";
+  size?: "xs" | "sm" | "md" | "lg";
 }) {
   const [failed, setFailed] = useState(false);
-  const dim = size === "sm" ? "w-7 h-7 text-[9px]" : "w-10 h-10 text-[10px]";
+  // Inline-styled square — guarantees the thumbnail stays exactly this size,
+  // independent of any flex/parent constraints. Tailwind w-* classes were
+  // sometimes losing to natural image size in flex parents.
+  const px =
+    size === "xs" ? 24 : size === "sm" ? 32 : size === "md" ? 40 : 56;
+  const boxStyle: React.CSSProperties = {
+    width: `${px}px`,
+    height: `${px}px`,
+    minWidth: `${px}px`,
+    minHeight: `${px}px`,
+    maxWidth: `${px}px`,
+    maxHeight: `${px}px`,
+    flexShrink: 0,
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  };
+  const imgStyle: React.CSSProperties = {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
+  };
 
   if (!imageUrl || failed) {
     return (
-      <span
-        className={clsx(
-          "flex items-center justify-center font-bold font-mono bg-surface-container-high text-on-surface-variant border border-outline-variant flex-shrink-0",
-          dim,
-        )}
+      <div
+        style={boxStyle}
+        className="bg-surface-container-high border border-outline-variant text-on-surface-variant font-bold font-mono"
         aria-hidden
       >
-        {fragranceInitials(name)}
-      </span>
+        <span style={{ fontSize: px <= 28 ? 9 : 10 }}>
+          {fragranceInitials(name)}
+        </span>
+      </div>
     );
   }
 
   return (
-    <span
-      className={clsx(
-        "block bg-surface-container-low overflow-hidden flex-shrink-0",
-        dim,
-      )}
-    >
+    <div style={boxStyle} className="bg-surface-container-low">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={imageUrl}
         alt={name}
-        className="w-full h-full object-cover"
+        style={imgStyle}
         onError={() => setFailed(true)}
       />
-    </span>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------
+ * PoseRail — compact horizontal thumbnail rail of recent placements.
+ *
+ * Always visible above the question screen so the user always sees what
+ * they've already done. Tap a thumbnail to start a "déplacer" flow on it.
+ * --------------------------------------------------------------------- */
+
+function PoseRail({
+  placements,
+  fragrances,
+  onSelect,
+}: {
+  placements: BodyPlacement[];
+  fragrances: Fragrance[];
+  onSelect: (fragranceId: string) => void;
+}) {
+  const items = placements
+    .map((p) => {
+      const f = fragrances.find((x) => x.key === p.fragranceId);
+      const meta = p.fragranceMeta;
+      const name = f?.name ?? meta?.name;
+      const imageUrl = f?.imageUrl ?? meta?.imageUrl ?? null;
+      if (!name) return null;
+      return {
+        fragranceId: p.fragranceId,
+        zone: p.zone,
+        name,
+        imageUrl,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => Boolean(x))
+    .reverse(); // most recent first
+
+  return (
+    <section className="mb-6">
+      <div className="flex justify-between items-end mb-2">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-outline">
+          Tes parfums ({items.length})
+        </p>
+        <p className="text-[9px] uppercase tracking-widest text-outline">
+          Touche pour modifier
+        </p>
+      </div>
+      <div className="flex gap-2 overflow-x-auto hide-scrollbar -mx-6 px-6 pb-1">
+        {items.map((it) => (
+          <button
+            key={`${it.zone}::${it.fragranceId}`}
+            type="button"
+            onClick={() => onSelect(it.fragranceId)}
+            className="flex-shrink-0 group flex flex-col items-center"
+            aria-label={`Modifier ${it.name}`}
+          >
+            <PlacementThumbnail
+              imageUrl={it.imageUrl}
+              name={it.name}
+              size="md"
+            />
+            <span className="text-[8px] uppercase tracking-widest text-outline mt-1 max-w-[40px] truncate">
+              {BODY_ZONE_LABELS[it.zone].split(" ")[0]}
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------
+ * FinishStickyBar — sticky bottom bar in idle state with ≥1 placement.
+ *
+ * Big "Terminer la balade" CTA so users don't miss it. Sits at z-30 (under
+ * the action banner z-50 + tab bar z-40 — but it's only shown when those
+ * aren't visible).
+ * --------------------------------------------------------------------- */
+
+function FinishStickyBar({ count }: { count: number }) {
+  return (
+    <div className="fixed inset-x-0 bottom-20 z-30 flex justify-center px-4 pointer-events-none">
+      <Link
+        href="/balade/end"
+        className="pointer-events-auto bg-primary text-on-primary px-6 py-3 shadow-2xl flex items-center gap-3 max-w-md w-full justify-between active:scale-95 transition-transform"
+      >
+        <span className="flex items-center gap-2">
+          <Icon name="check_circle" filled size={16} />
+          <span className="text-xs uppercase tracking-[0.2em] font-bold">
+            Terminer · {count} parfum{count > 1 ? "s" : ""}
+          </span>
+        </span>
+        <Icon name="arrow_forward" size={16} />
+      </Link>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------
+ * SuccessToast — appears 3 s after a placement commits.
+ * --------------------------------------------------------------------- */
+
+function SuccessToast({
+  name,
+  zone,
+  imageUrl,
+}: {
+  name: string;
+  zone: BodyZone;
+  imageUrl: string | null;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-x-0 top-20 z-50 flex justify-center px-4 pointer-events-none"
+      role="status"
+      aria-live="polite"
+    >
+      <div
+        className={clsx(
+          "pointer-events-auto bg-background border border-primary shadow-2xl flex items-stretch max-w-md w-full transition-all duration-300",
+          mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4",
+        )}
+      >
+        <div className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0">
+          <PlacementThumbnail imageUrl={imageUrl} name={name} size="sm" />
+          <Icon
+            name="check_circle"
+            filled
+            size={16}
+            className="text-primary flex-shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-[9px] uppercase tracking-[0.2em] text-outline">
+              Pose enregistrée
+            </p>
+            <p className="text-xs font-semibold tracking-tight truncate">
+              {name} · {BODY_ZONE_LABELS[zone]}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -427,11 +696,13 @@ function PlacementThumbnail({
  * --------------------------------------------------------------------- */
 
 function QuestionScreen({
-  step,
+  poseCount,
   onScan,
   onCandidatePicked,
 }: {
-  step: number;
+  /** How many perfumes have already been logged in this balade. Drives the
+   *  empty-state vs encouragement copy. */
+  poseCount: number;
   onScan: () => void;
   /** Called when the user picks a fragrance from the autocomplete dropdown. */
   onCandidatePicked: (candidate: SearchCandidate) => void;
@@ -479,16 +750,39 @@ function QuestionScreen({
     };
   }, [query]);
 
+  const isFirst = poseCount === 0;
   return (
     <section className="bg-surface-container-low border border-outline-variant px-5 py-8 mb-8">
       <p className="text-[10px] uppercase tracking-[0.3em] text-outline mb-3 text-center">
-        Étape {String(step).padStart(2, "0")} · Identification
+        {isFirst
+          ? "Comment ça marche"
+          : `${poseCount} parfum${poseCount > 1 ? "s" : ""} noté${poseCount > 1 ? "s" : ""} · Lequel ensuite ?`}
       </p>
       <h2 className="text-2xl md:text-3xl font-bold tracking-tighter leading-[1.05] mb-5 text-center">
-        Qu&apos;est-ce que
-        <br />
-        <span className="italic font-serif font-light">tu as senti ?</span>
+        {isFirst ? (
+          <>
+            Sens un parfum,
+            <br />
+            <span className="italic font-serif font-light">
+              dis-moi lequel.
+            </span>
+          </>
+        ) : (
+          <>
+            Quel parfum
+            <br />
+            <span className="italic font-serif font-light">
+              viens-tu de sentir ?
+            </span>
+          </>
+        )}
       </h2>
+      {isFirst && (
+        <p className="text-xs text-on-surface-variant text-center mb-5 leading-relaxed">
+          Identifie chaque parfum (Scanner ou Rechercher), puis touche le corps
+          pour noter où tu l&apos;as appliqué. Reviens ici pour le suivant.
+        </p>
+      )}
 
       {/* Inline autocomplete — no modal. Hits the AI agent (Fragrantica
           web_search) with 600ms debounce. */}
@@ -615,19 +909,12 @@ function ActionBanner({
           mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4",
         )}
       >
-        {fragranceImage && (
-          <div className="w-12 h-auto flex-shrink-0 bg-on-primary/10 overflow-hidden">
-            <img
-              src={fragranceImage}
-              alt=""
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = "none";
-              }}
-            />
-          </div>
-        )}
-        <div className="flex items-center gap-3 px-4 py-3 flex-1 min-w-0">
+        <div className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0">
+          <PlacementThumbnail
+            imageUrl={fragranceImage}
+            name={fragranceName}
+            size="sm"
+          />
           <div className="flex-1 min-w-0">
             <p className="text-[9px] uppercase tracking-[0.2em] opacity-70">
               {label}

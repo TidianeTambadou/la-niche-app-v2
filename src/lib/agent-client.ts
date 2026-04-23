@@ -96,17 +96,43 @@ export async function agentIdentify(
     payload: { imageBase64, imageMediaType },
   });
   if (res.ok && res.mode === "identify") return res.result;
+  if (!res.ok) {
+    const msg =
+      res.error === "agent_disabled"
+        ? "Agent IA désactivé (ANTHROPIC_API_KEY non configurée)"
+        : res.error === "upstream_error" && res.detail?.startsWith("429")
+          ? "Limite de débit Anthropic atteinte. Patiente une minute."
+          : res.error === "upstream_error"
+            ? `Erreur Anthropic : ${res.detail ?? "?"}`
+            : `${res.error}${res.detail ? ` — ${res.detail}` : ""}`;
+    throw new Error(msg);
+  }
   return null;
 }
 
-export async function agentAsk(question: string): Promise<string> {
-  const res = await call({ mode: "ask", payload: { question } });
+export type AskHistoryTurn = { role: "user" | "assistant"; content: string };
+
+export async function agentAsk(
+  question: string,
+  history?: AskHistoryTurn[],
+  signal?: AbortSignal,
+): Promise<string> {
+  const res = await call(
+    { mode: "ask", payload: { question, history } },
+    signal,
+  );
   if (res.ok && res.mode === "ask") return res.answer;
   if (!res.ok) {
     if (res.error === "agent_disabled") {
       return "L'expert IA n'est pas configuré sur ce déploiement.";
     }
-    throw new Error(res.error);
+    const msg =
+      res.error === "upstream_error" && res.detail?.startsWith("429")
+        ? "Limite de débit Anthropic atteinte. Patiente une minute."
+        : res.error === "upstream_error"
+          ? `Erreur Anthropic : ${res.detail ?? "?"}`
+          : `${res.error}${res.detail ? ` — ${res.detail}` : ""}`;
+    throw new Error(msg);
   }
   throw new Error("Réponse invalide");
 }

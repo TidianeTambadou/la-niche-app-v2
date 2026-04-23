@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/lib/auth";
 import { readProfileFromUser } from "@/lib/profile";
 
@@ -149,6 +150,13 @@ export function Drawer({ open, onClose }: Props) {
             </Link>
           </div>
         </nav>
+
+        <div className="px-6 py-4 border-t border-outline-variant/40">
+          <p className="text-[10px] uppercase tracking-widest text-outline mb-3">
+            Apparence
+          </p>
+          <ThemeToggle />
+        </div>
 
         <footer className="px-6 py-5 border-t border-outline-variant/40 safe-bottom">
           {user ? (

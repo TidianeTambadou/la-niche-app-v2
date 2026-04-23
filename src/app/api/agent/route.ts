@@ -84,8 +84,10 @@ export async function POST(req: Request) {
     );
   }
 
-  // Build the user message + output schema instruction depending on mode.
-  let userContent: unknown;
+  // Build the conversation + output schema instruction depending on mode.
+  // `messages` is the full Anthropic messages array. Search/identify are
+  // single-turn; ask can carry prior history (for the concierge chat).
+  let messages: Array<{ role: "user" | "assistant"; content: unknown }> = [];
   let outputSchema = "";
 
   switch (body.mode) {
@@ -96,7 +98,7 @@ export async function POST(req: Request) {
           { ok: true, mode: "search", candidates: [] } satisfies AgentResponse,
         );
       }
-      userContent = [
+      const userContent = [
         {
           type: "text",
           text: `Autocomplete parfum, requête = "${query}". Donne 1 à 4 parfums dont le nom commence par OU contient cette requête. Tu peux te baser sur ton training (Fragrantica est dans tes données).
@@ -106,6 +108,7 @@ Ne donne PAS source_url, on le synthétise nous-mêmes.`,
       ];
       outputSchema = `JSON STRICT, rien autour, max 4 candidats, champs courts :
 {"candidates":[{"name":"...","brand":"...","notes_brief":"≤50 char","family":"≤30 char","image_url":"https://... (optionnel)"}]}`;
+      messages = [{ role: "user", content: userContent }];
       break;
     }
 
@@ -120,7 +123,7 @@ Ne donne PAS source_url, on le synthétise nous-mêmes.`,
           { status: 400 },
         );
       }
-      userContent = [
+      const userContent = [
         {
           type: "image",
           source: {
@@ -134,6 +137,7 @@ Ne donne PAS source_url, on le synthétise nous-mêmes.`,
           text: `Identifie le parfum présent sur cette image (flacon, packaging). Cherche sur Fragrantica pour confirmer ton identification et trouver les notes principales.`,
         },
       ];
+      messages = [{ role: "user", content: userContent }];
       outputSchema = `Réponds UNIQUEMENT en JSON strict, schéma :
 {
   "name": "string",
@@ -155,7 +159,19 @@ Si tu ne peux pas identifier avec certitude, retourne :
           { status: 400 },
         );
       }
-      userContent = [{ type: "text", text: question }];
+      // Multi-turn: prepend prior history (oldest first), then the new user
+      // question. Cap to the last ~10 turns to keep token usage bounded on
+      // long chats — the system prompt + web_search results already eat a
+      // lot of the budget.
+      const history = body.payload?.history ?? [];
+      const recent = history.slice(-10);
+      messages = [
+        ...recent.map((t) => ({
+          role: t.role,
+          content: [{ type: "text", text: t.content }],
+        })),
+        { role: "user", content: [{ type: "text", text: question }] },
+      ];
       outputSchema = ""; // Free-form Markdown answer.
       break;
     }
@@ -241,7 +257,7 @@ Si tu ne peux pas identifier avec certitude, retourne :
                   : { type: "auto" },
             }
           : {}),
-        messages: [{ role: "user", content: userContent }],
+        messages,
       }),
     });
   } catch (e: unknown) {

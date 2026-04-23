@@ -104,7 +104,15 @@ export type AgentRequest =
       mode: "identify";
       payload: { imageBase64: string; imageMediaType: string };
     }
-  | { mode: "ask"; payload: { question: string } };
+  | {
+      mode: "ask";
+      payload: {
+        question: string;
+        /** Prior turns, oldest-first. The current `question` is appended as
+         *  the final user turn server-side. */
+        history?: Array<{ role: "user" | "assistant"; content: string }>;
+      };
+    };
 
 export type AgentResponse =
   | { ok: true; mode: "search"; candidates: SearchCandidate[] }
