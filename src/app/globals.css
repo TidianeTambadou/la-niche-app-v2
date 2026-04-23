@@ -220,11 +220,41 @@ a {
   animation: bubble-in 0.22s ease-out;
 }
 
+/* Tinder-style swipe exit for recommendations cards */
+@keyframes swipe-exit-left {
+  to { transform: translateX(-140%) rotate(-18deg); opacity: 0; }
+}
+@keyframes swipe-exit-right {
+  to { transform: translateX(140%) rotate(18deg); opacity: 0; }
+}
+.swipe-exit-left { animation: swipe-exit-left 0.38s cubic-bezier(0.4, 0, 1, 1) forwards; }
+.swipe-exit-right { animation: swipe-exit-right 0.38s cubic-bezier(0.4, 0, 1, 1) forwards; }
+
+/* Balade archive celebration */
+@keyframes celebration-rise {
+  from { opacity: 0; transform: translateY(20px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes celebration-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+.celebration-in {
+  animation: celebration-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.celebration-out {
+  animation: celebration-fade-out 0.4s ease-in forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shimmer-bar,
   .caption-rise,
   .ring-pulse::after,
-  .bubble-in {
+  .bubble-in,
+  .celebration-in,
+  .celebration-out,
+  .swipe-exit-left,
+  .swipe-exit-right {
     animation: none;
   }
   .shimmer-bar {

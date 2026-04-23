@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
@@ -31,6 +31,7 @@ export function FragranceDetail({ fragranceKey }: { fragranceKey: string }) {
   const shops = useShops();
   const { isWishlisted, addToWishlist, removeFromWishlist } = useStore();
   const [showBalade, setShowBalade] = useState(false);
+  const [showWishlistPicker, setShowWishlistPicker] = useState(false);
 
   if (loading && !fragrance) {
     return (
@@ -68,8 +69,24 @@ export function FragranceDetail({ fragranceKey }: { fragranceKey: string }) {
   };
   const hasNotes = (fragrance.notes ?? []).length > 0;
 
+  const fragranceMeta = {
+    name: fragrance.name,
+    brand: fragrance.brand,
+    imageUrl: fragrance.imageUrl,
+  };
+
   return (
     <div className="pb-12">
+      {showWishlistPicker && (
+        <WishlistPickerSheet
+          fragrance={fragranceMeta}
+          onPick={(s) => {
+            addToWishlist(fragrance.key, s, "manual", fragranceMeta);
+            setShowWishlistPicker(false);
+          }}
+          onClose={() => setShowWishlistPicker(false)}
+        />
+      )}
       {/* Hero image */}
       <section className="px-6 mb-12">
         <div className="relative aspect-[4/5] bg-surface-container-low overflow-hidden">
@@ -135,7 +152,7 @@ export function FragranceDetail({ fragranceKey }: { fragranceKey: string }) {
           onClick={() =>
             status
               ? removeFromWishlist(fragrance.key)
-              : addToWishlist(fragrance.key, "liked", "manual")
+              : setShowWishlistPicker(true)
           }
           className={clsx(
             "w-full py-4 rounded-full text-xs uppercase tracking-[0.2em] font-bold transition-all active:scale-95 flex items-center justify-center gap-2",
@@ -267,6 +284,76 @@ function DetailRow({ label, value }: { label: string; value: string }) {
         {label}
       </span>
       <span className="font-mono text-sm">{value}</span>
+    </div>
+  );
+}
+
+function WishlistPickerSheet({
+  fragrance,
+  onPick,
+  onClose,
+}: {
+  fragrance: { name: string; brand: string; imageUrl?: string | null };
+  onPick: (status: "liked" | "disliked") => void;
+  onClose: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    requestAnimationFrame(() => setMounted(true));
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-modal="true">
+      <div
+        className="absolute inset-0 bg-on-background/20 backdrop-blur-sm transition-opacity duration-200"
+        style={{ opacity: mounted ? 1 : 0 }}
+        onClick={onClose}
+        aria-hidden
+      />
+      <div
+        className={clsx(
+          "relative w-full bg-background border-t border-outline-variant shadow-2xl transition-transform duration-300 ease-out",
+          mounted ? "translate-y-0" : "translate-y-full",
+        )}
+      >
+        <div className="flex justify-center pt-3 pb-2">
+          <div className="w-8 h-1 bg-outline-variant rounded-full" />
+        </div>
+        <div className="px-6 pb-5 border-b border-outline-variant/40">
+          <p className="text-[9px] uppercase tracking-[0.3em] text-outline mb-0.5">{fragrance.brand}</p>
+          <p className="text-base font-semibold tracking-tight">{fragrance.name}</p>
+          <p className="text-[10px] text-outline mt-1">Ajouter à ma wishlist — choisis une catégorie</p>
+        </div>
+        <div className="grid grid-cols-2 gap-px bg-outline-variant/30 p-px">
+          <button
+            type="button"
+            onClick={() => onPick("liked")}
+            className="bg-background flex flex-col items-center gap-2 py-6 hover:bg-surface-container-low active:scale-95 transition-all"
+          >
+            <Icon name="favorite" filled size={28} className="text-primary" />
+            <span className="text-[10px] uppercase tracking-widest font-bold">J&apos;aime</span>
+            <span className="text-[9px] text-outline">Liked</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onPick("disliked")}
+            className="bg-background flex flex-col items-center gap-2 py-6 hover:bg-surface-container-low active:scale-95 transition-all"
+          >
+            <Icon name="block" size={28} className="text-outline" />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant">Pas pour moi</span>
+            <span className="text-[9px] text-outline">Disliked</span>
+          </button>
+        </div>
+        <div className="px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-2 text-[10px] uppercase tracking-widest text-outline"
+          >
+            Annuler
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

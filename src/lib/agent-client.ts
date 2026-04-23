@@ -6,17 +6,32 @@
 import type {
   AgentResponse,
   IdentifyResult,
+  RecommendationCandidate,
   SearchCandidate,
 } from "@/lib/agent";
 
 async function call(body: unknown, signal?: AbortSignal): Promise<AgentResponse> {
-  const res = await fetch("/api/agent", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-    signal,
-  });
-  return (await res.json()) as AgentResponse;
+  async function once(): Promise<AgentResponse> {
+    const res = await fetch("/api/agent", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    });
+    return (await res.json()) as AgentResponse;
+  }
+  // Single retry on 429s: every model in the fallback chain can be throttled
+  // at once; waiting a couple seconds often unblocks at least one.
+  const first = await once();
+  if (
+    !first.ok &&
+    first.error === "upstream_error" &&
+    first.detail?.startsWith("OpenRouter 429")
+  ) {
+    await new Promise((r) => setTimeout(r, 2500));
+    return once();
+  }
+  return first;
 }
 
 /* -------------------------------------------------------------------------
@@ -110,15 +125,45 @@ export async function agentIdentify(
   return null;
 }
 
+export async function agentRecommend(
+  count: number,
+  profileContext: string,
+  likedFragrances: Array<{ name: string; brand: string }>,
+  dislikedFragrances: Array<{ name: string; brand: string }>,
+  signal?: AbortSignal,
+): Promise<RecommendationCandidate[]> {
+  const res = await call(
+    {
+      mode: "recommend",
+      payload: { count, profileContext, likedFragrances, dislikedFragrances },
+    },
+    signal,
+  );
+  if (res.ok && res.mode === "recommend") return res.recommendations;
+  if (!res.ok) {
+    const msg =
+      res.error === "agent_disabled"
+        ? "Agent IA désactivé (OPENROUTER_API_KEY non configurée)"
+        : res.error === "upstream_error" && res.detail?.startsWith("429")
+          ? "Limite de débit atteinte. Patiente une minute."
+          : res.error === "upstream_error"
+            ? `Erreur IA : ${res.detail ?? "?"}`
+            : `${res.error}${res.detail ? ` — ${res.detail}` : ""}`;
+    throw new Error(msg);
+  }
+  return [];
+}
+
 export type AskHistoryTurn = { role: "user" | "assistant"; content: string };
 
 export async function agentAsk(
   question: string,
   history?: AskHistoryTurn[],
   signal?: AbortSignal,
+  profileContext?: string,
 ): Promise<string> {
   const res = await call(
-    { mode: "ask", payload: { question, history } },
+    { mode: "ask", payload: { question, history, profileContext } },
     signal,
   );
   if (res.ok && res.mode === "ask") return res.answer;

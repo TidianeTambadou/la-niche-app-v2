@@ -4,6 +4,15 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
 import { agentAsk, type AskHistoryTurn } from "@/lib/agent-client";
+import { useAuth } from "@/lib/auth";
+import {
+  readProfileFromUser,
+  FAMILY_VULGAR,
+  INTENSITY_VULGAR,
+  MOMENT_VULGAR,
+  OCCASION_VULGAR,
+  BUDGET_VULGAR,
+} from "@/lib/profile";
 
 type Msg = { id: number; role: "user" | "assistant" | "error"; content: string };
 
@@ -13,7 +22,30 @@ const SUGGESTIONS = [
   "Compare Aventus et Bleu de Chanel",
 ];
 
+function buildProfileContext(user: ReturnType<typeof useAuth>["user"]): string | undefined {
+  const profile = readProfileFromUser(user);
+  if (!profile) return undefined;
+  const families = profile.preferred_families
+    .map((f) => FAMILY_VULGAR[f].title)
+    .join(", ");
+  const intensity = INTENSITY_VULGAR[profile.intensity_preference].title;
+  const budget = BUDGET_VULGAR[profile.budget].title;
+  const moments = profile.moments.map((m) => MOMENT_VULGAR[m].title).join(", ");
+  const occasions = profile.occasions.map((o) => OCCASION_VULGAR[o].title).join(", ");
+  return [
+    "PROFIL OLFACTIF DE L'UTILISATEUR (utilise ces informations pour personnaliser tes réponses) :",
+    `- Familles olfactives préférées : ${families}`,
+    `- Sillage recherché : ${intensity}`,
+    `- Budget parfum : ${budget}`,
+    moments ? `- Moments d'utilisation : ${moments}` : null,
+    occasions ? `- Occasions : ${occasions}` : null,
+    "",
+    "Quand tu fais des recommandations, priorise les parfums qui correspondent à ces familles et ce budget. Explique pourquoi chaque suggestion correspond à son profil.",
+  ].filter(Boolean).join("\n");
+}
+
 export function ConciergeWidget() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -71,7 +103,7 @@ export function ConciergeWidget() {
         )
         .slice(0, -1)
         .map((m) => ({ role: m.role, content: m.content }));
-      const answer = await agentAsk(q, history);
+      const answer = await agentAsk(q, history, undefined, buildProfileContext(user));
       setMessages((curr) => [
         ...curr,
         { id: nextId(), role: "assistant", content: answer },

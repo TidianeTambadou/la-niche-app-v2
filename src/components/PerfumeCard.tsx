@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { clsx } from "clsx";
 import type { Fragrance } from "@/lib/fragrances";
 import { useStore } from "@/lib/store";
@@ -27,13 +27,28 @@ export function PerfumeCard({
 }: Props) {
   const { isWishlisted, addToWishlist, removeFromWishlist } = useStore();
   const [showBalade, setShowBalade] = useState(false);
+  const [showWishlistPicker, setShowWishlistPicker] = useState(false);
   const status = isWishlisted(fragrance.id);
+
+  const meta = {
+    name: fragrance.name,
+    brand: fragrance.brand,
+    imageUrl: fragrance.imageUrl,
+  };
 
   function toggleWishlist(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (status) removeFromWishlist(fragrance.id);
-    else addToWishlist(fragrance.id, "liked", origin);
+    if (status) {
+      removeFromWishlist(fragrance.id);
+    } else {
+      setShowWishlistPicker(true);
+    }
+  }
+
+  function pickStatus(s: "liked" | "disliked") {
+    addToWishlist(fragrance.id, s, origin, meta);
+    setShowWishlistPicker(false);
   }
 
   function openBaladeSheet(e: React.MouseEvent) {
@@ -42,9 +57,18 @@ export function PerfumeCard({
     setShowBalade(true);
   }
 
+  const wishlistPicker = showWishlistPicker ? (
+    <WishlistPickerSheet
+      fragrance={fragrance}
+      onPick={pickStatus}
+      onClose={() => setShowWishlistPicker(false)}
+    />
+  ) : null;
+
   if (variant === "compact") {
     return (
       <>
+        {wishlistPicker}
         <Link
           href={`/fragrance/${fragrance.key}`}
           className="group block min-w-[180px] flex-shrink-0"
@@ -84,6 +108,7 @@ export function PerfumeCard({
   if (variant === "feature") {
     return (
       <>
+        {wishlistPicker}
         <article className="bg-surface-container-lowest border border-outline-variant/40">
           <Link href={`/fragrance/${fragrance.id}`} className="block">
             <div className="relative aspect-[4/5] bg-surface-container-low overflow-hidden">
@@ -154,6 +179,7 @@ export function PerfumeCard({
   // list variant — default
   return (
     <>
+      {wishlistPicker}
       <article className="grid grid-cols-12 gap-4 items-start py-6 border-b border-outline-variant/30 last:border-0">
         <Link
           href={`/fragrance/${fragrance.key}`}
@@ -277,6 +303,98 @@ function CardActions({
       >
         Détails
       </Link>
+    </div>
+  );
+}
+
+/* ── WishlistPickerSheet ─────────────────────────────────────────────────── */
+
+function WishlistPickerSheet({
+  fragrance,
+  onPick,
+  onClose,
+}: {
+  fragrance: { name: string; brand: string; imageUrl?: string | null };
+  onPick: (status: "liked" | "disliked") => void;
+  onClose: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    requestAnimationFrame(() => setMounted(true));
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="absolute inset-0 bg-on-background/20 backdrop-blur-sm transition-opacity duration-200"
+        style={{ opacity: mounted ? 1 : 0 }}
+        onClick={onClose}
+        aria-hidden
+      />
+      <div
+        className={clsx(
+          "relative w-full bg-background border-t border-outline-variant shadow-2xl transition-transform duration-300 ease-out",
+          mounted ? "translate-y-0" : "translate-y-full",
+        )}
+      >
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-2">
+          <div className="w-8 h-1 bg-outline-variant rounded-full" />
+        </div>
+
+        {/* Fragrance info */}
+        <div className="px-6 pb-5 border-b border-outline-variant/40">
+          <p className="text-[9px] uppercase tracking-[0.3em] text-outline mb-0.5">
+            {fragrance.brand}
+          </p>
+          <p className="text-base font-semibold tracking-tight">
+            {fragrance.name}
+          </p>
+          <p className="text-[10px] text-outline mt-1">
+            Ajouter à ma wishlist — choisis une catégorie
+          </p>
+        </div>
+
+        {/* Pick */}
+        <div className="grid grid-cols-2 gap-px bg-outline-variant/30 p-px">
+          <button
+            type="button"
+            onClick={() => onPick("liked")}
+            className="bg-background flex flex-col items-center gap-2 py-6 hover:bg-surface-container-low active:scale-95 transition-all"
+          >
+            <Icon name="favorite" filled size={28} className="text-primary" />
+            <span className="text-[10px] uppercase tracking-widest font-bold">
+              J&apos;aime
+            </span>
+            <span className="text-[9px] text-outline">Liked</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onPick("disliked")}
+            className="bg-background flex flex-col items-center gap-2 py-6 hover:bg-surface-container-low active:scale-95 transition-all"
+          >
+            <Icon name="block" size={28} className="text-outline" />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant">
+              Pas pour moi
+            </span>
+            <span className="text-[9px] text-outline">Disliked</span>
+          </button>
+        </div>
+
+        <div className="px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-2 text-[10px] uppercase tracking-widest text-outline"
+          >
+            Annuler
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

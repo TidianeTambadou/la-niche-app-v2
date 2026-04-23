@@ -37,6 +37,9 @@ export const SEARCH_SYSTEM_PROMPT = `Tu es un moteur d'autocomplétion de parfum
 /** Compact prompt for image identification. */
 export const IDENTIFY_SYSTEM_PROMPT = `Tu identifies un parfum à partir d'une image (flacon/packaging). Utilise web_search sur fragrantica.com pour confirmer ton identification et trouver les notes. Retourne uniquement du JSON.`;
 
+/** System prompt for personalized recommendations. */
+export const RECOMMEND_SYSTEM_PROMPT = `Tu es un expert en parfumerie de niche. À partir du profil olfactif d'un utilisateur et de sa wishlist, tu génères des recommandations de parfums hautement personnalisées, justifiées, et crédibles. Tu t'appuies sur Fragrantica comme source principale. Tu ne proposes JAMAIS de parfums déjà dans la wishlist. Tu varies les maisons pour élargir la découverte. Retourne UNIQUEMENT du JSON valide, jamais de prose.`;
+
 /** Full expert prompt — used only for the free-form "ask the expert" mode. */
 export const AGENT_SYSTEM_PROMPT = `Tu es un expert en parfumerie de niche et grand public, avec une connaissance approfondie des matières premières, des pyramides olfactives, des maisons de parfum, des parfumeurs et des tendances du marché.
 
@@ -96,7 +99,23 @@ export type IdentifyResult = {
   source_url: string;
 };
 
-export type AgentMode = "search" | "identify" | "ask";
+export type RecommendationCandidate = {
+  name: string;
+  brand: string;
+  /** Primary olfactive family (e.g. "Woody Amber", "Aquatic"). */
+  family: string;
+  /** ≤ 80 char summary of dominant notes. */
+  notes_brief: string;
+  /** ≤ 140 char explanation of WHY this fits the user's profile. */
+  reason: string;
+  /** 0..100 */
+  match_score: number;
+  /** Optional Fragrantica image. */
+  image_url?: string;
+  source_url: string;
+};
+
+export type AgentMode = "search" | "identify" | "ask" | "recommend";
 
 export type AgentRequest =
   | { mode: "search"; payload: { query: string } }
@@ -108,9 +127,23 @@ export type AgentRequest =
       mode: "ask";
       payload: {
         question: string;
-        /** Prior turns, oldest-first. The current `question` is appended as
-         *  the final user turn server-side. */
         history?: Array<{ role: "user" | "assistant"; content: string }>;
+        /** Pre-formatted French summary of the user's olfactive profile,
+         *  injected into the system prompt for personalized recommendations. */
+        profileContext?: string;
+      };
+    }
+  | {
+      mode: "recommend";
+      payload: {
+        /** Number of recommendations requested (typically 5/10/20). */
+        count: number;
+        /** Pre-formatted French summary of the user's olfactive profile. */
+        profileContext: string;
+        /** Fragrances the user has liked (from wishlist). Guides taste. */
+        likedFragrances: Array<{ name: string; brand: string }>;
+        /** Fragrances the user has disliked. Signal what to avoid. */
+        dislikedFragrances: Array<{ name: string; brand: string }>;
       };
     };
 
@@ -118,6 +151,7 @@ export type AgentResponse =
   | { ok: true; mode: "search"; candidates: SearchCandidate[] }
   | { ok: true; mode: "identify"; result: IdentifyResult | null }
   | { ok: true; mode: "ask"; answer: string }
+  | { ok: true; mode: "recommend"; recommendations: RecommendationCandidate[] }
   | { ok: false; error: string; detail?: string };
 
 /* -------------------------------------------------------------------------

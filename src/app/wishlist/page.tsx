@@ -21,7 +21,15 @@ export default function WishlistPage() {
   const fragrances = useFragrances();
   const [filter, setFilter] = useState<Filter>("all");
 
-  const items = useMemo(() => {
+  type DisplayItem = {
+    entry: WishlistEntry;
+    name: string;
+    brand: string;
+    imageUrl: string | null;
+    href: string | null;
+  };
+
+  const items = useMemo<DisplayItem[]>(() => {
     let list = [...wishlist];
     if (filter === "liked") list = list.filter((w) => w.status === "liked");
     if (filter === "disliked")
@@ -33,15 +41,29 @@ export default function WishlistPage() {
     } else {
       list.sort((a, b) => b.addedAt - a.addedAt);
     }
-    return list
-      .map((w) => {
-        const fragrance = fragrances.find((f) => f.key === w.fragranceId);
-        return fragrance ? { entry: w, fragrance } : null;
-      })
-      .filter(
-        (x): x is { entry: WishlistEntry; fragrance: (typeof fragrances)[number] } =>
-          Boolean(x),
-      );
+    return list.flatMap((w): DisplayItem[] => {
+      const fragrance = fragrances.find((f) => f.key === w.fragranceId);
+      if (fragrance) {
+        return [{
+          entry: w,
+          name: fragrance.name,
+          brand: fragrance.brand,
+          imageUrl: fragrance.imageUrl,
+          href: `/fragrance/${fragrance.key}`,
+        }];
+      }
+      // Fallback: use fragranceMeta stored at wishlist time (works offline/before catalog loads)
+      if (w.fragranceMeta) {
+        return [{
+          entry: w,
+          name: w.fragranceMeta.name,
+          brand: w.fragranceMeta.brand,
+          imageUrl: w.fragranceMeta.imageUrl ?? null,
+          href: null,
+        }];
+      }
+      return [];
+    });
   }, [wishlist, filter, fragrances]);
 
   const counts = useMemo(
@@ -114,33 +136,37 @@ export default function WishlistPage() {
         </div>
       ) : (
         <ul className="flex flex-col">
-          {items.map(({ entry, fragrance }) => (
+          {items.map(({ entry, name, brand, imageUrl, href }) => (
             <li
-              key={fragrance.key}
+              key={entry.fragranceId}
               className="border-b border-outline-variant/30 last:border-0"
             >
               <div className="flex items-start gap-4 py-5">
-                <Link
-                  href={`/fragrance/${fragrance.key}`}
-                  className="block w-24 aspect-[3/4] bg-surface-container-low overflow-hidden flex-shrink-0"
-                >
-                  {fragrance.imageUrl && (
-                    <img
-                      src={fragrance.imageUrl}
-                      alt={fragrance.name}
-                      className="w-full h-full object-cover grayscale"
-                    />
-                  )}
-                </Link>
+                {/* Image */}
+                <div className="block w-24 aspect-[3/4] bg-surface-container-low overflow-hidden flex-shrink-0">
+                  {href ? (
+                    <Link href={href} className="block w-full h-full">
+                      {imageUrl && (
+                        <img src={imageUrl} alt={name} className="w-full h-full object-cover grayscale" />
+                      )}
+                    </Link>
+                  ) : imageUrl ? (
+                    <img src={imageUrl} alt={name} className="w-full h-full object-cover grayscale" />
+                  ) : null}
+                </div>
+
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] uppercase tracking-[0.2em] text-outline">
-                    {fragrance.brand}
+                    {brand}
                   </p>
-                  <Link href={`/fragrance/${fragrance.key}`}>
-                    <h3 className="text-base font-semibold tracking-tight">
-                      {fragrance.name}
-                    </h3>
-                  </Link>
+                  {href ? (
+                    <Link href={href}>
+                      <h3 className="text-base font-semibold tracking-tight">{name}</h3>
+                    </Link>
+                  ) : (
+                    <h3 className="text-base font-semibold tracking-tight">{name}</h3>
+                  )}
+
                   <div className="mt-2 flex items-center gap-2">
                     <span
                       className={clsx(
@@ -156,20 +182,21 @@ export default function WishlistPage() {
                       via {entry.origin}
                     </span>
                   </div>
+
                   <div className="mt-3 flex items-center gap-3">
                     <Link
-                      href={`/balade`}
+                      href="/balade"
                       className="text-[10px] uppercase tracking-widest font-bold border-b border-primary pb-0.5"
                     >
-                      Ajouter à balade
+                      Balade
                     </Link>
                     <button
                       type="button"
-                      onClick={() => removeFromWishlist(fragrance.key)}
+                      onClick={() => removeFromWishlist(entry.fragranceId)}
                       className="text-[10px] uppercase tracking-widest font-bold text-outline hover:text-error transition-colors flex items-center gap-1"
                     >
                       <Icon name="delete_outline" size={14} />
-                      Supprimer
+                      Retirer
                     </button>
                   </div>
                 </div>

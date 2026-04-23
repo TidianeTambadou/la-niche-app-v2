@@ -21,10 +21,11 @@ const TABS: Tab[] = [
     activeMatch: (p) => p === "/",
   },
   {
-    href: "/search",
-    label: "Search",
-    icon: "search",
-    activeMatch: (p) => p.startsWith("/search"),
+    href: "/recommendations",
+    label: "For you",
+    icon: "auto_awesome",
+    activeMatch: (p) =>
+      p.startsWith("/recommendations") || p.startsWith("/search"),
   },
   {
     href: "/scan",

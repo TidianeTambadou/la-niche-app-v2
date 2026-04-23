@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import {
   AGENT_SYSTEM_PROMPT,
   IDENTIFY_SYSTEM_PROMPT,
+  RECOMMEND_SYSTEM_PROMPT,
   SEARCH_SYSTEM_PROMPT,
   extractJson,
   type AgentRequest,
   type AgentResponse,
   type IdentifyResult,
+  type RecommendationCandidate,
   type SearchCandidate,
 } from "@/lib/agent";
 
@@ -69,7 +71,16 @@ async function tavilySearch(query: string): Promise<string> {
 
 /* ─── OpenRouter call (OpenAI-compatible) ───────────────────────────────── */
 
-const OPENROUTER_MODEL = "google/gemini-2.0-flash-001";
+/**
+ * Model fallback chain — OpenRouter tries each in order if the previous one
+ * is rate-limited (429) or fails. All entries must be vision-capable so the
+ * `identify` mode keeps working when Gemini is throttled upstream.
+ */
+const OPENROUTER_MODELS = [
+  "google/gemini-2.0-flash-001",
+  "google/gemini-flash-1.5",
+  "openai/gpt-4o-mini",
+];
 
 type ORMessage = { role: "system" | "user" | "assistant"; content: unknown };
 
@@ -87,7 +98,10 @@ async function openRouterCall(
       "x-title": "La Niche",
     },
     body: JSON.stringify({
-      model: OPENROUTER_MODEL,
+      // `models` (array) instead of `model` (string) → OpenRouter tries each
+      // in order on failure; auto-falls-back when Gemini is rate-limited.
+      models: OPENROUTER_MODELS,
+      route: "fallback",
       max_tokens: maxTokens,
       temperature: 0.3,
       messages,
@@ -244,9 +258,14 @@ export async function POST(req: Request) {
       // Web search to ground the answer
       const webResults = await tavilySearch(question);
       const history = (body.payload?.history ?? []).slice(-10);
+      const profileContext = (body.payload as { profileContext?: string })?.profileContext ?? "";
+
+      const systemContent = profileContext
+        ? `${AGENT_SYSTEM_PROMPT}\n\n---\n${profileContext}`
+        : AGENT_SYSTEM_PROMPT;
 
       const messages: ORMessage[] = [
-        { role: "system", content: AGENT_SYSTEM_PROMPT },
+        { role: "system", content: systemContent },
         ...history.map((t) => ({ role: t.role as "user" | "assistant", content: t.content })),
         {
           role: "user",
@@ -256,6 +275,85 @@ export async function POST(req: Request) {
 
       const answer = await openRouterCall(apiKey, messages, 1200);
       return NextResponse.json({ ok: true, mode: "ask", answer } satisfies AgentResponse);
+    } catch (e) {
+      return NextResponse.json(
+        { ok: false, error: "upstream_error", detail: e instanceof Error ? e.message : String(e) } satisfies AgentResponse,
+        { status: 502 },
+      );
+    }
+  }
+
+  /* ── RECOMMEND (Tinder-style personalized picks) ── */
+  if (body.mode === "recommend") {
+    const { count, profileContext, likedFragrances, dislikedFragrances } = body.payload ?? {
+      count: 10,
+      profileContext: "",
+      likedFragrances: [],
+      dislikedFragrances: [],
+    };
+    const safeCount = Math.min(20, Math.max(3, Math.round(count)));
+
+    try {
+      // Ground the recs in Fragrantica via Tavily: prioritise parfums
+      // similaires to the user's liked list; fall back to generic niche picks.
+      const seed = likedFragrances
+        .slice(0, 4)
+        .map((f) => `${f.brand} ${f.name}`)
+        .join(", ");
+      const query = seed
+        ? `parfums similaires à ${seed} recommandations niche fragrantica`
+        : `meilleures recommandations parfums niche fragrantica`;
+      const webResults = await tavilySearch(query);
+
+      const likedList = likedFragrances.length
+        ? likedFragrances.map((f) => `  • ${f.brand} — ${f.name}`).join("\n")
+        : "  (aucun pour l'instant)";
+      const dislikedList = dislikedFragrances.length
+        ? dislikedFragrances.map((f) => `  • ${f.brand} — ${f.name}`).join("\n")
+        : "  (aucun)";
+
+      const wishlistAvoid = [...likedFragrances, ...dislikedFragrances]
+        .map((f) => `${f.brand} ${f.name}`)
+        .join(" | ");
+
+      const text = await openRouterCall(
+        apiKey,
+        [
+          { role: "system", content: RECOMMEND_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: `${profileContext || "Aucun profil olfactif rempli — recommande des pièces polyvalentes et populaires."}\n\nParfums AIMÉS (wishlist) :\n${likedList}\n\nParfums REJETÉS :\n${dislikedList}\n\nÀ NE PAS SUGGÉRER (déjà connus) : ${wishlistAvoid || "—"}\n\nSources Fragrantica :\n${webResults}\n\nGénère EXACTEMENT ${safeCount} recommandations DIFFÉRENTES, variées en maisons. Chaque \`reason\` doit lier explicitement le parfum au profil de l'utilisateur. JSON STRICT :\n{"recommendations":[{"name":"...","brand":"...","family":"Woody Amber","notes_brief":"≤80 char","reason":"≤140 char pourquoi ce parfum pour ce profil","match_score":87,"image_url":"https://fimgs.net/...jpg (optionnel)","source_url":"https://www.fragrantica.com/perfume/...html"}]}`,
+          },
+        ],
+        2500,
+      );
+
+      const parsed = extractJson(text) as {
+        recommendations?: Partial<RecommendationCandidate>[];
+      };
+      const recommendations: RecommendationCandidate[] = (parsed.recommendations ?? [])
+        .filter((r) => r.name && r.brand)
+        .slice(0, safeCount)
+        .map((r) => ({
+          name: r.name!,
+          brand: r.brand!,
+          family: r.family ?? "—",
+          notes_brief: r.notes_brief ?? "",
+          reason: r.reason ?? "Correspond à ton profil olfactif.",
+          match_score: Math.min(
+            99,
+            Math.max(50, Math.round(r.match_score ?? 75)),
+          ),
+          image_url:
+            r.image_url && /^https?:\/\/.+\.(jpe?g|png|webp)(\?.*)?$/i.test(r.image_url)
+              ? r.image_url
+              : undefined,
+          source_url:
+            r.source_url ??
+            `https://www.fragrantica.com/search/?query=${encodeURIComponent(`${r.brand} ${r.name}`)}`,
+        }));
+
+      return NextResponse.json({ ok: true, mode: "recommend", recommendations } satisfies AgentResponse);
     } catch (e) {
       return NextResponse.json(
         { ok: false, error: "upstream_error", detail: e instanceof Error ? e.message : String(e) } satisfies AgentResponse,

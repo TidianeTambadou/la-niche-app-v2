@@ -47,6 +47,8 @@ export default function EndOfBaladePage() {
   const { activeBalade, history, addToWishlist, isWishlisted, endBalade } =
     useStore();
   const [archived, setArchived] = useState<FinishedBalade | null>(null);
+  const [celebrating, setCelebrating] = useState(false);
+  const [celebrationOut, setCelebrationOut] = useState(false);
 
   const balade = activeBalade ?? archived ?? history[0] ?? null;
 
@@ -99,14 +101,48 @@ export default function EndOfBaladePage() {
 
   function commit() {
     if (!activeBalade) return;
-    endBalade();
-    setArchived({ ...activeBalade, finishedAt: Date.now() });
+    const snap = { ...activeBalade, finishedAt: Date.now() };
+    setCelebrating(true);
+    setCelebrationOut(false);
+    // Start exit animation 400ms before unmounting
+    setTimeout(() => setCelebrationOut(true), 1800);
+    setTimeout(() => {
+      endBalade();
+      setArchived(snap);
+      setCelebrating(false);
+      setCelebrationOut(false);
+    }, 2200);
   }
 
   if (!balade) return null;
 
   return (
-    <div className="px-6 pt-4 pb-12">
+    <div className="px-6 pt-4 pb-36">
+      {/* ── Celebration overlay ───────────────────────────────────────── */}
+      {celebrating && (
+        <div
+          className={
+            celebrationOut
+              ? "fixed inset-0 z-50 flex flex-col items-center justify-center bg-background celebration-out pointer-events-none"
+              : "fixed inset-0 z-50 flex flex-col items-center justify-center bg-background"
+          }
+        >
+          <div className="celebration-in flex flex-col items-center gap-8">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo-laniche.png"
+              alt="La Niche"
+              className="w-32 object-contain"
+            />
+            <div className="flex flex-col items-center gap-3">
+              <Icon name="check_circle" size={32} className="text-primary" />
+              <p className="text-[11px] uppercase tracking-[0.4em] text-outline">
+                Balade archivée
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <header className="mb-6">
         <span className="text-[10px] uppercase tracking-[0.3em] text-outline block mb-2">
           {activeBalade ? "Re-sens et juge" : "Mémoire de balade"}
@@ -169,47 +205,52 @@ export default function EndOfBaladePage() {
         )}
       </section>
 
-      {/* Footer actions */}
-      {activeBalade ? (
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={commit}
-            className="w-full py-4 bg-primary text-on-primary rounded-full text-xs uppercase tracking-[0.2em] font-bold active:scale-95 transition-all flex items-center justify-center gap-2"
-          >
-            <Icon name="check" size={16} />
-            Terminer & archiver
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              router.push(
-                balade.mode === "free"
-                  ? "/balade/free"
-                  : "/balade/guided/active",
-              )
-            }
-            className="w-full py-3 border border-outline-variant rounded-full text-[10px] uppercase tracking-widest font-bold hover:border-primary transition-all"
-          >
-            Reprendre la balade
-          </button>
+      {/* Footer actions — sticky above the tab bar */}
+      <div className="fixed bottom-20 left-0 right-0 z-30 px-6 pb-2">
+        <div className="bg-background/95 backdrop-blur-sm border-t border-outline-variant/30 pt-3 flex flex-col gap-2">
+          {activeBalade ? (
+            <>
+              <button
+                type="button"
+                onClick={commit}
+                disabled={celebrating}
+                className="w-full py-4 bg-primary text-on-primary rounded-full text-xs uppercase tracking-[0.2em] font-bold active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Icon name="check" size={16} />
+                Terminer & archiver
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    balade.mode === "free"
+                      ? "/balade/free"
+                      : "/balade/guided/active",
+                  )
+                }
+                className="w-full py-3 border border-outline-variant rounded-full text-[10px] uppercase tracking-widest font-bold hover:border-primary transition-all"
+              >
+                Reprendre la balade
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/balade"
+                className="w-full py-4 bg-primary text-on-primary rounded-full text-xs uppercase tracking-[0.2em] font-bold text-center active:scale-95 transition-all"
+              >
+                Nouvelle balade
+              </Link>
+              <Link
+                href="/profile"
+                className="w-full py-3 border border-outline-variant rounded-full text-[10px] uppercase tracking-widest font-bold text-center hover:border-primary transition-all"
+              >
+                Voir l&apos;historique
+              </Link>
+            </>
+          )}
         </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <Link
-            href="/balade"
-            className="w-full py-4 bg-primary text-on-primary rounded-full text-xs uppercase tracking-[0.2em] font-bold text-center active:scale-95 transition-all"
-          >
-            Nouvelle balade
-          </Link>
-          <Link
-            href="/profile"
-            className="w-full py-3 border border-outline-variant rounded-full text-[10px] uppercase tracking-widest font-bold text-center hover:border-primary transition-all"
-          >
-            Voir l&apos;historique
-          </Link>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

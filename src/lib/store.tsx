@@ -18,6 +18,9 @@ export type WishlistEntry = {
   status: WishlistStatus;
   addedAt: number;
   origin: WishlistOrigin;
+  /** Snapshot of fragrance data captured at wishlist time — lets the wishlist
+   *  page render even when the Supabase catalog hasn't loaded yet. */
+  fragranceMeta?: { name: string; brand: string; imageUrl?: string | null };
 };
 
 export type BaladeMode = "free" | "guided";
@@ -79,6 +82,7 @@ type StoreActions = {
     fragranceId: string,
     status: WishlistStatus,
     origin: WishlistOrigin,
+    fragranceMeta?: { name: string; brand: string; imageUrl?: string | null },
   ) => void;
   removeFromWishlist: (fragranceId: string) => void;
   isWishlisted: (fragranceId: string) => WishlistStatus | null;
@@ -174,7 +178,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [state, hydrated]);
 
   const addToWishlist = useCallback<StoreActions["addToWishlist"]>(
-    (fragranceId, status, origin) => {
+    (fragranceId, status, origin, fragranceMeta) => {
       setState((s) => {
         const existing = s.wishlist.find((w) => w.fragranceId === fragranceId);
         if (existing) {
@@ -182,7 +186,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ...s,
             wishlist: s.wishlist.map((w) =>
               w.fragranceId === fragranceId
-                ? { ...w, status, addedAt: Date.now(), origin }
+                ? { ...w, status, addedAt: Date.now(), origin, ...(fragranceMeta ? { fragranceMeta } : {}) }
                 : w,
             ),
           };
@@ -190,7 +194,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return {
           ...s,
           wishlist: [
-            { fragranceId, status, addedAt: Date.now(), origin },
+            { fragranceId, status, addedAt: Date.now(), origin, fragranceMeta },
             ...s.wishlist,
           ],
         };
