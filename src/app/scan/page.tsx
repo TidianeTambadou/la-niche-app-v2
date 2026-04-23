@@ -41,7 +41,9 @@ export default function ScanPage() {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        // play() can reject on some mobile browsers even with muted+autoPlay;
+        // the video still streams via autoPlay attribute so we swallow the error.
+        await videoRef.current.play().catch(() => {});
       }
       setStage("camera");
     } catch (e) {
@@ -193,6 +195,7 @@ export default function ScanPage() {
             <video
               ref={videoRef}
               playsInline
+              autoPlay
               muted
               className="w-full h-full object-cover"
             />

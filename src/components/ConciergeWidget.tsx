@@ -1,19 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
 import { agentAsk, type AskHistoryTurn } from "@/lib/agent-client";
-
-/**
- * Floating expert concierge — fixed bottom-left on every page (mounted in
- * AppShell). Click → smooth scale/slide-in chat sheet that talks to the
- * AGENT_SYSTEM_PROMPT (niche perfumery expert, Fragrantica/Basenotes/etc.
- * sources only) via /api/agent in "ask" mode.
- *
- * Multi-turn: keeps last 10 turns and forwards them as `history` so follow-
- * up questions ("et son sillage ?") have context.
- */
 
 type Msg = { id: number; role: "user" | "assistant" | "error"; content: string };
 
@@ -33,14 +23,16 @@ export function ConciergeWidget() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const idCounter = useRef(0);
 
-  // Auto-scroll on new messages / typing indicator.
-  useEffect(() => {
+  function scrollToBottom() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
+  }
+
+  useEffect(() => {
+    scrollToBottom();
   }, [messages, sending]);
 
-  // Focus the input when sheet opens.
   useEffect(() => {
     if (open) {
       const t = setTimeout(() => inputRef.current?.focus(), 250);
@@ -48,7 +40,6 @@ export function ConciergeWidget() {
     }
   }, [open]);
 
-  // ESC to close.
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -78,7 +69,7 @@ export function ConciergeWidget() {
         .filter((m): m is Msg & { role: "user" | "assistant" } =>
           m.role === "user" || m.role === "assistant",
         )
-        .slice(0, -1) // last user turn is the new question
+        .slice(0, -1)
         .map((m) => ({ role: m.role, content: m.content }));
       const answer = await agentAsk(q, history);
       setMessages((curr) => [
@@ -106,7 +97,7 @@ export function ConciergeWidget() {
 
   return (
     <>
-      {/* Floating trigger — bottom-left, above the tab bar. */}
+      {/* Floating trigger */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -128,15 +119,15 @@ export function ConciergeWidget() {
         )}
       </button>
 
-      {/* Chat sheet — anchored bottom-left, scales/fades from the trigger. */}
+      {/* Chat sheet — slide-up (no scale-pop) */}
       <div
         className={clsx(
           "fixed left-2 right-2 sm:right-auto sm:left-4 sm:w-[380px] z-40",
           "bg-background border border-outline shadow-2xl flex flex-col",
-          "origin-bottom-left transition-all duration-300 ease-out",
+          "transition-all duration-300 ease-out",
           open
-            ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
-            : "opacity-0 scale-90 translate-y-6 pointer-events-none",
+            ? "opacity-100 translate-y-0 pointer-events-auto"
+            : "opacity-0 translate-y-6 pointer-events-none",
         )}
         style={{
           bottom: "calc(6rem + env(safe-area-inset-bottom))",
@@ -147,7 +138,7 @@ export function ConciergeWidget() {
         aria-hidden={!open}
       >
         {/* Header */}
-        <header className="px-4 py-3 border-b border-outline-variant flex items-center gap-3">
+        <header className="px-4 py-3 border-b border-outline-variant flex items-center gap-3 flex-shrink-0">
           <ConciergeAvatar size={36} />
           <div className="flex-1 min-w-0">
             <p className="text-[9px] uppercase tracking-[0.25em] text-outline">
@@ -177,7 +168,14 @@ export function ConciergeWidget() {
           {messages.length === 0 ? (
             <EmptyState onPick={(s) => send(s)} />
           ) : (
-            messages.map((m) => <Bubble key={m.id} msg={m} />)
+            messages.map((m, i) => (
+              <Bubble
+                key={m.id}
+                msg={m}
+                isLatest={i === messages.length - 1}
+                onTick={scrollToBottom}
+              />
+            ))
           )}
           {sending && <TypingIndicator />}
         </div>
@@ -188,7 +186,7 @@ export function ConciergeWidget() {
             e.preventDefault();
             send();
           }}
-          className="border-t border-outline-variant p-3 flex items-end gap-2"
+          className="border-t border-outline-variant p-3 flex items-end gap-2 flex-shrink-0"
         >
           <textarea
             ref={inputRef}
@@ -220,8 +218,7 @@ export function ConciergeWidget() {
 }
 
 /* -------------------------------------------------------------------------
- * Avatar — uses the La Niche brand mark from /public if present, falls back
- * to a clean monogram tile in the ATELIER aesthetic.
+ * Avatar
  * --------------------------------------------------------------------- */
 
 function ConciergeAvatar({ size }: { size: number }) {
@@ -254,7 +251,7 @@ function ConciergeAvatar({ size }: { size: number }) {
 }
 
 /* -------------------------------------------------------------------------
- * Empty state — short pitch + tap-to-send suggestion chips.
+ * Empty state
  * --------------------------------------------------------------------- */
 
 function EmptyState({ onPick }: { onPick: (s: string) => void }) {
@@ -290,13 +287,22 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
 }
 
 /* -------------------------------------------------------------------------
- * Bubble — minimal monochrome chat bubble.
+ * Bubble — monochrome chat bubble with slide-in animation.
+ * Latest assistant message gets word-by-word typewriter animation.
  * --------------------------------------------------------------------- */
 
-function Bubble({ msg }: { msg: Msg }) {
+function Bubble({
+  msg,
+  isLatest,
+  onTick,
+}: {
+  msg: Msg;
+  isLatest: boolean;
+  onTick: () => void;
+}) {
   if (msg.role === "user") {
     return (
-      <div className="flex justify-end">
+      <div className="bubble-in flex justify-end">
         <div className="max-w-[85%] bg-on-background text-background px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
           {msg.content}
         </div>
@@ -305,33 +311,146 @@ function Bubble({ msg }: { msg: Msg }) {
   }
   if (msg.role === "error") {
     return (
-      <div className="flex justify-start">
+      <div className="bubble-in flex justify-start">
         <div className="max-w-[85%] border border-error/40 text-error px-3 py-2 text-xs leading-relaxed">
-          ⚠️ {msg.content}
+          ⚠ {msg.content}
         </div>
       </div>
     );
   }
   return (
-    <div className="flex justify-start">
-      <div className="max-w-[90%] border border-outline-variant px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-on-background">
-        {msg.content}
+    <div className="bubble-in flex justify-start">
+      <div className="max-w-[90%] border border-outline-variant px-3 py-2.5 text-sm leading-relaxed text-on-background">
+        {isLatest ? (
+          <TypewriterText content={msg.content} onTick={onTick} />
+        ) : (
+          <MarkdownContent text={msg.content} />
+        )}
       </div>
     </div>
   );
 }
 
 /* -------------------------------------------------------------------------
- * Typing indicator while waiting for /api/agent ask response.
- *
- * The agent calls web_search so the wait is long (5-15s). A plain dot loop
- * feels broken at that duration — instead we show:
- *   - 3 shimmer skeleton bars (clinical, matches ATELIER aesthetic)
- *   - a pulsing source-status dot + caption that cycles through the
- *     agent's actual stages (consulte fragrantica → compare → synthèse)
- *
- * The cycling caption gives the user a sense of progress AND tells them
- * why it's slow (the agent is reading external sources).
+ * TypewriterText — reveals words progressively (simulates AI streaming).
+ * Targets ≤ 3 seconds total animation, min 1 word/tick at 30ms.
+ * When no longer latest (new message arrived), snaps to full text.
+ * --------------------------------------------------------------------- */
+
+function TypewriterText({
+  content,
+  onTick,
+}: {
+  content: string;
+  onTick: () => void;
+}) {
+  // Split preserving whitespace so rejoining gives the original text.
+  const tokens = useMemo(() => content.split(/(\s+)/), [content]);
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    setCount(0);
+    const total = tokens.length;
+    // Reveal enough tokens per 30ms tick to finish in max 3 seconds.
+    const chunkSize = Math.max(1, Math.ceil(total / (3000 / 30)));
+    const id = setInterval(() => {
+      setCount((c) => {
+        const next = Math.min(c + chunkSize, total);
+        if (next >= total) clearInterval(id);
+        onTick();
+        return next;
+      });
+    }, 30);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content]);
+
+  return <MarkdownContent text={tokens.slice(0, count).join("")} />;
+}
+
+/* -------------------------------------------------------------------------
+ * MarkdownContent — renders the subset of markdown Gemini produces:
+ *   **bold**  *italic*  bullet lists  **Section:**  blank-line paragraphs
+ * --------------------------------------------------------------------- */
+
+function MarkdownContent({ text }: { text: string }) {
+  return <div className="space-y-1">{parseMarkdown(text)}</div>;
+}
+
+function parseMarkdown(text: string): ReactNode[] {
+  const lines = text.split("\n");
+  const result: ReactNode[] = [];
+  let listItems: ReactNode[] = [];
+  let key = 0;
+
+  const nextKey = () => (key++).toString();
+
+  function flushList() {
+    if (listItems.length === 0) return;
+    result.push(
+      <ul key={nextKey()} className="space-y-0.5 pl-1">
+        {listItems.map((item, i) => (
+          <li key={i} className="flex gap-2">
+            <span className="text-outline mt-0.5 flex-shrink-0">·</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>,
+    );
+    listItems = [];
+  }
+
+  lines.forEach((line) => {
+    // Bullet: "* text" or "- text" (with optional indent)
+    if (/^\s*[*-]\s+/.test(line)) {
+      listItems.push(renderInline(line.replace(/^\s*[*-]\s+/, "")));
+      return;
+    }
+    flushList();
+
+    if (line.trim() === "") {
+      // Blank line — already handled by space-y-1 spacing
+      return;
+    }
+
+    // Section header: line that is entirely **bold** (with optional colon)
+    const headerMatch = line.trim().match(/^\*\*(.+?)\*\*\s*:?\s*$/);
+    if (headerMatch) {
+      result.push(
+        <p key={nextKey()} className="font-bold mt-2 first:mt-0">
+          {headerMatch[1]}
+        </p>,
+      );
+      return;
+    }
+
+    result.push(<p key={nextKey()}>{renderInline(line)}</p>);
+  });
+
+  flushList();
+  return result;
+}
+
+function renderInline(text: string): ReactNode {
+  // Split on **bold** first, then *italic* within the remaining parts.
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+          return <strong key={i}>{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
+          return <em key={i}>{part.slice(1, -1)}</em>;
+        }
+        return part || null;
+      })}
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------
+ * Typing indicator — shimmer skeleton + cycling source caption.
  * --------------------------------------------------------------------- */
 
 const LOADING_STEPS = [
@@ -353,7 +472,7 @@ function TypingIndicator() {
   }, []);
 
   return (
-    <div className="flex justify-start">
+    <div className="bubble-in flex justify-start">
       <div className="w-[88%] max-w-[300px] flex flex-col gap-2">
         <div
           className="border border-outline-variant px-3 py-3 space-y-2"

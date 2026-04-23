@@ -28,7 +28,7 @@ import {
   useState,
   type ComponentRef,
 } from "react";
-import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
+import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { CameraControls, Html, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { clsx } from "clsx";
@@ -212,6 +212,7 @@ function Marker({
     (haloRef.current.material as THREE.MeshBasicMaterial).opacity =
       0.45 - wave * 0.32;
     spotRef.current.scale.setScalar(1 + Math.sin(t * 1.6) * 0.08);
+    state.invalidate(); // keep demand-mode canvas alive while animating
   });
 
   return (
@@ -267,7 +268,6 @@ function PreviewMarker({
       (haloRef.current.material as THREE.MeshBasicMaterial).opacity =
         0.36 - wave * 0.28;
     }
-    // Slow expanding rings — "drop being drawn", calm not frenzied
     if (ring1Ref.current) {
       const growth = (t * 0.55) % 2;
       ring1Ref.current.scale.setScalar(1 + growth * 1.2);
@@ -284,6 +284,7 @@ function PreviewMarker({
         0.45 - growth * 0.25,
       );
     }
+    state.invalidate(); // keep demand-mode canvas alive while animating
   });
 
   return (
@@ -327,9 +328,11 @@ function PreviewMarker({
  * Camera controller — drei CameraControls for orbit + animated focus
  * --------------------------------------------------------------------- */
 
+// Camera framed to show full mannequin (head to feet) on all screen sizes.
+// FOV 36° vertical + lookAt at mannequin mid-height (0.925m = 1.85m / 2).
 const OVERVIEW = {
-  pos: [0, 1.05, 3.4] as const,
-  look: [0, 1.05, 0] as const,
+  pos: [0, 0.925, 3.4] as const,
+  look: [0, 0.925, 0] as const,
 };
 
 /**
@@ -342,16 +345,20 @@ const OVERVIEW = {
  */
 function StaticShadowKey() {
   const ref = useRef<THREE.DirectionalLight>(null);
+  const invalidate = useThree((s) => s.invalidate);
 
   useEffect(() => {
     const l = ref.current;
     if (!l) return;
     l.shadow.autoUpdate = false;
     const id = setTimeout(() => {
-      if (ref.current) ref.current.shadow.needsUpdate = true;
+      if (ref.current) {
+        ref.current.shadow.needsUpdate = true;
+        invalidate(); // force one render to apply the shadow bake
+      }
     }, 400);
     return () => clearTimeout(id);
-  }, []);
+  }, [invalidate]);
 
   return (
     <directionalLight
@@ -501,17 +508,13 @@ export function BodySilhouette3D({
         readOnly && "pointer-events-none",
         className,
       )}
-      style={{ aspectRatio: "3 / 4" }}
+      style={{ aspectRatio: "3 / 4", touchAction: "none" }}
     >
       <Canvas
-        shadows
-        // dpr capped at 1.5: still sharp on retina, ~30% less GPU work than
-        // 1.75 (or browser default 2-3 on phones).
+        shadows={{ type: THREE.PCFShadowMap }}
+        frameloop="demand"
         dpr={[1, 1.5]}
-        camera={{ position: [...OVERVIEW.pos], fov: 32 }}
-        // antialias=false: MSAA is expensive on mobile GPUs. For a clay
-        // mannequin the perceived quality loss is minimal.
-        // powerPreference: nudges discrete GPU on laptops with hybrid graphics.
+        camera={{ position: [...OVERVIEW.pos], fov: 36 }}
         gl={{
           antialias: false,
           alpha: true,
@@ -560,18 +563,16 @@ export function BodySilhouette3D({
 
         <CameraControls
           ref={controlsRef}
-          // Allow polar swing from ~30° (near top-down) to slightly below
-          // horizon — needed because focused zoom places camera high above.
           minPolarAngle={Math.PI / 6}
           maxPolarAngle={Math.PI / 2 + 0.15}
-          polarRotateSpeed={0.4}
-          azimuthRotateSpeed={0.7}
+          polarRotateSpeed={0.6}
+          azimuthRotateSpeed={0.9}
           dollySpeed={0}
           truckSpeed={0}
           minDistance={0.3}
           maxDistance={5}
-          smoothTime={0.85}
-          draggingSmoothTime={0.18}
+          smoothTime={0.25}
+          draggingSmoothTime={0.04}
           enabled={!readOnly}
         />
         <CameraController
