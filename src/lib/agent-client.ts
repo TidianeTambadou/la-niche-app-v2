@@ -124,7 +124,7 @@ export async function agentAsk(
   if (res.ok && res.mode === "ask") return res.answer;
   if (!res.ok) {
     if (res.error === "agent_disabled") {
-      return "L'expert IA n'est pas configuré sur ce déploiement.";
+      return `Agent désactivé — ${res.detail ?? "ANTHROPIC_API_KEY manquante"}`;
     }
     const msg =
       res.error === "upstream_error" && res.detail?.startsWith("429")

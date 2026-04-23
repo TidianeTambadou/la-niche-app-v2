@@ -72,15 +72,15 @@ export async function POST(req: Request) {
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
+  const anthropicKeys = Object.keys(process.env).filter(k => k.includes("ANTHROPIC"));
   // eslint-disable-next-line no-console
-  console.log("[agent] apiKey present:", !!apiKey, "| env keys with ANTHROPIC:", Object.keys(process.env).filter(k => k.includes("ANTHROPIC")));
+  console.log("[agent] apiKey present:", !!apiKey, "| anthropic keys found:", anthropicKeys);
   if (!apiKey) {
     return NextResponse.json(
       {
         ok: false,
         error: "agent_disabled",
-        detail:
-          "ANTHROPIC_API_KEY not set. Configure it in Vercel project env to enable the agent.",
+        detail: `ANTHROPIC_API_KEY not set. Keys found containing "ANTHROPIC": [${anthropicKeys.join(", ") || "none"}]. Total env keys: ${Object.keys(process.env).length}`,
       } satisfies AgentResponse,
       { status: 503 },
     );
