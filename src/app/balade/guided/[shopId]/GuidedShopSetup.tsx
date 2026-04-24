@@ -30,7 +30,12 @@ export function GuidedShopSetup({ shopId }: { shopId: string }) {
   const stock = useShopStock(shopId);
   const allFragrances = useFragrances();
   const { user } = useAuth();
-  const { wishlist, startBalade } = useStore();
+  const {
+    wishlist,
+    startBalade,
+    canUseGuidedBalade,
+    consumeGuidedBalade,
+  } = useStore();
   const [selected, setSelected] = useState<(typeof TIME_OPTIONS)[number] | null>(
     null,
   );
@@ -51,6 +56,13 @@ export function GuidedShopSetup({ shopId }: { shopId: string }) {
 
   function start() {
     if (!selected || !shop || recommendations.length === 0) return;
+    // Paywall: guided balades use the route-optimiser algorithm and
+    // count as a metered action. Redirect if the user is out of credits.
+    if (!canUseGuidedBalade()) {
+      router.push("/abonnement?from=balade");
+      return;
+    }
+    consumeGuidedBalade();
     startBalade({
       mode: "guided",
       shopId: shop.id,

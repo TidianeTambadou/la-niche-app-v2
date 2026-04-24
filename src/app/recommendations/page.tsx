@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { FragranceImage } from "@/components/FragranceImage";
 import { Icon } from "@/components/Icon";
@@ -249,8 +250,16 @@ function recFragranceId(card: RecommendationCandidate): string {
  * ====================================================================== */
 
 export default function RecommendationsPage() {
+  const router = useRouter();
   const { user } = useAuth();
-  const { wishlist, addToWishlist } = useStore();
+  const {
+    wishlist,
+    addToWishlist,
+    canUseRecommendation,
+    consumeRecommendation,
+    remaining,
+    subscription,
+  } = useStore();
 
   const [phase, setPhase] = useState<Phase>("mode-picker");
   const [mode, setMode] = useState<Mode>("self");
@@ -293,6 +302,11 @@ export default function RecommendationsPage() {
   }, [wishlist]);
 
   async function generate(forMode: Mode, answers?: Record<string, string>) {
+    // Paywall: block generation if the user has used their quota.
+    if (!canUseRecommendation()) {
+      router.push("/abonnement?from=recommendations");
+      return;
+    }
     setPhase("loading");
     setError(null);
     setIdx(0);
@@ -326,6 +340,9 @@ export default function RecommendationsPage() {
         setPhase(forMode === "friend" ? "mode-picker" : "configure");
         return;
       }
+      // Burn one credit only once the AI succeeded. This way an upstream
+      // error (rate limit, network) doesn't count against the user.
+      consumeRecommendation();
       setRecs(result.recommendations);
       setDna(result.dna);
       setPhase("swiping");
@@ -448,7 +465,15 @@ export default function RecommendationsPage() {
       <ModePickerView
         hasProfile={!!profile}
         error={error}
+        remainingRecs={remaining("recommendations")}
+        subscription={subscription}
         onPick={(m) => {
+          // Hard gate before the quiz/configure screens so the user
+          // doesn't fill a long form only to discover they're out of credits.
+          if (!canUseRecommendation()) {
+            router.push("/abonnement?from=recommendations");
+            return;
+          }
           setMode(m);
           setError(null);
           if (m === "self") setPhase("configure");
@@ -1548,12 +1573,23 @@ function NotesLayer({
 function ModePickerView({
   hasProfile,
   error,
+  remainingRecs,
+  subscription,
   onPick,
 }: {
   hasProfile: boolean;
   error: string | null;
+  remainingRecs: number;
+  subscription: "free" | "basic" | "premium";
   onPick: (m: Mode) => void;
 }) {
+  const unlimited = remainingRecs === Infinity;
+  const tierLabel =
+    subscription === "premium"
+      ? "Abonné Illimité"
+      : subscription === "basic"
+        ? "Abonné Basic"
+        : "Gratuit";
   return (
     <div className="px-6 pt-4 pb-12 min-h-screen flex flex-col">
       <header className="mb-10">
@@ -1575,6 +1611,42 @@ function ModePickerView({
           Unique · ODORARE.
         </p>
       </header>
+
+      {/* Quota strip */}
+      <div className="mb-8 border border-outline-variant p-4 flex items-center gap-3">
+        <div
+          className={clsx(
+            "w-9 h-9 flex items-center justify-center flex-shrink-0",
+            subscription === "free"
+              ? "bg-surface-container-high text-on-background"
+              : "bg-primary text-on-primary",
+          )}
+        >
+          <Icon
+            name={subscription === "free" ? "lock" : "verified"}
+            filled={subscription !== "free"}
+            size={16}
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[9px] uppercase tracking-[0.25em] text-outline font-mono">
+            {tierLabel}
+          </p>
+          <p className="text-sm font-semibold tracking-tight">
+            {unlimited
+              ? "Recommandations illimitées."
+              : `${remainingRecs} recommandation${remainingRecs > 1 ? "s" : ""} restante${remainingRecs > 1 ? "s" : ""} ce mois-ci.`}
+          </p>
+        </div>
+        {subscription !== "premium" && (
+          <Link
+            href="/abonnement?from=recommendations"
+            className="text-[10px] uppercase tracking-widest font-bold border-b border-primary pb-0.5 flex-shrink-0"
+          >
+            {subscription === "free" ? "Passer payant" : "Upgrade"}
+          </Link>
+        )}
+      </div>
 
       <div className="flex flex-col gap-3 flex-1">
         {/* Pour moi */}

@@ -72,10 +72,57 @@ export type ActiveBalade = {
 
 export type FinishedBalade = ActiveBalade & { finishedAt: number };
 
+/* -------------------------------------------------------------------------
+ * Subscription + usage metering.
+ *
+ * Each recommendation session costs ~3 ¢ (tokens + Tavily), each guided
+ * balade route ~1 ¢. We gate usage on the client for MVP — when real Stripe
+ * lands, mirror the same state on the server and keep this as a local cache.
+ * ----------------------------------------------------------------------- */
+
+export type SubscriptionTier = "free" | "basic" | "premium";
+
+export type UsageState = {
+  /** Sessions consumed in the current billing window. */
+  recommendations: number;
+  guidedBalades: number;
+  /** Unix ms — when the 30-day window rolls over and counters reset. */
+  resetAt: number;
+};
+
+export type TierLimits = {
+  recommendations: number;
+  guidedBalades: number;
+};
+
+export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
+  // Infinity encodes "unlimited" — checked as `count < limit` so it never trips.
+  free: { recommendations: 5, guidedBalades: 2 },
+  basic: { recommendations: 30, guidedBalades: 10 },
+  premium: { recommendations: Infinity, guidedBalades: Infinity },
+};
+
+export const TIER_PRICE_EUR: Record<SubscriptionTier, number> = {
+  free: 0,
+  basic: 2.99,
+  premium: 9.99,
+};
+
+export const TIER_LABELS: Record<SubscriptionTier, string> = {
+  free: "Gratuit",
+  basic: "Basic",
+  premium: "Illimité",
+};
+
 type StoreState = {
   wishlist: WishlistEntry[];
   activeBalade: ActiveBalade | null;
   history: FinishedBalade[];
+  subscription: SubscriptionTier;
+  /** Unix ms of the most recent subscription upgrade — shown as "Membre
+   *  depuis" on the profile. `null` for free users. */
+  subscribedAt: number | null;
+  usage: UsageState;
 };
 
 type StoreActions = {
@@ -128,6 +175,16 @@ type StoreActions = {
 
   recordTest: (fragranceId: string, feedback: WishlistStatus | null) => void;
   advanceRoute: () => void;
+
+  // Subscription / usage metering
+  canUseRecommendation: () => boolean;
+  consumeRecommendation: () => void;
+  canUseGuidedBalade: () => boolean;
+  consumeGuidedBalade: () => void;
+  /** Fake "subscribe" — flips the local tier. Real Stripe plugs in later. */
+  setSubscription: (tier: SubscriptionTier) => void;
+  /** Remaining count for the current tier; Infinity if unlimited. */
+  remaining: (kind: "recommendations" | "guidedBalades") => number;
 };
 
 type StoreContextValue = StoreState & StoreActions;
@@ -153,7 +210,17 @@ function readStorage(userId: string | null): StoreState | null {
   try {
     const raw = window.localStorage.getItem(storageKeyFor(userId));
     if (!raw) return null;
-    return JSON.parse(raw) as StoreState;
+    const parsed = JSON.parse(raw) as Partial<StoreState>;
+    // Forward-migrate: blobs from before subscription landed don't have
+    // these fields. Backfill with safe defaults.
+    return {
+      wishlist: parsed.wishlist ?? [],
+      activeBalade: parsed.activeBalade ?? null,
+      history: parsed.history ?? [],
+      subscription: parsed.subscription ?? "free",
+      subscribedAt: parsed.subscribedAt ?? null,
+      usage: rolloverUsage(parsed.usage ?? freshUsage()),
+    };
   } catch {
     return null;
   }
@@ -168,10 +235,29 @@ function writeStorage(userId: string | null, state: StoreState) {
   }
 }
 
+const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+function freshUsage(): UsageState {
+  return {
+    recommendations: 0,
+    guidedBalades: 0,
+    resetAt: Date.now() + MONTH_MS,
+  };
+}
+
+/** Rolls the 30-day window forward if expired. Pure — returns a new state. */
+function rolloverUsage(usage: UsageState): UsageState {
+  if (Date.now() > usage.resetAt) return freshUsage();
+  return usage;
+}
+
 const initialState: StoreState = {
   wishlist: [],
   activeBalade: null,
   history: [],
+  subscription: "free",
+  subscribedAt: null,
+  usage: freshUsage(),
 };
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
@@ -424,6 +510,72 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const canUseRecommendation = useCallback<StoreActions["canUseRecommendation"]>(
+    () => {
+      const usage = rolloverUsage(state.usage);
+      const limit = TIER_LIMITS[state.subscription].recommendations;
+      return usage.recommendations < limit;
+    },
+    [state.usage, state.subscription],
+  );
+
+  const consumeRecommendation = useCallback<
+    StoreActions["consumeRecommendation"]
+  >(() => {
+    setState((s) => {
+      const usage = rolloverUsage(s.usage);
+      return {
+        ...s,
+        usage: { ...usage, recommendations: usage.recommendations + 1 },
+      };
+    });
+  }, []);
+
+  const canUseGuidedBalade = useCallback<StoreActions["canUseGuidedBalade"]>(
+    () => {
+      const usage = rolloverUsage(state.usage);
+      const limit = TIER_LIMITS[state.subscription].guidedBalades;
+      return usage.guidedBalades < limit;
+    },
+    [state.usage, state.subscription],
+  );
+
+  const consumeGuidedBalade = useCallback<
+    StoreActions["consumeGuidedBalade"]
+  >(() => {
+    setState((s) => {
+      const usage = rolloverUsage(s.usage);
+      return {
+        ...s,
+        usage: { ...usage, guidedBalades: usage.guidedBalades + 1 },
+      };
+    });
+  }, []);
+
+  const setSubscription = useCallback<StoreActions["setSubscription"]>(
+    (tier) => {
+      setState((s) => ({
+        ...s,
+        subscription: tier,
+        subscribedAt: tier === "free" ? null : Date.now(),
+        // Reset counters on upgrade so a user who just maxed out free
+        // immediately benefits from their new plan.
+        usage: freshUsage(),
+      }));
+    },
+    [],
+  );
+
+  const remaining = useCallback<StoreActions["remaining"]>(
+    (kind) => {
+      const usage = rolloverUsage(state.usage);
+      const limit = TIER_LIMITS[state.subscription][kind];
+      if (limit === Infinity) return Infinity;
+      return Math.max(0, limit - usage[kind]);
+    },
+    [state.usage, state.subscription],
+  );
+
   const value = useMemo<StoreContextValue>(
     () => ({
       ...state,
@@ -440,6 +592,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       removePlacementAt,
       recordTest,
       advanceRoute,
+      canUseRecommendation,
+      consumeRecommendation,
+      canUseGuidedBalade,
+      consumeGuidedBalade,
+      setSubscription,
+      remaining,
     }),
     [
       state,
@@ -456,6 +614,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       removePlacementAt,
       recordTest,
       advanceRoute,
+      canUseRecommendation,
+      consumeRecommendation,
+      canUseGuidedBalade,
+      consumeGuidedBalade,
+      setSubscription,
+      remaining,
     ],
   );
 

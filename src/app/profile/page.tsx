@@ -4,7 +4,7 @@ import { type ReactNode, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
-import { useStore } from "@/lib/store";
+import { useStore, TIER_LIMITS, TIER_LABELS } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { useFragrances } from "@/lib/data";
 import {
@@ -18,7 +18,14 @@ import {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { wishlist, history } = useStore();
+  const {
+    wishlist,
+    history,
+    subscription,
+    subscribedAt,
+    usage,
+    remaining,
+  } = useStore();
   const { user, loading: authLoading, signOut } = useAuth();
   const fragrances = useFragrances();
   const [signingOut, setSigningOut] = useState(false);
@@ -75,9 +82,20 @@ export default function ProfilePage() {
               <p className="text-[9px] uppercase tracking-[0.35em] text-outline mb-1.5">
                 Profil
               </p>
-              <p className="text-sm font-semibold leading-tight truncate">
-                {user.email}
-              </p>
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="text-sm font-semibold leading-tight truncate">
+                  {user.email}
+                </p>
+                {subscription !== "free" && (
+                  <span
+                    className="inline-flex items-center justify-center w-4 h-4 bg-primary text-on-primary rounded-full shrink-0"
+                    title="Abonné La Niche"
+                    aria-label="Abonné La Niche"
+                  >
+                    <Icon name="verified" filled size={10} />
+                  </span>
+                )}
+              </div>
               {memberSince && (
                 <p className="text-[10px] text-outline mt-1.5 font-mono">
                   Membre depuis {memberSince}
@@ -118,6 +136,20 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+
+      {/* ── Subscription card ─────────────────────────────────────── */}
+      {user && (
+        <div className="px-6 mb-2">
+          <SubscriptionCard
+            subscription={subscription}
+            subscribedAt={subscribedAt}
+            recommendationsUsed={usage.recommendations}
+            recommendationsRemaining={remaining("recommendations")}
+            baladesUsed={usage.guidedBalades}
+            baladesRemaining={remaining("guidedBalades")}
+          />
+        </div>
+      )}
 
       {/* ── Stats strip ───────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-px bg-outline-variant/50 border-y border-outline-variant/50">
@@ -459,5 +491,178 @@ function Tag({
     >
       {children}
     </span>
+  );
+}
+
+function SubscriptionCard({
+  subscription,
+  subscribedAt,
+  recommendationsUsed,
+  recommendationsRemaining,
+  baladesUsed,
+  baladesRemaining,
+}: {
+  subscription: "free" | "basic" | "premium";
+  subscribedAt: number | null;
+  recommendationsUsed: number;
+  recommendationsRemaining: number;
+  baladesUsed: number;
+  baladesRemaining: number;
+}) {
+  const subscribed = subscription !== "free";
+  const tierLabel = TIER_LABELS[subscription];
+  const recLimit = TIER_LIMITS[subscription].recommendations;
+  const baladeLimit = TIER_LIMITS[subscription].guidedBalades;
+  const recPct =
+    recLimit === Infinity
+      ? 100
+      : Math.min(100, Math.round((recommendationsUsed / recLimit) * 100));
+  const baladePct =
+    baladeLimit === Infinity
+      ? 100
+      : Math.min(100, Math.round((baladesUsed / baladeLimit) * 100));
+  const subscribedDate = subscribedAt
+    ? new Date(subscribedAt).toLocaleDateString("fr-FR", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : null;
+
+  if (subscribed) {
+    return (
+      <div className="border border-primary bg-primary/[0.03] p-5">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 bg-primary text-on-primary flex items-center justify-center flex-shrink-0">
+            <Icon name="verified" filled size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[9px] uppercase tracking-[0.3em] text-primary font-bold mb-0.5">
+              Abonné La Niche
+            </p>
+            <p className="text-lg font-bold tracking-tight leading-tight">
+              Plan {tierLabel}
+            </p>
+            {subscribedDate && (
+              <p className="text-[10px] text-outline font-mono mt-1">
+                Depuis le {subscribedDate}
+              </p>
+            )}
+          </div>
+          <Link
+            href="/abonnement"
+            className="text-[9px] uppercase tracking-widest text-outline border-b border-outline/30 pb-px hover:text-on-background transition-colors flex-shrink-0 mt-1"
+          >
+            Gérer
+          </Link>
+        </div>
+
+        {subscription === "premium" ? (
+          <p className="text-[11px] text-on-surface-variant leading-relaxed">
+            Recommandations et balades guidées illimitées ce mois-ci.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <UsageBar
+              label="Recommandations"
+              used={recommendationsUsed}
+              remaining={recommendationsRemaining}
+              limit={recLimit}
+              pct={recPct}
+            />
+            <UsageBar
+              label="Balades guidées"
+              used={baladesUsed}
+              remaining={baladesRemaining}
+              limit={baladeLimit}
+              pct={baladePct}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Free plan
+  return (
+    <div className="border border-outline-variant p-5">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="w-10 h-10 bg-surface-container-high border border-outline-variant flex items-center justify-center flex-shrink-0 text-outline">
+          <Icon name="lock" size={18} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[9px] uppercase tracking-[0.3em] text-outline font-bold mb-0.5">
+            Plan gratuit
+          </p>
+          <p className="text-lg font-bold tracking-tight leading-tight">
+            Tu n&apos;es pas abonné.
+          </p>
+          <p className="text-[11px] text-on-surface-variant mt-1 leading-relaxed">
+            Accès limité aux recommandations et balades guidées.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-3 mb-4">
+        <UsageBar
+          label="Recommandations"
+          used={recommendationsUsed}
+          remaining={recommendationsRemaining}
+          limit={recLimit}
+          pct={recPct}
+        />
+        <UsageBar
+          label="Balades guidées"
+          used={baladesUsed}
+          remaining={baladesRemaining}
+          limit={baladeLimit}
+          pct={baladePct}
+        />
+      </div>
+
+      <Link
+        href="/abonnement"
+        className="w-full py-3 bg-primary text-on-primary rounded-full text-[10px] uppercase tracking-widest font-bold text-center active:scale-95 transition-all flex items-center justify-center gap-1.5"
+      >
+        <Icon name="auto_awesome" size={14} />
+        S&apos;abonner à La Niche
+      </Link>
+    </div>
+  );
+}
+
+function UsageBar({
+  label,
+  used,
+  remaining,
+  limit,
+  pct,
+}: {
+  label: string;
+  used: number;
+  remaining: number;
+  limit: number;
+  pct: number;
+}) {
+  const exhausted = remaining === 0 && limit !== Infinity;
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] uppercase tracking-widest text-on-surface-variant">
+          {label}
+        </span>
+        <span
+          className={`text-[10px] font-mono font-bold ${exhausted ? "text-error" : "text-on-background"}`}
+        >
+          {used} / {limit === Infinity ? "∞" : limit}
+        </span>
+      </div>
+      <div className="h-[3px] bg-outline-variant/40 overflow-hidden">
+        <div
+          className={`h-full transition-all ${exhausted ? "bg-error" : "bg-primary"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
   );
 }
