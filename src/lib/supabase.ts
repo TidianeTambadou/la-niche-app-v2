@@ -11,21 +11,26 @@ import { createClient } from "@supabase/supabase-js";
  * below should make the misconfiguration visible.
  */
 
-const url =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ??
-  "https://nmcsfdgqnttanufydjer.supabase.co";
-const anon =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  "sb_publishable_bld-zRED6KZAPIJIvf66Ew_DPVrtW-9";
+const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const envAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(
-  url,
-  anon,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
+const url = envUrl ?? "https://nmcsfdgqnttanufydjer.supabase.co";
+const anon = envAnon ?? "sb_publishable_bld-zRED6KZAPIJIvf66Ew_DPVrtW-9";
+
+if (typeof window !== "undefined" && (!envUrl || !envAnon)) {
+  // Visible in browser devtools so misconfigured deploys are obvious.
+  console.warn(
+    "[supabase] NEXT_PUBLIC_SUPABASE_URL or _ANON_KEY missing — using build-time fallback. Auth will fail if the fallback project is no longer active.",
+  );
+}
+
+export const supabase = createClient(url, anon, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    // PKCE is safer for SPAs and produces clearer redirect errors than the
+    // legacy implicit flow when magic-link / email-confirm returns come in.
+    flowType: "pkce",
   },
-);
+});
