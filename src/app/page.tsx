@@ -5,6 +5,7 @@ import Link from "next/link";
 import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
 import { ErrorBubble } from "@/components/ErrorBubble";
+import { PerfumeArtwork } from "@/components/PerfumeArtwork";
 import { NewsRail } from "@/components/NewsRail";
 import { latestNews } from "@/lib/news";
 import { useAuth } from "@/lib/auth";
@@ -533,41 +534,22 @@ function DailyFlashcard({
 }
 
 function DailyFlashcardFront({ pick }: { pick: SearchCandidate }) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const showImage = pick.image_url && !imgFailed;
   return (
-    <div className="relative w-full h-full overflow-hidden border border-outline-variant bg-surface-container-low">
-      {showImage ? (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          src={pick.image_url!}
-          alt={pick.name}
-          className="absolute inset-0 w-full h-full object-cover grayscale-[0.15]"
-          onError={() => setImgFailed(true)}
-        />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Icon name="local_florist" size={42} className="text-outline" />
-        </div>
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-on-background/85 via-on-background/30 to-transparent" />
-
+    <div className="relative w-full h-full">
+      <PerfumeArtwork
+        brand={pick.brand}
+        name={pick.name}
+        family={pick.family}
+        notesBrief={pick.notes_brief}
+        variant="card"
+        className="w-full h-full"
+      />
       <div className="absolute top-2 right-2 bg-background/90 px-2 py-1 text-[9px] uppercase tracking-widest font-mono">
         Du jour
       </div>
       <div className="absolute top-2 left-2 bg-background/90 px-2 py-1 text-[9px] uppercase tracking-widest font-mono flex items-center gap-1">
         <Icon name="touch_app" size={10} />
         Tap
-      </div>
-
-      <div className="absolute inset-x-0 bottom-0 p-4 text-background">
-        <p className="text-[10px] uppercase tracking-[0.25em] opacity-80">
-          {pick.brand}
-          {pick.family ? ` · ${pick.family}` : ""}
-        </p>
-        <p className="text-xl font-semibold tracking-tight leading-tight mt-0.5">
-          {pick.name}
-        </p>
       </div>
     </div>
   );

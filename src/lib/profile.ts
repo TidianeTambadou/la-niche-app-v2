@@ -69,6 +69,11 @@ export const FAMILY_VULGAR: Record<
     title: "Feu de bois sous la neige",
     subtitle: "Encens, cuir, fumée",
   },
+  Fruity: {
+    emoji: "🍑",
+    title: "Verger en été",
+    subtitle: "Pêche, pomme, fruits rouges",
+  },
 };
 
 export const INTENSITY_VULGAR: Record<

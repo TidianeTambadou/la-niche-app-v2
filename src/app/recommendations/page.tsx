@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
-import { FragranceImage } from "@/components/FragranceImage";
 import { Icon } from "@/components/Icon";
 import { ErrorBubble } from "@/components/ErrorBubble";
+import { PerfumeArtwork } from "@/components/PerfumeArtwork";
 import { useAuth } from "@/lib/auth";
 import { findBoutiqueById } from "@/lib/boutiques";
 import { useStore } from "@/lib/store";
@@ -993,15 +993,13 @@ function DoneView({
                 key={`${c.brand}-${c.name}`}
                 className="flex items-center gap-3 py-3 border-b border-outline-variant/30 last:border-0"
               >
-                <div className="w-12 h-16 bg-surface-container-low overflow-hidden flex-shrink-0">
-                  <FragranceImage
-                    src={c.image_url ?? null}
-                    name={c.name}
-                    brand={c.brand}
-                    fallbackSize="sm"
-                    className="w-full h-full grayscale"
-                  />
-                </div>
+                <PerfumeArtwork
+                  brand={c.brand}
+                  name={c.name}
+                  variant="thumb"
+                  className="w-12 h-16 flex-shrink-0"
+                />
+
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] uppercase tracking-widest text-outline">
                     {c.brand}
@@ -1126,13 +1124,15 @@ function SwipeCardFront({
 }) {
   return (
     <div className="relative w-full h-full overflow-hidden bg-background border border-outline-variant">
-      {/* Background image — falls back to monogram if URL missing/broken */}
-      <FragranceImage
-        src={card.image_url ?? null}
-        name={card.name}
+      {/* La Niche logo watermark — image scraping was unreliable so we now
+          render a branded placeholder with the perfume name on top. */}
+      <PerfumeArtwork
         brand={card.brand}
-        fallbackSize="xl"
-        className="absolute inset-0 w-full h-full grayscale"
+        name={card.name}
+        family={card.family}
+        variant="card"
+        showSoonCaption={false}
+        className="absolute inset-0 w-full h-full border-0 bg-on-background"
       />
 
       {/* Readability gradient */}

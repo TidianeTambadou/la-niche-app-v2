@@ -26,7 +26,8 @@ export type ScentFamily =
   | "Amber"
   | "Fresh"
   | "Spicy"
-  | "Smoky";
+  | "Smoky"
+  | "Fruity";
 
 export type BodyZone =
   // Head / neck

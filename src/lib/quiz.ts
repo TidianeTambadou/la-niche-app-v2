@@ -80,8 +80,14 @@ export const QUIZ_QUESTIONS: QuizQuestionDef[] = [
       self: "Qu'est-ce qui te fait kiffer ?",
       friend: "Qu'est-ce qui le fait kiffer ?",
     },
+    subtitle: {
+      self: "Choix multiples — coche toutes les familles qui te plaisent",
+      friend: "Choix multiples — coche toutes les familles qui lui plaisent",
+    },
+    multi: true,
     options: [
       { value: "sweet", label: "Sucré / gourmand (vanille, caramel)" },
+      { value: "fruity", label: "Fruité (pêche, pomme, fruits rouges)" },
       { value: "woody", label: "Boisé / sec (cèdre, santal)" },
       { value: "floral", label: "Floral (rose, jasmin, iris)" },
       { value: "citrus", label: "Citrus / frais (bergamote, citron)" },
@@ -174,6 +180,7 @@ export const QUIZ_LABEL: Record<string, Record<string, string>> = {
   },
   taste: {
     sweet: "gourmand sucré (vanille, caramel)",
+    fruity: "fruité (pêche, pomme, fruits rouges)",
     woody: "boisé sec (cèdre, santal)",
     floral: "floral (rose, jasmin, iris)",
     citrus: "citrus frais (bergamote, citron)",
@@ -251,6 +258,7 @@ export function buildQuizContext(
 
 const TASTE_TO_FAMILY: Record<string, ScentFamily | null> = {
   sweet: "Amber",
+  fruity: "Fruity",
   woody: "Woody",
   floral: "Floral",
   citrus: "Citrus",
@@ -303,8 +311,13 @@ export function deriveLegacyProfile(
 } {
   const families = new Set<ScentFamily>();
   const taste = answers["taste"];
-  if (typeof taste === "string") {
-    const f = TASTE_TO_FAMILY[taste];
+  const tasteValues = Array.isArray(taste)
+    ? taste
+    : typeof taste === "string"
+      ? [taste]
+      : [];
+  for (const t of tasteValues) {
+    const f = TASTE_TO_FAMILY[t];
     if (f) families.add(f);
   }
   const temp = answers["temperature"];

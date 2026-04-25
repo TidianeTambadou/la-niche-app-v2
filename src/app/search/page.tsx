@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { ErrorBubble } from "@/components/ErrorBubble";
+import { PerfumeArtwork } from "@/components/PerfumeArtwork";
 import { agentSearch } from "@/lib/agent-client";
 import type { SearchCandidate } from "@/lib/agent";
 import { fragranceKey, useFragrances } from "@/lib/data";
@@ -190,7 +191,6 @@ function SearchBar({
 function SearchResult({ candidate }: { candidate: SearchCandidate }) {
   const fragrances = useFragrances();
   const { addToWishlist, isWishlisted } = useStore();
-  const [imgFailed, setImgFailed] = useState(false);
 
   // Match the agent result to our local catalog so we can link to the
   // in-app fragrance detail page when possible (otherwise we link out to
@@ -204,26 +204,19 @@ function SearchResult({ candidate }: { candidate: SearchCandidate }) {
     addToWishlist(wishlistKey, "liked", "search", {
       name: candidate.name,
       brand: candidate.brand,
-      imageUrl: candidate.image_url ?? null,
+      imageUrl: null,
     });
   }
 
   return (
     <li className="py-4 border-b border-outline-variant/30 last:border-0">
       <div className="flex items-start gap-3">
-        <div className="w-16 h-20 bg-surface-container-low overflow-hidden flex-shrink-0 flex items-center justify-center">
-          {candidate.image_url && !imgFailed ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={candidate.image_url}
-              alt={candidate.name}
-              className="w-full h-full object-cover grayscale"
-              onError={() => setImgFailed(true)}
-            />
-          ) : (
-            <Icon name="local_florist" size={20} className="text-outline" />
-          )}
-        </div>
+        <PerfumeArtwork
+          brand={candidate.brand}
+          name={candidate.name}
+          variant="thumb"
+          className="w-16 h-20 flex-shrink-0"
+        />
 
         <div className="flex-1 min-w-0">
           <p className="text-[10px] uppercase tracking-[0.2em] text-outline">

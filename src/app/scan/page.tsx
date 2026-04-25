@@ -32,6 +32,19 @@ export default function ScanPage() {
 
   useEffect(() => () => stopCamera(), []);
 
+  // The <video> element is only mounted while stage === "camera" | "scanning".
+  // When startCamera() resolves we may not yet have the element in the DOM —
+  // this effect attaches the stream as soon as React renders the video.
+  useEffect(() => {
+    if (stage !== "camera" && stage !== "scanning") return;
+    if (!videoRef.current || !streamRef.current) return;
+    if (videoRef.current.srcObject === streamRef.current) return;
+    videoRef.current.srcObject = streamRef.current;
+    // play() can reject on some mobile browsers even with muted+autoplay;
+    // the autoPlay attribute keeps the stream alive so we swallow the error.
+    videoRef.current.play().catch(() => {});
+  }, [stage]);
+
   async function startCamera() {
     setError(null);
     try {
@@ -40,12 +53,8 @@ export default function ScanPage() {
         audio: false,
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        // play() can reject on some mobile browsers even with muted+autoPlay;
-        // the video still streams via autoPlay attribute so we swallow the error.
-        await videoRef.current.play().catch(() => {});
-      }
+      // Mount the video element first; the useEffect above wires up
+      // srcObject once the <video> ref is populated.
       setStage("camera");
     } catch (e) {
       console.warn("Camera unavailable:", e);

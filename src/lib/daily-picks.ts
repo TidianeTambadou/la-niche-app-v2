@@ -26,7 +26,7 @@ type CachedPicks = {
   revealed: boolean;
 };
 
-const STORAGE_PREFIX = "la-niche.daily-picks.v2";
+const STORAGE_PREFIX = "la-niche.daily-picks.v3";
 
 function todayKey(): string {
   const d = new Date();
@@ -59,6 +59,7 @@ function writeCache(userId: string | null, value: CachedPicks): void {
 
 const TASTE_KEYWORDS: Record<string, string> = {
   sweet: "gourmand vanille caramel",
+  fruity: "fruité pêche fruits rouges",
   woody: "boisé cèdre santal",
   floral: "floral rose jasmin iris",
   citrus: "citrus bergamote",
@@ -96,15 +97,29 @@ function answerOf(
   return undefined;
 }
 
+function answersOf(
+  answers: Record<string, string | string[]> | undefined,
+  key: string,
+): string[] {
+  const v = answers?.[key];
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string");
+  if (typeof v === "string") return [v];
+  return [];
+}
+
 /** Build a Fragrantica-friendly French query from the user profile. */
 function buildDailyQuery(profile: OlfactiveProfile | null): string {
   const parts: string[] = ["parfum niche"];
   if (profile?.quiz_answers) {
-    const taste = answerOf(profile.quiz_answers, "taste");
+    // taste is multi-select — pick up to 2 keyword sets so the query stays
+    // tight enough to retrieve relevant results.
+    const tasteVals = answersOf(profile.quiz_answers, "taste").slice(0, 2);
+    for (const t of tasteVals) {
+      if (TASTE_KEYWORDS[t]) parts.push(TASTE_KEYWORDS[t]);
+    }
     const temp = answerOf(profile.quiz_answers, "temperature");
     const vibe = answerOf(profile.quiz_answers, "vibe");
     const target = answerOf(profile.quiz_answers, "target");
-    if (taste && TASTE_KEYWORDS[taste]) parts.push(TASTE_KEYWORDS[taste]);
     if (temp && TEMP_KEYWORDS[temp]) parts.push(TEMP_KEYWORDS[temp]);
     if (vibe && VIBE_KEYWORDS[vibe]) parts.push(VIBE_KEYWORDS[vibe]);
     if (target && TARGET_KEYWORDS[target]) parts.push(TARGET_KEYWORDS[target]);

@@ -81,106 +81,12 @@ async function tavilySearchRaw(
   return data.results ?? [];
 }
 
-/* ─── Bottle image enrichment ────────────────────────────────────────────
- * The LLM almost never returns valid image_urls (Fragrantica IDs are opaque
- * — fimgs.net/mdimg/perfume/375x500.<ID>.jpg). Real images come from two
- * places: Tavily's image search, and og:image meta tags on the Fragrantica
- * perfume page itself. We try Tavily first (cheap, 1 round-trip per perfume)
- * then fall back to scraping og:image on the Fragrantica URL.
+/* ─── Source-URL picker ──────────────────────────────────────────────────
+ * Image scraping was removed: results were unreliable (wrong perfumes,
+ * 404s) and the UI now displays a logo-watermarked placeholder instead.
+ * We still want the *source* URL to point at the real Fragrantica perfume
+ * page when possible, so the user can open the right page if they want.
  * ---------------------------------------------------------------------- */
-
-const IMAGE_HOST_RX = /^https?:\/\/[^\s"']+\.(jpe?g|png|webp)(\?[^\s"']*)?$/i;
-
-type TavilyImage = string | { url: string; description?: string };
-
-/** Targeted image search — used for SEARCH and RECOMMEND result enrichment. */
-async function tavilyImageSearch(
-  query: string,
-  domains: string[] = ["fragrantica.com", "fragrantica.fr"],
-  maxResults = 3,
-): Promise<TavilyImage[]> {
-  const apiKey = process.env.TAVILY_API_KEY;
-  if (!apiKey) return [];
-  try {
-    const res = await fetch("https://api.tavily.com/search", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        api_key: apiKey,
-        query,
-        include_domains: domains,
-        include_images: true,
-        include_image_descriptions: true,
-        search_depth: "basic",
-        max_results: maxResults,
-      }),
-    });
-    if (!res.ok) return [];
-    const data = (await res.json()) as { images?: TavilyImage[] };
-    return data.images ?? [];
-  } catch {
-    return [];
-  }
-}
-
-/** Scrape <meta property="og:image"> from a Fragrantica perfume page. The
- *  page format puts the bottle image in og:image consistently. */
-async function fetchOgImage(url: string): Promise<string | undefined> {
-  if (!url || !url.startsWith("http")) return undefined;
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "user-agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 LaNicheBot/1.0",
-        accept: "text/html,application/xhtml+xml",
-      },
-      signal: AbortSignal.timeout(4500),
-    });
-    if (!res.ok) return undefined;
-    const html = await res.text();
-    const m =
-      html.match(
-        /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-      ) ??
-      html.match(
-        /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
-      );
-    const found = m?.[1];
-    if (found && IMAGE_HOST_RX.test(found)) return found;
-    return undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Best-effort bottle image lookup — Tavily image search first, og:image
- *  fallback when a Fragrantica perfume page URL is known. */
-async function bottleImageFor(
-  brand: string,
-  name: string,
-  sourceUrl?: string,
-): Promise<string | undefined> {
-  const trimmedBrand = brand.trim();
-  const trimmedName = name.trim();
-  if (!trimmedBrand || !trimmedName) return undefined;
-
-  // Step 1 — Tavily image search restricted to Fragrantica.
-  const images = await tavilyImageSearch(
-    `${trimmedBrand} ${trimmedName} perfume bottle`,
-  );
-  for (const img of images) {
-    const u = typeof img === "string" ? img : img.url;
-    if (u && IMAGE_HOST_RX.test(u)) return u;
-  }
-
-  // Step 2 — og:image fallback when we have a Fragrantica perfume URL
-  // (search-results URLs don't carry a bottle image).
-  if (sourceUrl && /fragrantica\.[a-z]+\/perfume\//i.test(sourceUrl)) {
-    const og = await fetchOgImage(sourceUrl);
-    if (og) return og;
-  }
-  return undefined;
-}
 
 /** Pick the best Fragrantica perfume URL for a (brand, name) candidate from
  *  a pool of Tavily results. Falls back to the search query URL. */
@@ -427,18 +333,12 @@ export async function POST(req: Request) {
           } satisfies Omit<SearchCandidate, "image_url">;
         });
 
-      // Image enrichment in parallel — Tavily image search first, og:image
-      // fallback when we landed on a real perfume page.
-      const candidates: SearchCandidate[] = await Promise.all(
-        baseCandidates.map(async (c) => ({
-          ...c,
-          image_url:
-            (await bottleImageFor(c.brand, c.name, c.source_url).catch(
-              () => undefined,
-            )) ??
-            `https://placehold.co/300x400/0a0a0a/e2e2e2?font=montserrat&text=${encodeURIComponent(c.name)}`,
-        })),
-      );
+      // Image scraping was removed (unreliable). The frontend now renders a
+      // logo-watermarked placeholder card with brand + name + notes.
+      const candidates: SearchCandidate[] = baseCandidates.map((c) => ({
+        ...c,
+        image_url: undefined,
+      }));
 
       rememberSearch(cacheKey, candidates);
       return NextResponse.json({ ok: true, mode: "search", candidates } satisfies AgentResponse);
@@ -743,27 +643,15 @@ Sélectionne EXACTEMENT ${safeCount} parfums DIFFÉRENTS des parfums aimés/reje
               Math.max(50, Math.round(r.match_score ?? 75)),
             ),
             available_at: Array.from(inferred),
-            image_url:
-              r.image_url && IMAGE_HOST_RX.test(r.image_url)
-                ? r.image_url
-                : undefined,
+            // Image scraping disabled — UI renders a logo placeholder.
+            image_url: undefined,
             source_url:
               r.source_url ??
               `https://www.fragrantica.com/search/?query=${encodeURIComponent(`${r.brand} ${r.name}`)}`,
           } satisfies RecommendationCandidate;
         });
 
-      // Image enrichment in parallel — Tavily image search + og:image
-      // fallback. Skip when the LLM already returned a valid image_url.
-      const recommendations: RecommendationCandidate[] = await Promise.all(
-        baseRecommendations.map(async (r) => {
-          if (r.image_url) return r;
-          const img = await bottleImageFor(r.brand, r.name, r.source_url).catch(
-            () => undefined,
-          );
-          return img ? { ...r, image_url: img } : r;
-        }),
-      );
+      const recommendations: RecommendationCandidate[] = baseRecommendations;
 
       return NextResponse.json({
         ok: true,

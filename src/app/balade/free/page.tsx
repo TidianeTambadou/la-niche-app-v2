@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
 import { ErrorBubble } from "@/components/ErrorBubble";
+import { PerfumeArtwork } from "@/components/PerfumeArtwork";
 import {
   BodySilhouette,
   fragranceInitials,
@@ -918,10 +919,11 @@ function QuestionScreen({
                 }}
                 className="w-full text-left px-3 py-2 hover:bg-surface-container-low border-b border-outline-variant/30 last:border-0 flex items-center gap-3"
               >
-                <PlacementThumbnail
-                  imageUrl={c.image_url}
+                <PerfumeArtwork
+                  brand={c.brand}
                   name={c.name}
-                  size="md"
+                  variant="thumb"
+                  className="w-10 h-10 flex-shrink-0"
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] uppercase tracking-[0.15em] text-outline">
@@ -1152,6 +1154,16 @@ function ScanPanel({
   }
   useEffect(() => stopCamera, []);
 
+  // Attach the captured stream once the <video> element is mounted (which
+  // only happens after stage flips to "live"/"scanning").
+  useEffect(() => {
+    if (stage !== "live" && stage !== "scanning") return;
+    if (!videoRef.current || !streamRef.current) return;
+    if (videoRef.current.srcObject === streamRef.current) return;
+    videoRef.current.srcObject = streamRef.current;
+    videoRef.current.play().catch(() => {});
+  }, [stage]);
+
   async function startCamera() {
     setError(null);
     if (fragrances.length === 0) {
@@ -1164,10 +1176,7 @@ function ScanPanel({
         audio: false,
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
+      // The useEffect above attaches srcObject once the video mounts.
       setStage("live");
     } catch (e) {
       setError(

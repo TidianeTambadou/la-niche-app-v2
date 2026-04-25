@@ -149,6 +149,7 @@ const FAMILY_MOMENT_HINTS: Record<ScentFamily, Moment[]> = {
   Amber: ["evening", "night"],
   Smoky: ["night"],
   Spicy: ["evening", "night"],
+  Fruity: ["day", "evening"],
 };
 
 const FAMILY_OCCASION_HINTS: Record<ScentFamily, Occasion[]> = {
@@ -159,6 +160,7 @@ const FAMILY_OCCASION_HINTS: Record<ScentFamily, Occasion[]> = {
   Amber: ["date", "going_out"],
   Smoky: ["going_out"],
   Spicy: ["date", "going_out"],
+  Fruity: ["casual", "date"],
 };
 
 const INTENSITY_MOMENT_HINTS: Record<IntensityPref, Moment[]> = {
