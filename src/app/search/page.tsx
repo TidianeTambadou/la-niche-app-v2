@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
+import { ErrorBubble } from "@/components/ErrorBubble";
 import { PerfumeCard } from "@/components/PerfumeCard";
 import {
   searchFragrances,
@@ -46,7 +47,7 @@ export default function SearchPage() {
         <div className="flex items-center gap-2 mb-4">
           <span className="w-2 h-2 bg-primary rounded-full" />
           <span className="text-[10px] uppercase tracking-[0.2em] font-medium">
-            Concierge IA
+            Concierge La Niche
           </span>
         </div>
         <h1 className="text-4xl font-light tracking-tighter leading-none mb-4">
@@ -61,8 +62,12 @@ export default function SearchPage() {
       </section>
 
       {error && (
-        <div className="mb-6 border border-error/40 bg-error-container/20 px-4 py-3">
-          <p className="text-xs text-error">{error}</p>
+        <div className="mb-6">
+          <ErrorBubble
+            detail={error}
+            context="Search · chargement catalogue"
+            variant="block"
+          />
         </div>
       )}
 

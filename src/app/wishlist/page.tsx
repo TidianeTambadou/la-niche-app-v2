@@ -6,19 +6,39 @@ import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
 import { FragranceImage } from "@/components/FragranceImage";
 import { useFragrances } from "@/lib/data";
-import { useStore, type WishlistEntry } from "@/lib/store";
+import {
+  useStore,
+  WISHLIST_CATEGORY_LABELS,
+  WISHLIST_CATEGORY_ORDER,
+  type WishlistCategory,
+  type WishlistEntry,
+} from "@/lib/store";
 
-type Filter = "all" | "liked" | "disliked" | "recent";
+type Filter =
+  | "all"
+  | "liked"
+  | "disliked"
+  | "recent"
+  | "uncategorized"
+  | WishlistCategory;
 
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "liked", label: "Liked" },
-  { id: "disliked", label: "Disliked" },
-  { id: "recent", label: "Recent" },
+const STATUS_FILTERS: { id: Filter; label: string }[] = [
+  { id: "all", label: "Tous" },
+  { id: "liked", label: "Aimés" },
+  { id: "disliked", label: "Rejetés" },
+  { id: "recent", label: "Récents" },
+];
+
+const CATEGORY_FILTERS: { id: Filter; label: string }[] = [
+  ...WISHLIST_CATEGORY_ORDER.map((c) => ({
+    id: c as Filter,
+    label: WISHLIST_CATEGORY_LABELS[c],
+  })),
+  { id: "uncategorized", label: "Sans rangement" },
 ];
 
 export default function WishlistPage() {
-  const { wishlist, removeFromWishlist } = useStore();
+  const { wishlist, removeFromWishlist, setWishlistCategory } = useStore();
   const fragrances = useFragrances();
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -33,15 +53,19 @@ export default function WishlistPage() {
   const items = useMemo<DisplayItem[]>(() => {
     let list = [...wishlist];
     if (filter === "liked") list = list.filter((w) => w.status === "liked");
-    if (filter === "disliked")
+    else if (filter === "disliked")
       list = list.filter((w) => w.status === "disliked");
-    if (filter === "recent") {
+    else if (filter === "uncategorized")
+      list = list.filter((w) => !w.category);
+    else if (filter === "recent") {
       list = list
         .filter((w) => Date.now() - w.addedAt < 1000 * 60 * 60 * 24 * 14)
         .sort((a, b) => b.addedAt - a.addedAt);
-    } else {
-      list.sort((a, b) => b.addedAt - a.addedAt);
+    } else if (filter !== "all") {
+      // category filter
+      list = list.filter((w) => w.category === filter);
     }
+    if (filter !== "recent") list.sort((a, b) => b.addedAt - a.addedAt);
     return list.flatMap((w): DisplayItem[] => {
       const fragrance = fragrances.find((f) => f.key === w.fragranceId);
       if (fragrance) {
@@ -53,7 +77,6 @@ export default function WishlistPage() {
           href: `/fragrance/${fragrance.key}`,
         }];
       }
-      // Fallback: use fragranceMeta stored at wishlist time (works offline/before catalog loads)
       if (w.fragranceMeta) {
         return [{
           entry: w,
@@ -67,21 +90,25 @@ export default function WishlistPage() {
     });
   }, [wishlist, filter, fragrances]);
 
-  const counts = useMemo(
-    () => ({
+  const counts = useMemo(() => {
+    const base: Record<string, number> = {
       all: wishlist.length,
       liked: wishlist.filter((w) => w.status === "liked").length,
       disliked: wishlist.filter((w) => w.status === "disliked").length,
       recent: wishlist.filter(
         (w) => Date.now() - w.addedAt < 1000 * 60 * 60 * 24 * 14,
       ).length,
-    }),
-    [wishlist],
-  );
+      uncategorized: wishlist.filter((w) => !w.category).length,
+    };
+    for (const c of WISHLIST_CATEGORY_ORDER) {
+      base[c] = wishlist.filter((w) => w.category === c).length;
+    }
+    return base;
+  }, [wishlist]);
 
   return (
     <div className="px-6 pt-4 pb-12">
-      <header className="mb-10">
+      <header className="mb-8">
         <p className="text-[10px] uppercase tracking-[0.3em] text-outline mb-2">
           Archives &amp; aspirations
         </p>
@@ -90,43 +117,30 @@ export default function WishlistPage() {
         </h1>
       </header>
 
-      <div className="flex gap-6 mb-8 overflow-x-auto hide-scrollbar border-b border-outline-variant/40 pb-3">
-        {FILTERS.map((f) => {
-          const active = f.id === filter;
-          return (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setFilter(f.id)}
-              className={clsx(
-                "flex flex-col items-start group transition-opacity",
-                active ? "opacity-100" : "opacity-40 hover:opacity-100",
-              )}
-            >
-              <span className="text-xs font-bold tracking-[0.2em] uppercase mb-1">
-                {f.label}
-              </span>
-              <span className="text-[10px] font-mono text-outline">
-                {String(counts[f.id]).padStart(2, "0")} UNITS
-              </span>
-              <div
-                className={clsx(
-                  "h-0.5 mt-2 bg-primary transition-all",
-                  active ? "w-full" : "w-0",
-                )}
-              />
-            </button>
-          );
-        })}
-      </div>
+      <FilterRow
+        title="Vue"
+        filters={STATUS_FILTERS}
+        active={filter}
+        counts={counts}
+        onPick={setFilter}
+      />
+
+      <FilterRow
+        title="Mes catégories"
+        filters={CATEGORY_FILTERS}
+        active={filter}
+        counts={counts}
+        onPick={setFilter}
+      />
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center text-center py-20">
           <Icon name="favorite_border" size={42} className="text-outline mb-4" />
           <p className="text-sm text-on-surface-variant max-w-xs mb-6">
-            Aucun parfum {filter !== "all" ? `(filtre : ${filter})` : ""}{" "}
-            pour le moment. Ajoute des parfums depuis Search, Scan ou pendant
-            une balade.
+            Aucun parfum
+            {filter !== "all" ? ` (filtre : ${labelFor(filter)})` : ""} pour
+            le moment. Ajoute des parfums depuis Search, Scan ou pendant une
+            balade.
           </p>
           <Link
             href="/search"
@@ -143,7 +157,6 @@ export default function WishlistPage() {
               className="border-b border-outline-variant/30 last:border-0"
             >
               <div className="flex items-start gap-4 py-5">
-                {/* Image */}
                 <div className="block w-24 aspect-[3/4] bg-surface-container-low overflow-hidden flex-shrink-0">
                   {href ? (
                     <Link href={href} className="block w-full h-full">
@@ -172,13 +185,17 @@ export default function WishlistPage() {
                   </p>
                   {href ? (
                     <Link href={href}>
-                      <h3 className="text-base font-semibold tracking-tight">{name}</h3>
+                      <h3 className="text-base font-semibold tracking-tight">
+                        {name}
+                      </h3>
                     </Link>
                   ) : (
-                    <h3 className="text-base font-semibold tracking-tight">{name}</h3>
+                    <h3 className="text-base font-semibold tracking-tight">
+                      {name}
+                    </h3>
                   )}
 
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
                     <span
                       className={clsx(
                         "text-[9px] px-2 py-0.5 rounded-full uppercase font-bold tracking-widest",
@@ -187,12 +204,24 @@ export default function WishlistPage() {
                           : "border border-error text-error",
                       )}
                     >
-                      {entry.status === "liked" ? "Liked" : "Disliked"}
+                      {entry.status === "liked" ? "Aimé" : "Rejeté"}
                     </span>
                     <span className="text-[9px] uppercase tracking-widest text-outline">
                       via {entry.origin}
                     </span>
+                    {entry.category && (
+                      <span className="text-[9px] px-2 py-0.5 rounded-full uppercase font-bold tracking-widest bg-surface-container-high text-on-background">
+                        {WISHLIST_CATEGORY_LABELS[entry.category]}
+                      </span>
+                    )}
                   </div>
+
+                  <CategorySelector
+                    value={entry.category ?? null}
+                    onChange={(cat) =>
+                      setWishlistCategory(entry.fragranceId, cat)
+                    }
+                  />
 
                   <div className="mt-3 flex items-center gap-3">
                     <Link
@@ -218,4 +247,96 @@ export default function WishlistPage() {
       )}
     </div>
   );
+}
+
+function FilterRow({
+  title,
+  filters,
+  active,
+  counts,
+  onPick,
+}: {
+  title: string;
+  filters: { id: Filter; label: string }[];
+  active: Filter;
+  counts: Record<string, number>;
+  onPick: (f: Filter) => void;
+}) {
+  return (
+    <div className="mb-6">
+      <p className="text-[9px] uppercase tracking-[0.25em] font-bold text-outline mb-2">
+        {title}
+      </p>
+      <div className="flex gap-2 overflow-x-auto hide-scrollbar -mx-6 px-6 pb-2">
+        {filters.map((f) => {
+          const isActive = active === f.id;
+          const n = counts[f.id] ?? 0;
+          return (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => onPick(f.id)}
+              className={clsx(
+                "flex-shrink-0 px-3 py-1.5 border text-[10px] uppercase tracking-widest font-bold transition-all",
+                isActive
+                  ? "bg-primary text-on-primary border-primary"
+                  : "border-outline-variant hover:border-primary text-on-background",
+              )}
+            >
+              {f.label}
+              <span
+                className={clsx(
+                  "ml-1.5 font-mono",
+                  isActive ? "text-on-primary/80" : "text-outline",
+                )}
+              >
+                {String(n).padStart(2, "0")}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CategorySelector({
+  value,
+  onChange,
+}: {
+  value: WishlistCategory | null;
+  onChange: (cat: WishlistCategory | null) => void;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-1">
+      {WISHLIST_CATEGORY_ORDER.map((c) => {
+        const picked = value === c;
+        return (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onChange(picked ? null : c)}
+            className={clsx(
+              "text-[9px] px-2 py-0.5 border uppercase tracking-widest font-bold transition-all",
+              picked
+                ? "bg-on-background text-background border-on-background"
+                : "border-outline-variant/60 text-outline hover:border-primary hover:text-on-background",
+            )}
+            aria-pressed={picked}
+          >
+            {WISHLIST_CATEGORY_LABELS[c]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function labelFor(f: Filter): string {
+  if (f === "all") return "Tous";
+  if (f === "liked") return "Aimés";
+  if (f === "disliked") return "Rejetés";
+  if (f === "recent") return "Récents";
+  if (f === "uncategorized") return "Sans rangement";
+  return WISHLIST_CATEGORY_LABELS[f];
 }

@@ -15,11 +15,38 @@ import { useAuth } from "@/lib/auth";
 export type WishlistStatus = "liked" | "disliked";
 export type WishlistOrigin = "search" | "scan" | "balade" | "manual";
 
+/** User-assigned bucket inside the wishlist. `null` = uncategorised. */
+export type WishlistCategory =
+  | "to_smell"
+  | "to_buy"
+  | "favorite"
+  | "already_tested"
+  | "seen_in_shop";
+
+export const WISHLIST_CATEGORY_LABELS: Record<WishlistCategory, string> = {
+  to_smell: "À sentir",
+  to_buy: "À acheter",
+  favorite: "Favori",
+  already_tested: "Déjà testé",
+  seen_in_shop: "Vu en boutique",
+};
+
+export const WISHLIST_CATEGORY_ORDER: WishlistCategory[] = [
+  "favorite",
+  "to_smell",
+  "to_buy",
+  "already_tested",
+  "seen_in_shop",
+];
+
 export type WishlistEntry = {
   fragranceId: string;
   status: WishlistStatus;
   addedAt: number;
   origin: WishlistOrigin;
+  /** Optional user-assigned classification. Lets the wishlist be sorted into
+   *  collections (à sentir, à acheter…). `undefined` = uncategorised. */
+  category?: WishlistCategory;
   /** Snapshot of fragrance data captured at wishlist time — lets the wishlist
    *  page render even when the Supabase catalog hasn't loaded yet. */
   fragranceMeta?: { name: string; brand: string; imageUrl?: string | null };
@@ -135,6 +162,11 @@ type StoreActions = {
   ) => void;
   removeFromWishlist: (fragranceId: string) => void;
   isWishlisted: (fragranceId: string) => WishlistStatus | null;
+  /** Set or clear the user-assigned category on a wishlist entry. */
+  setWishlistCategory: (
+    fragranceId: string,
+    category: WishlistCategory | null,
+  ) => void;
 
   // Balade lifecycle
   startBalade: (input: {
@@ -340,6 +372,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       state.wishlist.find((w) => w.fragranceId === fragranceId)?.status ?? null,
     [state.wishlist],
   );
+
+  const setWishlistCategory = useCallback<
+    StoreActions["setWishlistCategory"]
+  >((fragranceId, category) => {
+    setState((s) => ({
+      ...s,
+      wishlist: s.wishlist.map((w) =>
+        w.fragranceId === fragranceId
+          ? { ...w, category: category ?? undefined }
+          : w,
+      ),
+    }));
+  }, []);
 
   const startBalade = useCallback<StoreActions["startBalade"]>((input) => {
     setState((s) => ({
@@ -582,6 +627,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       addToWishlist,
       removeFromWishlist,
       isWishlisted,
+      setWishlistCategory,
       startBalade,
       endBalade,
       cancelBalade,
@@ -604,6 +650,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       addToWishlist,
       removeFromWishlist,
       isWishlisted,
+      setWishlistCategory,
       startBalade,
       endBalade,
       cancelBalade,

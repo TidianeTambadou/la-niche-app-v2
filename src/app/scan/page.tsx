@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
+import { ErrorBubble } from "@/components/ErrorBubble";
 import { useFragrances, type Fragrance } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { agentIdentify } from "@/lib/agent-client";
@@ -121,11 +122,7 @@ export default function ScanPage() {
       setStage("result");
     } catch (e) {
       console.error("agentIdentify failed:", e);
-      setError(
-        e instanceof Error
-          ? e.message
-          : "L'agent IA n'a pas pu analyser l'image.",
-      );
+      setError(e instanceof Error ? e.message : "identify failed");
       setStage("error");
     }
   }
@@ -149,7 +146,7 @@ export default function ScanPage() {
     <div className="px-6 pt-4 pb-12">
       <header className="mb-8">
         <span className="text-[10px] uppercase tracking-[0.3em] text-outline mb-3 block">
-          Reconnaissance IA
+          Reconnaissance · Équipe La Niche
         </span>
         <h1 className="text-4xl font-bold tracking-tighter leading-none">
           Scan parfum
@@ -170,7 +167,8 @@ export default function ScanPage() {
               />
               <p className="text-sm text-on-surface-variant max-w-xs mx-auto leading-relaxed">
                 Pointe la caméra sur un flacon ou son packaging.
-                L&apos;agent IA identifie le parfum à partir de l&apos;image.
+                L&apos;équipe La Niche identifie le parfum à partir de
+                l&apos;image.
               </p>
             </div>
           </div>
@@ -183,7 +181,7 @@ export default function ScanPage() {
             Ouvrir la caméra
           </button>
           <p className="text-[10px] uppercase tracking-widest text-outline text-center leading-relaxed">
-            L&apos;image capturée est envoyée à l&apos;agent IA pour
+            L&apos;image capturée est envoyée à l&apos;équipe La Niche pour
             identification (Fragrantica).
           </p>
         </section>
@@ -216,7 +214,7 @@ export default function ScanPage() {
                     <Dot delay={300} />
                   </div>
                   <span className="text-[10px] uppercase tracking-widest font-mono text-on-primary">
-                    L&apos;agent analyse l&apos;image…
+                    L&apos;équipe La Niche analyse l&apos;image…
                   </span>
                 </div>
               </div>
@@ -263,9 +261,9 @@ export default function ScanPage() {
               Aucun parfum identifié
             </p>
             <p className="text-sm text-on-surface-variant max-w-sm mx-auto leading-relaxed">
-              L&apos;agent n&apos;a pas pu reconnaître ce flacon avec assez
-              de certitude. Essaie avec un meilleur cadrage, une étiquette
-              lisible, ou plus de lumière.
+              L&apos;équipe La Niche n&apos;a pas pu reconnaître ce flacon
+              avec assez de certitude. Essaie avec un meilleur cadrage, une
+              étiquette lisible, ou plus de lumière.
             </p>
           </div>
           <div className="flex flex-col gap-2">
@@ -289,27 +287,12 @@ export default function ScanPage() {
       )}
 
       {stage === "error" && (
-        <section className="flex flex-col gap-6 text-center py-8">
-          <Icon
-            name="error_outline"
-            size={48}
-            className="text-error mx-auto"
+        <section className="flex flex-col gap-6 py-8">
+          <ErrorBubble
+            detail={error ?? undefined}
+            context="Scan parfum"
+            onRetry={reset}
           />
-          <div>
-            <p className="text-base font-semibold mb-2">
-              Une erreur est survenue
-            </p>
-            <p className="text-sm text-on-surface-variant max-w-sm mx-auto leading-relaxed">
-              {error ?? "Erreur inconnue."}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={reset}
-            className="w-full py-4 bg-primary text-on-primary rounded-full text-xs uppercase tracking-[0.2em] font-bold active:scale-95 transition-transform"
-          >
-            Recommencer
-          </button>
         </section>
       )}
 

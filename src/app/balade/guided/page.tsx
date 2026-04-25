@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Icon } from "@/components/Icon";
+import { ErrorBubble } from "@/components/ErrorBubble";
 import { shopOpenNow, useData, useShops } from "@/lib/data";
 
 export default function GuidedShopPickPage() {
@@ -57,8 +58,12 @@ export default function GuidedShopPickPage() {
       </div>
 
       {error && (
-        <div className="mb-6 border border-error/40 bg-error-container/20 px-4 py-3">
-          <p className="text-xs text-error">{error}</p>
+        <div className="mb-6">
+          <ErrorBubble
+            detail={error}
+            context="Balade guidée · chargement"
+            variant="block"
+          />
         </div>
       )}
 

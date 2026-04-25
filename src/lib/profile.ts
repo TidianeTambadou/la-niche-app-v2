@@ -22,6 +22,10 @@ export type OlfactiveProfile = {
   moments: Moment[];
   occasions: Occasion[];
   budget: Budget;
+  /** Raw quiz answers from the shared questionnaire (vibe, target, taste,
+   *  temperature, intensity, budget, occasion, nope). The legacy fields
+   *  above are derived from these on save so older screens keep working. */
+  quiz_answers?: Record<string, string | string[]>;
   /** ISO timestamp of when the user completed (or last edited) the wizard. */
   completed_at: string;
 };

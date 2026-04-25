@@ -108,7 +108,7 @@ export default function BaladeEntryPage() {
             </h2>
             <p className="text-sm text-on-surface-variant group-hover:text-on-primary/70 max-w-md leading-relaxed">
               En boutique. Choisis le lieu, indique ton temps disponible :
-              l&apos;IA génère un parcours optimisé.
+              l&apos;équipe La Niche génère un parcours optimisé.
             </p>
           </div>
           <Icon

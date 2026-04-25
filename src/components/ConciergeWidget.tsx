@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
+import { ErrorBubble } from "@/components/ErrorBubble";
 import { agentAsk, type AskHistoryTurn } from "@/lib/agent-client";
 import { useAuth } from "@/lib/auth";
 import {
@@ -13,6 +14,7 @@ import {
   OCCASION_VULGAR,
   BUDGET_VULGAR,
 } from "@/lib/profile";
+import { buildQuizContext } from "@/lib/quiz";
 
 type Msg = { id: number; role: "user" | "assistant" | "error"; content: string };
 
@@ -25,13 +27,22 @@ const SUGGESTIONS = [
 function buildProfileContext(user: ReturnType<typeof useAuth>["user"]): string | undefined {
   const profile = readProfileFromUser(user);
   if (!profile) return undefined;
+  // Prefer the richer quiz answers when the new onboarding has been
+  // completed; fall back to the legacy derived fields otherwise.
+  if (profile.quiz_answers) {
+    return [
+      buildQuizContext(profile.quiz_answers, "self"),
+      "",
+      "Quand tu fais des recommandations, priorise les parfums qui correspondent à ce profil. Explique pourquoi chaque suggestion correspond.",
+    ].join("\n");
+  }
   const families = profile.preferred_families
-    .map((f) => FAMILY_VULGAR[f].title)
+    .map((f) => FAMILY_VULGAR[f]?.title ?? f)
     .join(", ");
-  const intensity = INTENSITY_VULGAR[profile.intensity_preference].title;
-  const budget = BUDGET_VULGAR[profile.budget].title;
-  const moments = profile.moments.map((m) => MOMENT_VULGAR[m].title).join(", ");
-  const occasions = profile.occasions.map((o) => OCCASION_VULGAR[o].title).join(", ");
+  const intensity = INTENSITY_VULGAR[profile.intensity_preference]?.title ?? profile.intensity_preference;
+  const budget = BUDGET_VULGAR[profile.budget]?.title ?? profile.budget;
+  const moments = profile.moments.map((m) => MOMENT_VULGAR[m]?.title ?? m).join(", ");
+  const occasions = profile.occasions.map((o) => OCCASION_VULGAR[o]?.title ?? o).join(", ");
   return [
     "PROFIL OLFACTIF DE L'UTILISATEUR (utilise ces informations pour personnaliser tes réponses) :",
     `- Familles olfactives préférées : ${families}`,
@@ -343,9 +354,13 @@ function Bubble({
   }
   if (msg.role === "error") {
     return (
-      <div className="bubble-in flex justify-start">
-        <div className="max-w-[85%] border border-error/40 text-error px-3 py-2 text-xs leading-relaxed">
-          ⚠ {msg.content}
+      <div className="bubble-in flex justify-start w-full">
+        <div className="max-w-[90%]">
+          <ErrorBubble
+            detail={msg.content}
+            context="Concierge La Niche"
+            variant="inline"
+          />
         </div>
       </div>
     );

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
+import { ErrorBubble } from "@/components/ErrorBubble";
 import {
   BodySilhouette,
   fragranceInitials,
@@ -15,7 +16,7 @@ import {
 } from "@/lib/fragrances";
 import { fragranceKey, useFragrances, type Fragrance } from "@/lib/data";
 import { useStore, type BodyPlacement } from "@/lib/store";
-import { agentSearch } from "@/lib/agent-client";
+import { agentAsk, agentSearch } from "@/lib/agent-client";
 import type { SearchCandidate } from "@/lib/agent";
 
 export default function FreeBaladePage() {
@@ -40,21 +41,29 @@ export default function FreeBaladePage() {
    *   scanning   → ScanSheet open
    *   placing    → fragrance picked, body becomes interactive: next tap on
    *                the mannequin draws the marker at the click point.
+   *   confirming → tap registered; isLayering=true means the zone already
+   *                holds another perfume and committing will analyse the mix.
    */
   type Flow =
     | { kind: "idle" }
     | { kind: "scanning" }
     | { kind: "placing"; fragrance: Fragrance }
-    /** User has tapped a body point but hasn't confirmed yet. The preview
-     *  marker is drawn at `position`. Re-tapping moves the preview; the
-     *  ConfirmBanner is the only way to commit. */
     | {
         kind: "confirming";
         fragrance: Fragrance;
         zone: BodyZone;
         position: [number, number, number];
+        isLayering: boolean;
       };
   const [flow, setFlow] = useState<Flow>({ kind: "idle" });
+  /** Layering analysis state — when set, a toast displays the mix description
+   *  returned by the La Niche team's analysis (or a loading state). */
+  const [layeringAnalysis, setLayeringAnalysis] = useState<{
+    zone: BodyZone;
+    mixed: string[];
+    text: string | null;
+    error: string | null;
+  } | null>(null);
   const [editingFragranceId, setEditingFragranceId] = useState<string | null>(
     null,
   );
@@ -69,22 +78,37 @@ export default function FreeBaladePage() {
 
   const placements = activeBalade?.placements ?? [];
 
+  // When in placement mode, dim already-occupied markers so the user sees
+  // those zones are taken (a tap there triggers the layering flow).
+  const isPlacingFlow =
+    flow.kind === "placing" || flow.kind === "confirming";
   const filledMarkers = useMemo(
     () =>
       placements
         .map((p) => {
           const f = fragrances.find((x) => x.key === p.fragranceId);
-          if (!f) return null;
+          const meta = p.fragranceMeta;
+          const name = f?.name ?? meta?.name;
+          if (!name) return null;
           return {
             fragranceId: p.fragranceId,
             zone: p.zone,
-            label: fragranceInitials(f.name),
+            label: fragranceInitials(name),
             position: p.position,
+            dimmed: isPlacingFlow,
           };
         })
         .filter((m): m is NonNullable<typeof m> => Boolean(m)),
-    [placements, fragrances],
+    [placements, fragrances, isPlacingFlow],
   );
+
+  /** Set of zones that already hold at least one perfume — drives the
+   *  greying overlay AND the layering branch in handleBodyClick. */
+  const occupiedZones = useMemo(() => {
+    const s = new Set<BodyZone>();
+    for (const p of placements) s.add(p.zone);
+    return s;
+  }, [placements]);
 
   function handleBodyClick(
     zone: BodyZone,
@@ -101,12 +125,13 @@ export default function FreeBaladePage() {
     }
 
     // 2) PLACEMENT flow: tap = preview only. Move into "confirming" state,
-    //    keep the same fragrance, store the candidate zone/position. The
-    //    ConfirmBanner button is the only way to actually commit.
+    //    keep the same fragrance, store the candidate zone/position. If the
+    //    zone already holds a perfume the confirm becomes a "layering" — same
+    //    state, isLayering=true, the banner copy + after-effect change.
     if (flow.kind === "placing" || flow.kind === "confirming") {
-      const fragrance =
-        flow.kind === "placing" ? flow.fragrance : flow.fragrance;
-      setFlow({ kind: "confirming", fragrance, zone, position });
+      const fragrance = flow.fragrance;
+      const isLayering = occupiedZones.has(zone);
+      setFlow({ kind: "confirming", fragrance, zone, position, isLayering });
       setSelectedZone(zone);
       return;
     }
@@ -129,13 +154,58 @@ export default function FreeBaladePage() {
       brand: flow.fragrance.brand,
       imageUrl: flow.fragrance.imageUrl,
     };
-    layerOnBody(flow.zone, flow.fragrance.key, flow.position, meta);
+    const wasLayering = flow.isLayering;
+    const targetZone = flow.zone;
+    const newName = flow.fragrance.name;
+    const newBrand = flow.fragrance.brand;
+    layerOnBody(targetZone, flow.fragrance.key, flow.position, meta);
     setLastPlaced({
-      name: flow.fragrance.name,
-      zone: flow.zone,
+      name: newName,
+      zone: targetZone,
       imageUrl: flow.fragrance.imageUrl,
     });
     setFlow({ kind: "idle" });
+
+    // Layering: ask the La Niche team to describe what the mix smells like.
+    if (wasLayering) {
+      const existing = placements
+        .filter((p) => p.zone === targetZone)
+        .map((p) => {
+          const f = fragrances.find((x) => x.key === p.fragranceId);
+          return f
+            ? `${f.brand} ${f.name}`
+            : p.fragranceMeta
+              ? `${p.fragranceMeta.brand} ${p.fragranceMeta.name}`
+              : null;
+        })
+        .filter((s): s is string => Boolean(s));
+      const all = [...existing, `${newBrand} ${newName}`];
+      setLayeringAnalysis({
+        zone: targetZone,
+        mixed: all,
+        text: null,
+        error: null,
+      });
+      const prompt = `Analyse de layering — l'utilisateur vient de superposer plusieurs parfums sur la même zone du corps (${BODY_ZONE_LABELS[targetZone]}). Les parfums mélangés sont : ${all.join(" + ")}.
+
+Décris en 3-4 phrases concrètes ce que ce mélange va donner sur la peau : accords dominants qui ressortent, notes qui peuvent rentrer en conflit, type de sillage attendu, et un verdict honnête (réussi, risqué, à éviter ?). Pas de jargon, ton direct, comme un conseiller en boutique.`;
+      agentAsk(prompt)
+        .then((text) => {
+          setLayeringAnalysis((prev) =>
+            prev && prev.zone === targetZone ? { ...prev, text } : prev,
+          );
+        })
+        .catch((e: unknown) => {
+          setLayeringAnalysis((prev) =>
+            prev && prev.zone === targetZone
+              ? {
+                  ...prev,
+                  error: e instanceof Error ? e.message : "analysis failed",
+                }
+              : prev,
+          );
+        });
+    }
   }
 
   // Auto-dismiss the success toast after 3 s.
@@ -286,9 +356,13 @@ export default function FreeBaladePage() {
             {editingFragranceId
               ? "Touche un nouveau point sur le corps."
               : flow.kind === "placing"
-                ? "Touche la zone du corps où tu l'as appliqué."
+                ? occupiedZones.size > 0
+                  ? "Touche la zone du corps où tu l'as appliqué. Les zones grisées sont déjà occupées — re-toucher = layering."
+                  : "Touche la zone du corps où tu l'as appliqué."
                 : flow.kind === "confirming"
-                  ? "Re-touche pour ajuster, ou confirme en bas."
+                  ? flow.isLayering
+                    ? "Cette zone est déjà occupée. Confirme pour layerer, ou retouche ailleurs."
+                    : "Re-touche pour ajuster, ou confirme en bas."
                   : null}
           </p>
           <section className="bg-surface-container-low border border-primary py-4 mb-8 transition-colors">
@@ -416,11 +490,15 @@ export default function FreeBaladePage() {
       )}
       {flow.kind === "confirming" && (
         <ActionBanner
-          label="Confirmer la pose ici ?"
+          label={
+            flow.isLayering
+              ? `Layering · ${BODY_ZONE_LABELS[flow.zone]} déjà parfumée. L'équipe La Niche analysera le mélange.`
+              : "Confirmer la pose ici ?"
+          }
           fragranceName={flow.fragrance.name}
           fragranceImage={flow.fragrance.imageUrl}
           onCancel={cancelFlow}
-          confirmLabel="Confirmer"
+          confirmLabel={flow.isLayering ? "Layer ici" : "Confirmer"}
           onConfirm={confirmPlacement}
         />
       )}
@@ -456,6 +534,18 @@ export default function FreeBaladePage() {
           name={lastPlaced.name}
           zone={lastPlaced.zone}
           imageUrl={lastPlaced.imageUrl}
+        />
+      )}
+
+      {/* Layering analysis sheet — shown after a layering pose commits while
+          the La Niche team writes up the mix verdict. */}
+      {layeringAnalysis && (
+        <LayeringAnalysisSheet
+          zone={layeringAnalysis.zone}
+          mixed={layeringAnalysis.mixed}
+          text={layeringAnalysis.text}
+          error={layeringAnalysis.error}
+          onClose={() => setLayeringAnalysis(null)}
         />
       )}
 
@@ -806,7 +896,11 @@ function QuestionScreen({
         {(candidates.length > 0 || error || (query.length >= 3 && !loading)) && (
           <div className="absolute left-0 right-0 top-full mt-1 bg-background border border-outline-variant shadow-2xl z-20 max-h-64 overflow-y-auto">
             {error && (
-              <p className="px-4 py-3 text-xs text-error">{error}</p>
+              <ErrorBubble
+                detail={error}
+                context="Balade libre · recherche"
+                variant="inline"
+              />
             )}
             {!error && candidates.length === 0 && !loading && (
               <p className="px-4 py-3 text-xs text-outline italic">
@@ -1214,3 +1308,117 @@ function ScanPanel({
     </div>
   );
 }
+
+/* -------------------------------------------------------------------------
+ * LayeringAnalysisSheet — bottom sheet that surfaces the verdict from the
+ * La Niche team after a layering pose. Loading skeleton while the analysis
+ * is in flight; ErrorBubble fallback if it fails.
+ * --------------------------------------------------------------------- */
+
+function LayeringAnalysisSheet({
+  zone,
+  mixed,
+  text,
+  error,
+  onClose,
+}: {
+  zone: BodyZone;
+  mixed: string[];
+  text: string | null;
+  error: string | null;
+  onClose: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="absolute inset-0 bg-on-background/30 transition-opacity duration-300"
+        style={{ opacity: mounted ? 1 : 0 }}
+        onClick={onClose}
+        aria-hidden
+      />
+      <div
+        className={clsx(
+          "relative w-full max-w-screen-md bg-background border-t border-outline-variant max-h-[70vh] flex flex-col safe-bottom shadow-2xl transition-transform duration-300 ease-out",
+          mounted ? "translate-y-0" : "translate-y-full",
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="pt-1.5 pb-1 flex justify-center">
+          <div className="w-10 h-1 bg-outline-variant rounded-full" />
+        </div>
+        <header className="px-5 pb-3 border-b border-outline-variant/40 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-[0.25em] text-outline">
+              Layering · {BODY_ZONE_LABELS[zone]}
+            </p>
+            <p className="text-sm font-bold tracking-tight">
+              Verdict de l&apos;équipe La Niche
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fermer"
+            className="text-outline hover:text-on-background flex-shrink-0"
+          >
+            <Icon name="close" size={18} />
+          </button>
+        </header>
+
+        <div className="px-5 py-4 flex-1 overflow-y-auto space-y-4">
+          <div>
+            <p className="text-[9px] uppercase tracking-widest text-outline mb-2">
+              Mélange
+            </p>
+            <ul className="flex flex-col gap-1">
+              {mixed.map((m, i) => (
+                <li
+                  key={`${m}-${i}`}
+                  className="text-xs text-on-background border-l-2 border-primary pl-3 py-0.5"
+                >
+                  {m}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <p className="text-[9px] uppercase tracking-widest text-outline mb-2">
+              Analyse
+            </p>
+            {error ? (
+              <ErrorBubble
+                detail={error}
+                context="Balade · analyse layering"
+                variant="block"
+              />
+            ) : text ? (
+              <p className="text-sm leading-relaxed text-on-background whitespace-pre-wrap">
+                {text}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <p className="text-[10px] uppercase tracking-widest text-outline font-mono">
+                  L&apos;équipe La Niche analyse le mélange…
+                </p>
+                <div className="h-2 shimmer-bar w-full" />
+                <div className="h-2 shimmer-bar w-[88%]" />
+                <div className="h-2 shimmer-bar w-[62%]" />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

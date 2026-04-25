@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { FragranceImage } from "@/components/FragranceImage";
 import { Icon } from "@/components/Icon";
+import { ErrorBubble } from "@/components/ErrorBubble";
 import { useAuth } from "@/lib/auth";
 import { findBoutiqueById } from "@/lib/boutiques";
 import { useStore } from "@/lib/store";
@@ -22,6 +23,11 @@ import type {
   OlfactiveDNA,
   RecommendationCandidate,
 } from "@/lib/agent";
+import {
+  QUIZ_QUESTIONS,
+  buildQuizContext,
+  type QuizAnswer,
+} from "@/lib/quiz";
 
 type Phase =
   | "mode-picker"
@@ -36,178 +42,16 @@ type Mode = "self" | "friend";
 type Count = 5 | 10 | 20;
 
 /* -------------------------------------------------------------------------
- * "Pour un ami" quiz — ultra-vulgarized, no taboo. Each answer value gets
- * mapped back into a French profile context string passed to the Analyst.
+ * Friend / self quiz — uses the shared QUIZ_QUESTIONS bank from src/lib/quiz.
+ * The "Pour un ami" flow uses perspective="friend"; the user-profile flow
+ * (onboarding) uses perspective="self" and reads the same answers back from
+ * `OlfactiveProfile.quiz_answers`.
  * --------------------------------------------------------------------- */
 
-type QuizOption = { value: string; label: string };
-type QuizQuestion = {
-  id: string;
-  question: string;
-  subtitle?: string;
-  options: QuizOption[];
-};
-
-const FRIEND_QUIZ: QuizQuestion[] = [
-  {
-    id: "vibe",
-    question: "Ton pote a quelle vibe générale ?",
-    subtitle: "Le style global, pas le parfum",
-    options: [
-      { value: "fresh-young", label: "Jeune frais — street, décontracté" },
-      { value: "classy-pro", label: "Classique distingué — homme d'affaires" },
-      { value: "rock-nightlife", label: "Rockstar — ambiance nuit, clubbing" },
-      { value: "bohemian", label: "Bohème, naturel, zéro prise de tête" },
-    ],
-  },
-  {
-    id: "target",
-    question: "Il veut plaire à qui surtout ?",
-    options: [
-      { value: "women", label: "Les meufs — faire tourner la tête" },
-      { value: "men", label: "Les mecs" },
-      { value: "everyone", label: "Tout le monde, bonne vibe globale" },
-      { value: "self", label: "Lui-même — faut qu'il kiffe avant tout" },
-    ],
-  },
-  {
-    id: "temperature",
-    question: "Plutôt chaud ou plutôt frais ?",
-    options: [
-      { value: "cool", label: "Frais — agrumes, menthe, marin" },
-      { value: "warm", label: "Chaud — cuir, épices, vanille" },
-      { value: "balanced", label: "Entre les deux, selon l'humeur" },
-    ],
-  },
-  {
-    id: "taste",
-    question: "Qu'est-ce qui le fait kiffer ?",
-    options: [
-      { value: "sweet", label: "Sucré / gourmand (vanille, caramel)" },
-      { value: "woody", label: "Boisé / sec (cèdre, santal)" },
-      { value: "floral", label: "Floral (rose, jasmin, iris)" },
-      { value: "citrus", label: "Citrus / frais (bergamote, citron)" },
-      { value: "smoky", label: "Fumé / mystérieux (oud, encens, tabac)" },
-      { value: "leather", label: "Cuir, musqué, animal" },
-    ],
-  },
-  {
-    id: "intensity",
-    question: "Il veut sentir comment ?",
-    options: [
-      { value: "subtle", label: "Discret — juste pour lui" },
-      { value: "moderate", label: "Présent — sentu à 1 mètre" },
-      { value: "projective", label: "Marquant — on se retourne" },
-    ],
-  },
-  {
-    id: "budget",
-    question: "Budget max pour un parfum ?",
-    options: [
-      { value: "u100", label: "Moins de 100 €" },
-      { value: "100_200", label: "Entre 100 et 200 €" },
-      { value: "o200", label: "Plus de 200 € — il a les moyens" },
-      { value: "any", label: "Aucune limite" },
-    ],
-  },
-  {
-    id: "occasion",
-    question: "Il le portera surtout pour quoi ?",
-    options: [
-      { value: "daily", label: "Tous les jours / casual" },
-      { value: "work", label: "Bosser, réunions, pro" },
-      { value: "date", label: "Dates, séduire" },
-      { value: "night", label: "Soirées, clubs, la nuit" },
-    ],
-  },
-  {
-    id: "nope",
-    question: "Qu'est-ce qu'il DÉTESTE ?",
-    subtitle: "Pour éviter les cata au comptoir",
-    options: [
-      { value: "too_sweet", label: "Trop sucré / écœurant" },
-      { value: "too_floral", label: "Trop fleuri / mémé" },
-      { value: "too_aquatic", label: "Trop marin / savonneux / eau de bébé" },
-      { value: "too_animal", label: "Trop animal / cuir lourd" },
-      { value: "none", label: "Rien — il est chill" },
-    ],
-  },
-];
-
-const QUIZ_LABEL: Record<string, Record<string, string>> = {
-  vibe: {
-    "fresh-young": "jeune frais, ambiance street décontractée",
-    "classy-pro": "classique distingué, homme d'affaires",
-    "rock-nightlife": "rockstar nocturne, clubbing",
-    bohemian: "bohème, naturel, effortless",
-  },
-  target: {
-    women: "séduire les femmes, faire tourner la tête",
-    men: "plaire aux hommes",
-    everyone: "dégager une bonne vibe générale",
-    self: "se plaire à lui-même avant tout",
-  },
-  temperature: {
-    cool: "frais (agrumes, menthe, marin)",
-    warm: "chaud (cuir, épices, vanille)",
-    balanced: "équilibré chaud/frais selon le jour",
-  },
-  taste: {
-    sweet: "gourmand sucré (vanille, caramel)",
-    woody: "boisé sec (cèdre, santal)",
-    floral: "floral (rose, jasmin, iris)",
-    citrus: "citrus frais (bergamote, citron)",
-    smoky: "fumé mystérieux (oud, encens, tabac)",
-    leather: "cuir, musqué, animal",
-  },
-  intensity: {
-    subtle: "discret, sillage intime",
-    moderate: "présent, sillage modéré",
-    projective: "projectif, marquant à distance",
-  },
-  budget: {
-    u100: "moins de 100 €",
-    "100_200": "100 à 200 €",
-    o200: "plus de 200 €",
-    any: "sans limite",
-  },
-  occasion: {
-    daily: "usage quotidien, casual",
-    work: "bureau, rendez-vous professionnels",
-    date: "dates, séduction",
-    night: "soirées, clubs, nuit",
-  },
-  nope: {
-    too_sweet: "trop sucré, écœurant, gourmand envahissant",
-    too_floral: "trop fleuri, style mémé",
-    too_aquatic: "trop marin, savonneux, eau de bébé",
-    too_animal: "trop animal, cuir lourd",
-    none: "aucun tabou particulier",
-  },
-};
-
 function buildFriendProfileContext(
-  answers: Record<string, string>,
+  answers: Record<string, QuizAnswer>,
 ): string {
-  const lines: string[] = [
-    "PROFIL OLFACTIF DE LA PERSONNE (quiz réalisé par un proche, mode « pour un ami ») :",
-  ];
-  const keys: Array<[string, string]> = [
-    ["vibe", "Vibe générale"],
-    ["target", "Veut plaire à"],
-    ["temperature", "Préférence température"],
-    ["taste", "Goûts olfactifs clés"],
-    ["intensity", "Sillage recherché"],
-    ["budget", "Budget max"],
-    ["occasion", "Occasion principale"],
-    ["nope", "À éviter absolument"],
-  ];
-  for (const [k, label] of keys) {
-    const v = answers[k];
-    const readable = v ? QUIZ_LABEL[k]?.[v] : undefined;
-    if (readable) lines.push(`- ${label} : ${readable}`);
-  }
-  return lines.join("\n");
+  return buildQuizContext(answers, "friend");
 }
 
 /* -------------------------------------------------------------------------
@@ -217,6 +61,11 @@ function buildFriendProfileContext(
 
 function buildProfileContext(profile: OlfactiveProfile | null): string {
   if (!profile) return "";
+  // New onboarding stores raw quiz answers — they're richer than the legacy
+  // derived fields, so prefer them when available.
+  if (profile.quiz_answers) {
+    return buildQuizContext(profile.quiz_answers, "self");
+  }
   const families = profile.preferred_families
     .map((f) => FAMILY_VULGAR[f]?.title ?? f)
     .join(", ");
@@ -263,7 +112,7 @@ export default function RecommendationsPage() {
 
   const [phase, setPhase] = useState<Phase>("mode-picker");
   const [mode, setMode] = useState<Mode>("self");
-  const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, QuizAnswer>>({});
   const [count, setCount] = useState<Count>(10);
   const [recs, setRecs] = useState<RecommendationCandidate[]>([]);
   const [dna, setDna] = useState<OlfactiveDNA | null>(null);
@@ -301,7 +150,7 @@ export default function RecommendationsPage() {
     return { likedFragrances: liked, dislikedFragrances: disliked };
   }, [wishlist]);
 
-  async function generate(forMode: Mode, answers?: Record<string, string>) {
+  async function generate(forMode: Mode, answers?: Record<string, QuizAnswer>) {
     // Paywall: block generation if the user has used their quota.
     if (!canUseRecommendation()) {
       router.push("/abonnement?from=recommendations");
@@ -738,9 +587,9 @@ function ConfigureView({
           Pour toi.
         </h1>
         <p className="text-sm text-on-surface-variant mt-4 max-w-md leading-relaxed">
-          L&apos;IA analyse ton profil olfactif et ta wishlist pour te
-          proposer des parfums que tu n&apos;as pas encore croisés. Swipe
-          ou tape pour décider — chaque choix affine ta signature.
+          L&apos;équipe La Niche analyse ton profil olfactif et ta wishlist
+          pour te proposer des parfums que tu n&apos;as pas encore croisés.
+          Swipe ou tape pour décider — chaque choix affine ta signature.
         </p>
       </header>
 
@@ -846,9 +695,13 @@ function ConfigureView({
       </section>
 
       {error && (
-        <p className="mb-6 text-[11px] text-error border border-error/40 bg-error/5 px-4 py-3">
-          {error}
-        </p>
+        <div className="mb-6">
+          <ErrorBubble
+            detail={error}
+            context="Recommandations · ConfigureView"
+            variant="block"
+          />
+        </div>
       )}
 
       {/* Generate CTA */}
@@ -872,11 +725,8 @@ function ConfigureView({
  * Loading view
  * ====================================================================== */
 
-/* Multi-agent pipeline progress.
- *
- * The underlying API call is a single POST, but we simulate staged progress
- * on the frontend so the user sees that three specialised agents are at
- * work. Timings are calibrated to the average end-to-end latency (~15s). */
+/* Loading screen — three sequential checkpoints framed as the La Niche team
+ * working in the background. Timings calibrated to ~15s end-to-end. */
 function LoadingView() {
   const [stage, setStage] = useState(0);
 
@@ -892,20 +742,20 @@ function LoadingView() {
   const stages = [
     {
       icon: "biotech",
-      title: "Agent Analyste",
-      label: "Extraction de ton ADN olfactif",
+      title: "Analyse",
+      label: "Lecture de ton ADN olfactif",
       detail: "Croisement profil + wishlist + données Fragrantica",
     },
     {
       icon: "travel_explore",
-      title: "Agent Chercheur",
+      title: "Recherche",
       label: "Exploration ciblée Fragrantica",
       detail: "Requêtes parallèles sur tes accords clés",
     },
     {
       icon: "auto_awesome",
-      title: "Agent Curator",
-      label: "Ranking strict contre ton ADN",
+      title: "Sélection",
+      label: "Choix final contre ton ADN",
       detail: "Chaque parfum doit citer tes notes phares",
     },
   ];
@@ -914,12 +764,12 @@ function LoadingView() {
     <div className="px-6 pt-10 pb-12">
       <header className="mb-10">
         <p className="text-[10px] uppercase tracking-[0.3em] text-outline mb-2">
-          Pipeline multi-agents
+          Équipe La Niche
         </p>
         <h1 className="text-4xl font-medium leading-[0.95] tracking-tighter">
-          Trois agents
+          On s&apos;occupe
           <br />
-          travaillent pour toi.
+          de tout.
         </h1>
       </header>
 
@@ -1179,9 +1029,13 @@ function DoneView({
       )}
 
       {error && (
-        <p className="mb-4 text-[11px] text-error border border-error/40 bg-error/5 px-4 py-3">
-          {error}
-        </p>
+        <div className="mb-4">
+          <ErrorBubble
+            detail={error}
+            context="Recommandations · DoneView"
+            variant="block"
+          />
+        </div>
       )}
 
       <div className="flex flex-col gap-2">
@@ -1608,7 +1462,7 @@ function ModePickerView({
         <p className="text-[11px] text-outline mt-3 flex items-center gap-1.5">
           <Icon name="storefront" size={12} />
           Recommandations priorisées sur les stocks Jovoy · Nose · Sens
-          Unique · ODORARE.
+          Unique · ODORARE · Galeries Lafayette · Printemps.
         </p>
       </header>
 
@@ -1713,13 +1567,17 @@ function ModePickerView({
       </div>
 
       {error && (
-        <p className="mt-4 text-[11px] text-error border border-error/40 bg-error/5 px-4 py-3">
-          {error}
-        </p>
+        <div className="mt-4">
+          <ErrorBubble
+            detail={error}
+            context="Recommandations · ModePicker"
+            variant="block"
+          />
+        </div>
       )}
 
       <p className="text-[10px] uppercase tracking-[0.2em] text-outline text-center mt-8">
-        Agents · Analyste · Chercheur · Curator
+        Équipe La Niche · Analyse · Recherche · Sélection
       </p>
     </div>
   );
@@ -1735,22 +1593,40 @@ function QuizView({
   onComplete,
   onBack,
 }: {
-  answers: Record<string, string>;
-  setAnswers: (a: Record<string, string>) => void;
-  onComplete: (answers: Record<string, string>) => void;
+  answers: Record<string, QuizAnswer>;
+  setAnswers: (a: Record<string, QuizAnswer>) => void;
+  onComplete: (answers: Record<string, QuizAnswer>) => void;
   onBack: () => void;
 }) {
   const [step, setStep] = useState(0);
-  const q = FRIEND_QUIZ[step];
-  const progress = (step + 1) / FRIEND_QUIZ.length;
+  const q = QUIZ_QUESTIONS[step];
+  const progress = (step + 1) / QUIZ_QUESTIONS.length;
+  const current = answers[q.id];
 
-  function answer(value: string) {
-    const next = { ...answers, [q.id]: value };
+  function commit(next: Record<string, QuizAnswer>) {
     setAnswers(next);
-    if (step + 1 >= FRIEND_QUIZ.length) {
+    if (step + 1 >= QUIZ_QUESTIONS.length) {
       onComplete(next);
     } else {
       setStep(step + 1);
+    }
+  }
+
+  function pickSingle(value: string) {
+    commit({ ...answers, [q.id]: value });
+  }
+
+  function toggleMulti(value: string) {
+    const arr = Array.isArray(current) ? current : [];
+    const next = arr.includes(value)
+      ? arr.filter((v) => v !== value)
+      : [...arr, value];
+    setAnswers({ ...answers, [q.id]: next });
+  }
+
+  function continueMulti() {
+    if (Array.isArray(current) && current.length > 0) {
+      commit({ ...answers, [q.id]: current });
     }
   }
 
@@ -1759,9 +1635,11 @@ function QuizView({
     else setStep((s) => s - 1);
   }
 
+  const canContinue =
+    q.multi && Array.isArray(current) && current.length > 0;
+
   return (
-    <div className="px-6 pt-4 pb-12 min-h-screen flex flex-col">
-      {/* Progress strip */}
+    <div className="px-6 pt-4 pb-32 min-h-screen flex flex-col">
       <div className="flex items-center gap-3 mb-8">
         <button
           type="button"
@@ -1779,47 +1657,70 @@ function QuizView({
         </div>
         <span className="text-[10px] font-mono font-bold text-outline min-w-[36px] text-right">
           {String(step + 1).padStart(2, "0")}/
-          {String(FRIEND_QUIZ.length).padStart(2, "0")}
+          {String(QUIZ_QUESTIONS.length).padStart(2, "0")}
         </span>
       </div>
 
-      {/* Question */}
-      <div
-        key={q.id}
-        className="quiz-in flex-1 flex flex-col"
-      >
+      <div key={q.id} className="quiz-in flex-1 flex flex-col">
         <p className="text-[10px] uppercase tracking-[0.3em] text-outline mb-3">
           Pour un ami · question {step + 1}
+          {q.multi ? " · choix multiples" : ""}
         </p>
         <h1 className="text-3xl font-medium leading-[1.05] tracking-tighter mb-3">
-          {q.question}
+          {q.question.friend}
         </h1>
-        {q.subtitle && (
-          <p className="text-sm text-on-surface-variant mb-8">{q.subtitle}</p>
+        {q.subtitle?.friend && (
+          <p className="text-sm text-on-surface-variant mb-8">
+            {q.subtitle.friend}
+          </p>
         )}
 
         <div className="flex flex-col gap-2 mt-4">
           {q.options.map((opt) => {
-            const picked = answers[q.id] === opt.value;
+            const picked = q.multi
+              ? Array.isArray(current) && current.includes(opt.value)
+              : current === opt.value;
             return (
               <button
                 key={opt.value}
                 type="button"
-                onClick={() => answer(opt.value)}
+                onClick={() =>
+                  q.multi ? toggleMulti(opt.value) : pickSingle(opt.value)
+                }
+                aria-pressed={picked}
                 className={clsx(
-                  "w-full py-4 px-5 text-left border transition-all active:scale-[0.98]",
+                  "w-full py-4 px-5 text-left border transition-all active:scale-[0.98] flex items-center gap-3",
                   picked
                     ? "bg-primary text-on-primary border-primary"
                     : "bg-background border-outline-variant hover:border-primary hover:bg-surface-container-low",
                 )}
               >
-                <span className="text-sm font-medium leading-relaxed">
+                {q.multi && (
+                  <Icon
+                    name={picked ? "check_box" : "check_box_outline_blank"}
+                    filled={picked}
+                    size={18}
+                  />
+                )}
+                <span className="text-sm font-medium leading-relaxed flex-1">
                   {opt.label}
                 </span>
               </button>
             );
           })}
         </div>
+
+        {q.multi && (
+          <button
+            type="button"
+            onClick={continueMulti}
+            disabled={!canContinue}
+            className="mt-6 w-full py-4 bg-primary text-on-primary rounded-full text-xs uppercase tracking-[0.25em] font-bold active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-2"
+          >
+            <Icon name="arrow_forward" size={16} />
+            Continuer
+          </button>
+        )}
       </div>
     </div>
   );

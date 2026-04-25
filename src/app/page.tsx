@@ -70,7 +70,7 @@ export default function HomePage() {
           Explorer
         </p>
         <div className="grid grid-cols-3 gap-px bg-outline-variant/40">
-          <QuickAction href="/search" icon="search" label="Search" sublabel="IA" />
+          <QuickAction href="/search" icon="search" label="Search" sublabel="Équipe" />
           <QuickAction href="/scan" icon="qr_code_scanner" label="Scan" sublabel="Caméra" />
           <QuickAction href="/balade" icon="directions_walk" label="Balade" sublabel="Test" />
         </div>
@@ -157,7 +157,7 @@ export default function HomePage() {
                 Définis ton profil
               </p>
               <p className="text-[10px] uppercase tracking-widest text-outline mt-1.5">
-                5 questions · 1 minute
+                8 questions · 2 minutes
               </p>
             </div>
             <Icon

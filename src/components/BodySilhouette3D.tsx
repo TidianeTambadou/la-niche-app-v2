@@ -87,6 +87,9 @@ export type PlacedMarker = {
   zone: BodyZone;
   label: string; // perfume initials
   position?: [number, number, number];
+  /** When true, this marker is rendered greyed-out — used in placement mode
+   *  to signal "this zone is already taken; tapping = layering". */
+  dimmed?: boolean;
 };
 
 type Props = {
@@ -194,13 +197,23 @@ function Marker({
   label,
   highlighted,
   isDark,
+  dimmed = false,
 }: {
   position: [number, number, number];
   label: string;
   highlighted: boolean;
   isDark: boolean;
+  dimmed?: boolean;
 }) {
-  const color = isDark ? "#f0ede8" : "#000";
+  // Dimmed markers use a lighter grey to signal "zone already occupied —
+  // tapping means layering". Crisp markers remain black/white for fresh poses.
+  const color = dimmed
+    ? isDark
+      ? "#6b6764"
+      : "#a8a39d"
+    : isDark
+      ? "#f0ede8"
+      : "#000";
   const haloRef = useRef<THREE.Mesh>(null);
   const spotRef = useRef<THREE.Mesh>(null);
 
@@ -222,13 +235,13 @@ function Marker({
         <meshBasicMaterial
           color={color}
           transparent
-          opacity={0.22}
+          opacity={dimmed ? 0.4 : 0.22}
           depthTest={false}
         />
       </mesh>
       <mesh ref={spotRef} renderOrder={3}>
         <sphereGeometry args={[0.025, 12, 12]} />
-        <meshBasicMaterial color={color} depthTest={false} />
+        <meshBasicMaterial color={color} transparent opacity={dimmed ? 0.7 : 1} depthTest={false} />
       </mesh>
       {label && highlighted && (
         <Html
@@ -552,6 +565,7 @@ export function BodySilhouette3D({
               label={m.label}
               highlighted={isHighlighted}
               isDark={isDark}
+              dimmed={m.dimmed ?? false}
             />
           );
         })}

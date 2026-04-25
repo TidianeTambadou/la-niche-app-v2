@@ -56,6 +56,24 @@ export const BOUTIQUES: Boutique[] = [
     url: "https://www.jovoyparis.com/",
     note: "Référence mondiale pour les parfums rares et collectionneurs.",
   },
+  {
+    id: "galeries-lafayette",
+    name: "Galeries Lafayette",
+    shortLabel: "Galeries Lafayette",
+    city: "Paris",
+    domain: "galerieslafayette.com",
+    url: "https://www.galerieslafayette.com/c/parfum",
+    note: "Grand magasin · large sélection grandes maisons et niche.",
+  },
+  {
+    id: "printemps",
+    name: "Printemps",
+    shortLabel: "Printemps",
+    city: "Paris",
+    domain: "printemps.com",
+    url: "https://www.printemps.com/fr/fr/parfum-femme",
+    note: "Grand magasin · découverte niche et exclusivités.",
+  },
 ];
 
 export const BOUTIQUE_IDS = BOUTIQUES.map((b) => b.id);

@@ -54,7 +54,7 @@ const PLANS: Plan[] = [
     badge: "Populaire",
     tagline: "Pour vraiment utiliser l'app",
     features: [
-      "Analyse multi-agents Fragrantica + boutiques",
+      "Analyse Fragrantica + boutiques par l'équipe La Niche",
       "Mode « Pour un ami » avec rapport vendeur",
       "Balades guidées avec route optimisée",
       "Wishlist + historique illimités",
@@ -162,9 +162,10 @@ function AbonnementContent() {
           niveau d&apos;accès.
         </h1>
         <p className="text-sm text-on-surface-variant mt-4 max-w-md leading-relaxed">
-          Chaque recommandation mobilise un pipeline d&apos;agents IA + des
-          recherches Fragrantica et catalogues boutiques. Les plans payants
-          financent ces requêtes et te donnent plus de marge pour explorer.
+          Chaque recommandation mobilise l&apos;équipe La Niche, des
+          recherches Fragrantica et les catalogues des boutiques partenaires.
+          Les plans payants financent ces requêtes et te donnent plus de
+          marge pour explorer.
         </p>
       </header>
 
