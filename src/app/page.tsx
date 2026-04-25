@@ -1,13 +1,15 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
-import { PerfumeCard } from "@/components/PerfumeCard";
+import { ErrorBubble } from "@/components/ErrorBubble";
 import { NewsRail } from "@/components/NewsRail";
 import { latestNews } from "@/lib/news";
-import { useData, useFragrances } from "@/lib/data";
 import { useAuth } from "@/lib/auth";
 import { readProfileFromUser, FAMILY_VULGAR } from "@/lib/profile";
+import { useDailyPicks } from "@/lib/daily-picks";
+import type { SearchCandidate } from "@/lib/agent";
 
 /* ─── Phrases éditoriales — rotation par jour ─────────────────────────── */
 
@@ -37,12 +39,10 @@ function phraseOfDay(): string {
 /* ─── Page ─────────────────────────────────────────────────────────────── */
 
 export default function HomePage() {
-  const { loading } = useData();
-  const fragrances = useFragrances();
   const { user } = useAuth();
   const profile = readProfileFromUser(user);
   const news = latestNews(6);
-  const suggestions = fragrances.slice(0, 6);
+  const dailyPicks = useDailyPicks(profile, user?.id ?? null);
 
   const today = new Date().toLocaleDateString("fr-FR", {
     weekday: "long",
@@ -169,35 +169,17 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* ── Sélection ───────────────────────────────────────────────────── */}
+      {/* ── Sélection pour toi (carrousel quotidien) ───────────────────── */}
       <section className="mb-12">
         <div className="flex justify-between items-end mb-4">
           <p className="text-[10px] uppercase tracking-[0.25em] font-bold">
             Sélection pour toi
           </p>
-          <Link
-            href="/search"
-            className="text-[10px] uppercase tracking-widest font-bold border-b border-primary pb-0.5"
-          >
-            Voir tout
-          </Link>
+          <span className="text-[10px] font-mono text-outline">
+            Du jour
+          </span>
         </div>
-        {loading ? (
-          <SkeletonRail />
-        ) : suggestions.length > 0 ? (
-          <div className="flex gap-4 overflow-x-auto hide-scrollbar -mx-6 px-6 pb-2">
-            {suggestions.map((f) => (
-              <PerfumeCard
-                key={f.key}
-                fragrance={f}
-                variant="compact"
-                origin="manual"
-              />
-            ))}
-          </div>
-        ) : (
-          <EmptyBlock label="Lance une balade pour découvrir des parfums." />
-        )}
+        <DailyCarousel state={dailyPicks} hasProfile={!!profile} />
       </section>
 
       {/* ── Actualité ───────────────────────────────────────────────────── */}
@@ -256,23 +238,181 @@ function QuickAction({
   );
 }
 
-function SkeletonRail() {
+/* ─── Daily picks carousel ──────────────────────────────────────────────── */
+
+function DailyCarousel({
+  state,
+  hasProfile,
+}: {
+  state: ReturnType<typeof useDailyPicks>;
+  hasProfile: boolean;
+}) {
+  if (state.status === "loading") {
+    return (
+      <div className="flex gap-4 overflow-hidden -mx-6 px-6">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="min-w-[78%] sm:min-w-[260px] aspect-[3/4] shimmer-bar flex-shrink-0"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (state.status === "error") {
+    return (
+      <ErrorBubble
+        detail={state.error}
+        context="Sélection du jour"
+        variant="block"
+      />
+    );
+  }
+
+  if (state.picks.length === 0) {
+    return (
+      <div className="border border-outline-variant/40 bg-surface-container-low p-6 text-center">
+        <p className="text-xs text-on-surface-variant">
+          {hasProfile
+            ? "Pas de sélection aujourd'hui — réessaie demain."
+            : "Définis ton univers pour recevoir une sélection chaque jour."}
+        </p>
+        {!hasProfile && (
+          <Link
+            href="/onboarding"
+            className="inline-block mt-3 text-[10px] uppercase tracking-widest font-bold border-b border-primary pb-0.5"
+          >
+            Commencer
+          </Link>
+        )}
+      </div>
+    );
+  }
+
+  return <AutoScrollCarousel picks={state.picks} />;
+}
+
+function AutoScrollCarousel({ picks }: { picks: SearchCandidate[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(0);
+  const userInteracted = useRef(false);
+
+  // Auto-advance every 5s, respecting manual swipes (paused for 8s after a
+  // user touch / scroll). Only kicks in when there are 2+ picks.
+  useEffect(() => {
+    if (picks.length < 2) return;
+    const id = window.setInterval(() => {
+      if (userInteracted.current) return;
+      const el = scrollRef.current;
+      if (!el) return;
+      const next = (active + 1) % picks.length;
+      const card = el.children[next] as HTMLElement | undefined;
+      if (card) {
+        el.scrollTo({ left: card.offsetLeft - el.offsetLeft, behavior: "smooth" });
+        setActive(next);
+      }
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [picks.length, active]);
+
+  function noteUserInteraction() {
+    userInteracted.current = true;
+    window.setTimeout(() => {
+      userInteracted.current = false;
+    }, 8000);
+  }
+
+  function onScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Snap to whichever card is closest to the left edge.
+    const children = Array.from(el.children) as HTMLElement[];
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < children.length; i++) {
+      const dist = Math.abs(children[i].offsetLeft - el.scrollLeft - el.offsetLeft);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = i;
+      }
+    }
+    if (bestIdx !== active) setActive(bestIdx);
+  }
+
   return (
-    <div className="flex gap-4 overflow-hidden -mx-6 px-6">
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="min-w-[180px] aspect-[3/4] shimmer-bar flex-shrink-0"
-        />
-      ))}
+    <div>
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        onPointerDown={noteUserInteraction}
+        onWheel={noteUserInteraction}
+        className="flex gap-4 overflow-x-auto hide-scrollbar -mx-6 px-6 pb-2 snap-x snap-mandatory scroll-smooth"
+        style={{ scrollPaddingLeft: "1.5rem" }}
+      >
+        {picks.map((p, i) => (
+          <DailyCard key={`${p.brand}-${p.name}-${i}`} pick={p} />
+        ))}
+      </div>
+      {picks.length > 1 && (
+        <div className="flex justify-center gap-1.5 mt-3">
+          {picks.map((_, i) => (
+            <span
+              key={i}
+              className={`h-[3px] transition-all ${
+                i === active
+                  ? "w-6 bg-primary"
+                  : "w-3 bg-outline-variant/60"
+              }`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function EmptyBlock({ label }: { label: string }) {
+function DailyCard({ pick }: { pick: SearchCandidate }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const showImage = pick.image_url && !imgFailed;
   return (
-    <div className="border border-outline-variant/40 bg-surface-container-low p-6 text-center">
-      <p className="text-xs text-on-surface-variant">{label}</p>
-    </div>
+    <a
+      href={pick.source_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="snap-start flex-shrink-0 min-w-[78%] sm:min-w-[260px] aspect-[3/4] relative overflow-hidden border border-outline-variant bg-surface-container-low active:scale-[0.99] transition-transform"
+    >
+      {showImage ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={pick.image_url!}
+          alt={pick.name}
+          className="absolute inset-0 w-full h-full object-cover grayscale-[0.15]"
+          onError={() => setImgFailed(true)}
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Icon name="local_florist" size={42} className="text-outline" />
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-on-background/85 via-on-background/40 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 p-4 text-background">
+        <p className="text-[10px] uppercase tracking-[0.25em] opacity-80">
+          {pick.brand}
+          {pick.family ? ` · ${pick.family}` : ""}
+        </p>
+        <p className="text-lg font-semibold tracking-tight leading-tight mt-0.5">
+          {pick.name}
+        </p>
+        {pick.notes_brief && (
+          <p className="text-[11px] opacity-80 mt-1.5 leading-snug line-clamp-2">
+            {pick.notes_brief}
+          </p>
+        )}
+      </div>
+      <div className="absolute top-2 right-2 bg-background/90 px-2 py-1 text-[9px] uppercase tracking-widest font-mono">
+        Du jour
+      </div>
+    </a>
   );
 }

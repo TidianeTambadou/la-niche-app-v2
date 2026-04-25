@@ -1,216 +1,292 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { ErrorBubble } from "@/components/ErrorBubble";
-import { PerfumeCard } from "@/components/PerfumeCard";
-import {
-  searchFragrances,
-  useData,
-  useFragrances,
-} from "@/lib/data";
+import { agentSearch } from "@/lib/agent-client";
+import type { SearchCandidate } from "@/lib/agent";
+import { fragranceKey, useFragrances } from "@/lib/data";
+import { useStore } from "@/lib/store";
 
 const SUGGESTIONS = [
-  "boisé chaud élégant hiver",
-  "frais minéral pluie",
-  "ambré soir chaud",
-  "fumé intense nuit",
-  "floral poudré intime",
+  "Aventus",
+  "Tom Ford Oud Wood",
+  "Bleu de Chanel",
+  "Vetiver",
+  "Sauvage",
 ];
 
 export default function SearchPage() {
-  const { loading, error } = useData();
-  const fragrances = useFragrances();
   const [query, setQuery] = useState("");
-  const [submitted, setSubmitted] = useState<string | null>(null);
+  const [results, setResults] = useState<SearchCandidate[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const results = useMemo(() => {
-    if (!submitted) return [];
-    return searchFragrances(fragrances, submitted);
-  }, [submitted, fragrances]);
-
-  function submit(e?: React.FormEvent) {
-    e?.preventDefault();
+  // Debounced search — same pattern as the balade libre autocomplete: 800ms
+  // after the last keystroke, ≥3 chars, hits /api/agent which queries
+  // Fragrantica + Basenotes + Parfumo + Fragrancex + nstperfume.
+  useEffect(() => {
     const q = query.trim();
-    if (!q) return;
-    setSubmitted(q);
-  }
-
-  function pickSuggestion(s: string) {
-    setQuery(s);
-    setSubmitted(s);
-  }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (abortRef.current) abortRef.current.abort();
+    if (q.length < 3) {
+      setResults([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    debounceRef.current = setTimeout(async () => {
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+      try {
+        const r = await agentSearch(q, ctrl.signal);
+        if (!ctrl.signal.aborted) {
+          setResults(r);
+          setLoading(false);
+        }
+      } catch (e: unknown) {
+        if (!ctrl.signal.aborted) {
+          setError(e instanceof Error ? e.message : "search failed");
+          setLoading(false);
+        }
+      }
+    }, 800);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query]);
 
   return (
-    <div className="px-6 pt-4 pb-12">
-      <section className="mb-10">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="w-2 h-2 bg-primary rounded-full" />
-          <span className="text-[10px] uppercase tracking-[0.2em] font-medium">
-            Concierge La Niche
-          </span>
-        </div>
-        <h1 className="text-4xl font-light tracking-tighter leading-none mb-4">
-          Décris ton
-          <br />
-          <span className="font-bold">atmosphère</span>.
+    <div className="px-6 pt-4 pb-24">
+      <header className="mb-6">
+        <span className="text-[10px] uppercase tracking-[0.3em] text-outline mb-2 block">
+          Recherche
+        </span>
+        <h1 className="text-4xl font-bold tracking-tighter leading-none">
+          Cherche un parfum
         </h1>
-        <p className="text-sm text-on-surface-variant leading-relaxed max-w-md">
-          Notre moteur traduit des préférences abstraites en formules olfactives.
-          Décris une mémoire, une texture, ou une humeur.
-        </p>
-      </section>
+      </header>
+
+      <SearchBar
+        query={query}
+        setQuery={setQuery}
+        loading={loading}
+      />
+
+      <p className="text-[10px] uppercase tracking-widest text-outline mt-3 leading-relaxed">
+        Sources : Fragrantica · Basenotes · Parfumo · Fragrancex · nstperfume
+      </p>
+
+      {/* Suggestions when no query yet */}
+      {query.trim().length < 3 && !loading && results.length === 0 && (
+        <section className="mt-8">
+          <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-outline mb-3">
+            Essais rapides
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {SUGGESTIONS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setQuery(s)}
+                className="px-3 py-1.5 border border-outline-variant text-[10px] uppercase tracking-widest font-bold hover:border-primary hover:bg-surface-container-low transition-all"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {error && (
-        <div className="mb-6">
+        <div className="mt-6">
           <ErrorBubble
             detail={error}
-            context="Search · chargement catalogue"
+            context="Recherche · agentSearch"
             variant="block"
           />
         </div>
       )}
 
-      {/* Concierge greeting */}
-      {!submitted && (
-        <section className="mb-10">
-          <div className="flex items-center gap-3 mb-3">
-            <Icon name="face_6" size={16} />
-            <span className="text-[10px] uppercase tracking-widest font-bold">
-              Concierge
-            </span>
-          </div>
-          <p className="text-base font-light leading-relaxed text-on-surface-variant">
-            Bonjour. Pour commencer, comment décrirais-tu l&apos;atmosphère que tu
-            souhaites habiter ?
-          </p>
-        </section>
-      )}
-
-      {/* User echo + analysis */}
-      {submitted && (
-        <section className="mb-10">
-          <div className="flex flex-col gap-4 items-end mb-8">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] uppercase tracking-widest font-bold text-outline">
-                Toi
-              </span>
-              <Icon name="person" size={16} className="text-outline" />
-            </div>
-            <div className="text-base font-light leading-relaxed text-on-background text-right italic max-w-md">
-              &laquo;&nbsp;{submitted}&nbsp;&raquo;
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 mb-4">
-            <Icon name="face_6" size={16} />
-            <span className="text-[10px] uppercase tracking-widest font-bold">
-              Concierge
-            </span>
-          </div>
-          {results.length > 0 ? (
-            <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
-              J&apos;ai isolé{" "}
-              <span className="text-on-background font-medium">
-                {results.length} formulation{results.length > 1 ? "s" : ""}
-              </span>{" "}
-              alignées avec ta requête. Affine en ajoutant des mots, ou explore
-              les détails.
-            </p>
-          ) : (
-            <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
-              Aucune correspondance pour « {submitted} » dans le stock actuel.
-              Essaie avec un nom de marque ou de parfum présent en boutique.
-            </p>
-          )}
-
-          {results.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {results.slice(0, 6).map((f, i) => (
-                <PerfumeCard
-                  key={f.key}
-                  fragrance={f}
-                  variant="feature"
-                  matchScore={Math.max(0.55, 0.98 - i * 0.06)}
-                  origin="search"
-                />
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Input */}
-      <form onSubmit={submit} className="sticky bottom-24 bg-background pt-4">
-        <div className="flex items-end gap-3 border-b-2 border-primary pb-3">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Décris une atmosphère…"
-            className="w-full bg-transparent border-none outline-none text-base font-light placeholder:text-outline/60 py-1"
-            autoComplete="off"
-          />
-          <button
-            type="submit"
-            disabled={!query.trim()}
-            className="bg-primary text-on-primary w-11 h-11 flex items-center justify-center rounded-full active:scale-95 transition-transform disabled:opacity-30"
-            aria-label="Envoyer"
-          >
-            <Icon name="arrow_forward" size={18} />
-          </button>
-        </div>
-
-        <div className="flex gap-2 mt-3 overflow-x-auto hide-scrollbar -mx-6 px-6 pb-1">
-          {SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => pickSuggestion(s)}
-              className="px-3 py-1.5 rounded-full border border-outline-variant text-[10px] uppercase tracking-widest whitespace-nowrap hover:bg-primary hover:text-on-primary hover:border-primary transition-all"
-            >
-              {s}
-            </button>
+      {loading && results.length === 0 && (
+        <ul className="mt-8 space-y-3">
+          {[0, 1, 2, 3].map((i) => (
+            <li
+              key={i}
+              className="h-20 bg-surface-container-low animate-pulse"
+            />
           ))}
-        </div>
-      </form>
+        </ul>
+      )}
 
-      {/* Empty-state catalog browse */}
-      {!submitted && (
-        <section className="mt-10">
-          <h2 className="text-[10px] uppercase tracking-[0.2em] font-bold mb-4">
-            Catalogue
-          </h2>
-          {loading ? (
-            <div className="grid grid-cols-2 gap-4">
-              {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="aspect-[4/5] bg-surface-container-low animate-pulse"
-                />
-              ))}
-            </div>
-          ) : fragrances.length === 0 ? (
-            <div className="border border-outline-variant/40 bg-surface-container-low p-6 text-center">
-              <p className="text-xs text-on-surface-variant">
-                Aucun parfum dans le stock des boutiques. Ajoute du stock dans le
-                CRM pour les voir apparaître ici.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {fragrances.slice(0, 4).map((f) => (
-                <PerfumeCard
-                  key={f.key}
-                  fragrance={f}
-                  variant="feature"
-                  origin="search"
-                />
-              ))}
-            </div>
-          )}
+      {!loading && !error && query.trim().length >= 3 && results.length === 0 && (
+        <p className="text-sm text-on-surface-variant mt-8 italic">
+          Aucun résultat sur Fragrantica pour «&nbsp;{query}&nbsp;».
+        </p>
+      )}
+
+      {results.length > 0 && (
+        <section className="mt-8">
+          <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-outline mb-3">
+            {results.length} résultat{results.length > 1 ? "s" : ""}
+          </p>
+          <ul className="flex flex-col">
+            {results.map((c, i) => (
+              <SearchResult key={`${c.brand}-${c.name}-${i}`} candidate={c} />
+            ))}
+          </ul>
         </section>
       )}
     </div>
+  );
+}
+
+function SearchBar({
+  query,
+  setQuery,
+  loading,
+}: {
+  query: string;
+  setQuery: (q: string) => void;
+  loading: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3 border-b-2 border-primary pb-3">
+      <Icon name="search" size={18} className="text-outline" />
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Tape un nom (ex : Aventus, Vetiver, Tom Ford)…"
+        className="flex-1 bg-transparent border-none outline-none text-base font-light placeholder:text-outline/60 py-1"
+        autoComplete="off"
+        autoFocus
+      />
+      {loading ? (
+        <Icon
+          name="progress_activity"
+          size={16}
+          className="text-outline animate-spin"
+        />
+      ) : query.length > 0 ? (
+        <button
+          type="button"
+          onClick={() => setQuery("")}
+          aria-label="Effacer"
+          className="text-outline hover:text-on-background"
+        >
+          <Icon name="close" size={16} />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function SearchResult({ candidate }: { candidate: SearchCandidate }) {
+  const fragrances = useFragrances();
+  const { addToWishlist, isWishlisted } = useStore();
+  const [imgFailed, setImgFailed] = useState(false);
+
+  // Match the agent result to our local catalog so we can link to the
+  // in-app fragrance detail page when possible (otherwise we link out to
+  // Fragrantica).
+  const localKey = fragranceKey(candidate.brand, candidate.name);
+  const inCatalog = fragrances.find((f) => f.key === localKey);
+  const wishlistKey = inCatalog?.key ?? `ext::${localKey}`;
+  const wishlistStatus = isWishlisted(wishlistKey);
+
+  function like() {
+    addToWishlist(wishlistKey, "liked", "search", {
+      name: candidate.name,
+      brand: candidate.brand,
+      imageUrl: candidate.image_url ?? null,
+    });
+  }
+
+  return (
+    <li className="py-4 border-b border-outline-variant/30 last:border-0">
+      <div className="flex items-start gap-3">
+        <div className="w-16 h-20 bg-surface-container-low overflow-hidden flex-shrink-0 flex items-center justify-center">
+          {candidate.image_url && !imgFailed ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={candidate.image_url}
+              alt={candidate.name}
+              className="w-full h-full object-cover grayscale"
+              onError={() => setImgFailed(true)}
+            />
+          ) : (
+            <Icon name="local_florist" size={20} className="text-outline" />
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-outline">
+            {candidate.brand}
+            {candidate.family ? ` · ${candidate.family}` : ""}
+          </p>
+          {inCatalog ? (
+            <Link href={`/fragrance/${inCatalog.key}`}>
+              <h3 className="text-base font-semibold tracking-tight">
+                {candidate.name}
+              </h3>
+            </Link>
+          ) : (
+            <h3 className="text-base font-semibold tracking-tight">
+              {candidate.name}
+            </h3>
+          )}
+          {candidate.notes_brief && (
+            <p className="text-[12px] text-on-surface-variant mt-1 leading-relaxed">
+              {candidate.notes_brief}
+            </p>
+          )}
+
+          <div className="mt-2 flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={like}
+              className="text-[10px] uppercase tracking-widest font-bold flex items-center gap-1 hover:text-primary transition-colors"
+              aria-label={
+                wishlistStatus === "liked"
+                  ? "Déjà dans la wishlist"
+                  : "Ajouter à la wishlist"
+              }
+            >
+              <Icon
+                name={wishlistStatus === "liked" ? "favorite" : "favorite_border"}
+                filled={wishlistStatus === "liked"}
+                size={14}
+                className={
+                  wishlistStatus === "liked" ? "text-primary" : "text-outline"
+                }
+              />
+              {wishlistStatus === "liked" ? "Dans la wishlist" : "Wishlist"}
+            </button>
+            {candidate.source_url && (
+              <a
+                href={candidate.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] uppercase tracking-widest font-bold border-b border-primary pb-0.5 flex items-center gap-1"
+              >
+                <Icon name="open_in_new" size={12} />
+                Fiche source
+              </a>
+            )}
+            {inCatalog && (
+              <span className="text-[9px] uppercase tracking-widest font-bold text-primary">
+                · En boutique
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </li>
   );
 }
