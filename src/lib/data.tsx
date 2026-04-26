@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 import type { Shop as RemoteShop, StockItem as RemoteStockItem } from "@/lib/types";
 
 export type { RemoteShop, RemoteStockItem };
@@ -123,6 +124,23 @@ export function aggregateStock(stock: RemoteStockItem[]): Fragrance[] {
       ? Math.min(...candidatePrices)
       : null;
 
+    // Notes + family come from the most recent stock row that actually has
+    // them (auto-enriched by /api/boutique/stock at import time).
+    const enriched =
+      sorted.find(
+        (i) =>
+          (i.notes_top && i.notes_top.length > 0) ||
+          (i.notes_heart && i.notes_heart.length > 0) ||
+          (i.notes_base && i.notes_base.length > 0) ||
+          i.family,
+      ) ?? first;
+
+    const notes: { layer: "top" | "heart" | "base"; name: string }[] = [
+      ...(enriched.notes_top ?? []).map((n) => ({ layer: "top" as const, name: n })),
+      ...(enriched.notes_heart ?? []).map((n) => ({ layer: "heart" as const, name: n })),
+      ...(enriched.notes_base ?? []).map((n) => ({ layer: "base" as const, name: n })),
+    ];
+
     fragrances.push({
       key: k,
       id: k,
@@ -133,6 +151,8 @@ export function aggregateStock(stock: RemoteStockItem[]): Fragrance[] {
       availability,
       bestPrice,
       tags: [],
+      family: enriched.family ?? undefined,
+      notes: notes.length > 0 ? notes : undefined,
     });
   }
 
@@ -320,6 +340,23 @@ export function useShopStock(shopId: string | null | undefined): Fragrance[] {
     if (!shopId) return [];
     return aggregateStock(stock.filter((s) => s.shop_id === shopId));
   }, [stock, shopId]);
+}
+
+/**
+ * Returns the shop owned by the currently signed-in user, or null when the
+ * user isn't a boutique account. The CRM convention `shops.id = auth.uid()`
+ * is what marks a user as a shop owner — no extra role column needed.
+ */
+export function useMyShop(): RemoteShop | null {
+  const { user } = useAuth();
+  const shops = useShops();
+  if (!user) return null;
+  return shops.find((s) => s.id === user.id) ?? null;
+}
+
+/** True iff the signed-in user owns a row in `public.shops`. */
+export function useIsBoutiqueAccount(): boolean {
+  return useMyShop() !== null;
 }
 
 /* -------------------------------------------------------------------------

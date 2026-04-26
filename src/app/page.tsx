@@ -14,6 +14,7 @@ import { readProfileFromUser, FAMILY_VULGAR } from "@/lib/profile";
 import { useDailyPicks, type DailyPicksHook } from "@/lib/daily-picks";
 import type { SearchCandidate } from "@/lib/agent";
 import { useStore } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 
 /* ─── Phrases éditoriales — rotation par jour ─────────────────────────── */
 
@@ -56,6 +57,9 @@ export default function HomePage() {
 
   return (
     <div className="px-6 pt-4 pb-12">
+
+      {/* ── Concours bannière ───────────────────────────────────────────── */}
+      <ContestBanner userId={user?.id ?? null} />
 
       {/* ── Hero éditorial ──────────────────────────────────────────────── */}
       <section className="mb-14 pt-2">
@@ -184,6 +188,11 @@ export default function HomePage() {
           </span>
         </div>
         <DailyShowcase hook={dailyPicks} hasProfile={!!profile} />
+      </section>
+
+      {/* ── Mini classement ─────────────────────────────────────────────── */}
+      <section className="mb-12">
+        <MiniLeaderboard userId={user?.id ?? null} />
       </section>
 
       {/* ── Actualité ───────────────────────────────────────────────────── */}
@@ -593,6 +602,152 @@ function DailyFlashcardFront({ pick }: { pick: SearchCandidate }) {
         <Icon name="touch_app" size={10} />
         Tap
       </div>
+    </div>
+  );
+}
+
+/* ─── Contest banner ────────────────────────────────────────────────────── */
+
+type ReferralMe = { rank: number | null; points: number };
+
+function ContestBanner({ userId }: { userId: string | null }) {
+  const [me, setMe] = useState<ReferralMe | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token;
+      if (!token) return;
+      fetch("/api/referral", { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => {
+          if (d) setMe({ rank: d.rank, points: d.points });
+        })
+        .catch(() => {});
+    });
+  }, [userId]);
+
+  return (
+    <Link href="/classement" className="block mb-8 group">
+      <div className="relative overflow-hidden bg-primary text-on-primary px-5 py-4 flex items-center justify-between gap-4">
+        {/* Animated shimmer */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="envelope-sheen absolute top-0 -left-1/3 h-full w-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+        </div>
+        <div>
+          <p className="text-[8px] uppercase tracking-[0.4em] opacity-70 mb-0.5">
+            Concours lancement
+          </p>
+          <p className="text-xl font-black tracking-tight leading-none">
+            Gagne 400€&nbsp;!
+          </p>
+          <p className="text-[9px] uppercase tracking-widest opacity-70 mt-1">
+            Parraine tes amis · points &amp; classement
+          </p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {userId && me ? (
+            <div className="text-right">
+              <p className="text-[8px] uppercase tracking-widest opacity-70">
+                Ton score
+              </p>
+              <p className="text-lg font-black leading-none">{me.points} pts</p>
+              {me.rank && (
+                <p className="text-[8px] opacity-60">#{me.rank}</p>
+              )}
+            </div>
+          ) : (
+            <p className="text-[9px] uppercase tracking-widest opacity-70 text-right max-w-[80px]">
+              Voir le classement
+            </p>
+          )}
+          <Icon
+            name="chevron_right"
+            size={20}
+            className="opacity-60 group-hover:opacity-100 transition-opacity"
+          />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/* ─── Mini leaderboard ──────────────────────────────────────────────────── */
+
+type LeaderboardRow = {
+  user_id: string;
+  display_name: string;
+  points: number;
+  rank: number;
+};
+
+function MiniLeaderboard({ userId }: { userId: string | null }) {
+  const [rows, setRows] = useState<LeaderboardRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    supabase
+      .from("leaderboard_view")
+      .select("user_id, display_name, points, rank")
+      .order("points", { ascending: false })
+      .limit(5)
+      .then(({ data }) => {
+        setRows((data as LeaderboardRow[]) ?? []);
+        setLoaded(true);
+      });
+  }, []);
+
+  if (loaded && rows.length === 0) return null;
+
+  return (
+    <div>
+      <div className="flex justify-between items-end mb-4">
+        <p className="text-[10px] uppercase tracking-[0.25em] font-bold">
+          Classement parrainage
+        </p>
+        <Link
+          href="/classement"
+          className="text-[10px] uppercase tracking-widest font-bold border-b border-primary pb-0.5"
+        >
+          Voir tout
+        </Link>
+      </div>
+
+      {!loaded ? (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-10 bg-surface-container animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <div className="border border-outline-variant/40 divide-y divide-outline-variant/20">
+          {rows.map((row, i) => {
+            const isMe = row.user_id === userId;
+            const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
+            return (
+              <div
+                key={row.user_id}
+                className={`flex items-center gap-3 px-4 py-2.5 ${isMe ? "bg-primary/5" : ""}`}
+              >
+                <div className="w-6 text-center shrink-0">
+                  {medal ? (
+                    <span className="text-sm">{medal}</span>
+                  ) : (
+                    <span className="text-[10px] font-mono text-outline">
+                      #{row.rank}
+                    </span>
+                  )}
+                </div>
+                <p className={`flex-1 text-[11px] font-semibold uppercase tracking-widest truncate ${isMe ? "text-primary" : ""}`}>
+                  {row.display_name}
+                  {isMe && <span className="ml-1 text-[8px] opacity-50">(toi)</span>}
+                </p>
+                <p className="text-xs font-black shrink-0">{row.points} pts</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

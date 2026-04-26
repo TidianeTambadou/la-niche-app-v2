@@ -7,6 +7,7 @@ import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/lib/auth";
+import { useIsBoutiqueAccount } from "@/lib/data";
 import { readProfileFromUser } from "@/lib/profile";
 
 const NAV = [
@@ -27,6 +28,7 @@ export function Drawer({ open, onClose }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const isBoutique = useIsBoutiqueAccount();
   const profile = readProfileFromUser(user);
 
   // ESC closes
@@ -129,6 +131,33 @@ export function Drawer({ open, onClose }: Props) {
               );
             })}
           </ul>
+
+          {isBoutique && (
+            <div className="mt-6 pt-6 border-t border-outline-variant/40">
+              <p className="text-[10px] uppercase tracking-widest text-outline mb-3 px-4">
+                Console boutique
+              </p>
+              <Link
+                href="/boutique"
+                className="flex items-center gap-4 px-4 py-3 hover:bg-surface-container-low transition-colors"
+              >
+                <Icon
+                  name="storefront"
+                  filled={pathname.startsWith("/boutique")}
+                  size={20}
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="block text-sm uppercase tracking-widest font-medium">
+                    Mon stock
+                  </span>
+                  <span className="block text-[10px] uppercase tracking-widest text-outline mt-0.5">
+                    Importer & enrichir
+                  </span>
+                </div>
+                <Icon name="arrow_forward" size={16} className="text-outline" />
+              </Link>
+            </div>
+          )}
 
           <div className="mt-6 pt-6 border-t border-outline-variant/40">
             <p className="text-[10px] uppercase tracking-widest text-outline mb-3 px-4">

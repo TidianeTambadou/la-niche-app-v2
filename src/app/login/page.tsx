@@ -96,6 +96,32 @@ export default function LoginPage() {
   );
 }
 
+/**
+ * Resolve where to land after a successful sign-in. Users whose `auth.uid()`
+ * is in `public.shops` are boutique accounts and should always go to their
+ * dashboard so they can manage stock — unless an explicit `redirect` query
+ * param overrides that. Returns `null` when the lookup fails so callers can
+ * fall back to the requested redirect.
+ */
+async function resolvePostLoginRedirect(
+  userId: string,
+  requested: string,
+): Promise<string> {
+  // Honour an explicit, non-default redirect first (e.g. /wishlist).
+  if (requested && requested !== "/") return requested;
+  try {
+    const { data } = await supabase
+      .from("shops")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (data?.id) return "/boutique";
+  } catch {
+    /* fall through */
+  }
+  return requested || "/";
+}
+
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -111,11 +137,17 @@ function LoginContent() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  // If already logged in, bounce to redirect target.
+  // If already logged in, bounce to redirect target — boutique accounts
+  // land on /boutique unless an explicit redirect was requested.
   useEffect(() => {
-    if (!authLoading && user) {
-      router.replace(redirect);
-    }
+    if (authLoading || !user) return;
+    let cancelled = false;
+    resolvePostLoginRedirect(user.id, redirect).then((target) => {
+      if (!cancelled) router.replace(target);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [authLoading, user, redirect, router]);
 
   async function sendPasswordReset() {
@@ -190,11 +222,14 @@ function LoginContent() {
     setSubmitting(true);
     try {
       if (mode === "signin") {
-        const { error } = await withAuthTimeout(
+        const { data: signInData, error } = await withAuthTimeout(
           supabase.auth.signInWithPassword({ email: trimmed, password }),
         );
         if (error) throw error;
-        router.push(redirect);
+        const target = signInData?.user
+          ? await resolvePostLoginRedirect(signInData.user.id, redirect)
+          : redirect;
+        router.push(target);
         router.refresh();
       } else if (mode === "signup") {
         const onboardingRedirect = "/onboarding";
@@ -215,8 +250,23 @@ function LoginContent() {
           }),
         );
         if (error) throw error;
+        // Claim referral if the user arrived via a referral link
         if (data.session) {
-          // Email confirmation disabled in Supabase: we already have a session.
+          const refCode = (() => {
+            try { return localStorage.getItem("la-niche.referral-code"); } catch { return null; }
+          })();
+          if (refCode) {
+            fetch("/api/referral", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${data.session.access_token}`,
+              },
+              body: JSON.stringify({ action: "claim", code: refCode }),
+            }).then(() => {
+              try { localStorage.removeItem("la-niche.referral-code"); } catch { /* */ }
+            }).catch(() => { /* best effort */ });
+          }
           router.push(onboardingRedirect);
           router.refresh();
         } else {

@@ -836,14 +836,14 @@ function QuestionScreen({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Debounced search: 800ms after the last keystroke, hit /api/agent.
-  // Minimum 3 chars before firing — keeps the rate-limit-tight Anthropic
-  // budget healthy. Same query within 5 min comes from the client cache.
+  // Cost-aware autocomplete debounce: 1500ms + min 4 chars + the agent-
+  // client's prefix-cache means a word like "Sauvage" triggers ~1 API call
+  // total even as the user types each letter, deletes, and re-types.
   useEffect(() => {
     const q = query.trim();
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (abortRef.current) abortRef.current.abort();
-    if (q.length < 3) {
+    if (q.length < 4) {
       setCandidates([]);
       setLoading(false);
       setError(null);
@@ -866,7 +866,7 @@ function QuestionScreen({
           setLoading(false);
         }
       }
-    }, 800);
+    }, 1500);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };

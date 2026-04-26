@@ -28,11 +28,14 @@ export default function SearchPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Cost-aware debounce: 1500ms after the last keystroke, min 4 chars.
+  // Coupled with the prefix-cache in agent-client, this means a typical
+  // word ("Sauvage") triggers ~1 API call instead of 4-5.
   useEffect(() => {
     const q = query.trim();
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (abortRef.current) abortRef.current.abort();
-    if (q.length < 3) {
+    if (q.length < 4) {
       setResults([]);
       setLoading(false);
       setError(null);
@@ -55,13 +58,13 @@ export default function SearchPage() {
           setLoading(false);
         }
       }
-    }, 800);
+    }, 1500);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query]);
 
-  const hasQuery = query.trim().length >= 3;
+  const hasQuery = query.trim().length >= 4;
 
   return (
     <div className="px-6 pt-4 pb-24">

@@ -10,7 +10,7 @@ import { PerfumeArtwork } from "@/components/PerfumeArtwork";
 import { CreateCardButton } from "@/components/CreateCardButton";
 import { useAuth } from "@/lib/auth";
 import { findBoutiqueById } from "@/lib/boutiques";
-import { useStore } from "@/lib/store";
+import { useStore, TIER_LABELS, type SubscriptionTier } from "@/lib/store";
 import {
   readProfileFromUser,
   FAMILY_VULGAR,
@@ -18,7 +18,12 @@ import {
   BUDGET_VULGAR,
   type OlfactiveProfile,
 } from "@/lib/profile";
-import { agentFriendReport, agentRecommend } from "@/lib/agent-client";
+import {
+  agentFriendReport,
+  agentRecommend,
+  AuthRequiredError,
+  QuotaExceededError,
+} from "@/lib/agent-client";
 import type {
   FriendReport,
   OlfactiveDNA,
@@ -109,6 +114,7 @@ export default function RecommendationsPage() {
     consumeRecommendation,
     remaining,
     subscription,
+    refreshUsage,
   } = useStore();
 
   const [phase, setPhase] = useState<Phase>("mode-picker");
@@ -190,13 +196,24 @@ export default function RecommendationsPage() {
         setPhase(forMode === "friend" ? "mode-picker" : "configure");
         return;
       }
-      // Burn one credit only once the AI succeeded. This way an upstream
-      // error (rate limit, network) doesn't count against the user.
+      // Burn one credit locally for instant UX feedback. The server has
+      // already deducted the canonical count — refreshUsage() reconciles.
       consumeRecommendation();
+      void refreshUsage();
       setRecs(result.recommendations);
       setDna(result.dna);
       setPhase("swiping");
     } catch (e) {
+      // Server quota exhausted → bounce to /abonnement (the local count
+      // could still appear under-used if localStorage is stale).
+      if (e instanceof QuotaExceededError) {
+        router.push("/abonnement?from=recommendations");
+        return;
+      }
+      if (e instanceof AuthRequiredError) {
+        router.push("/login?redirect=/recommendations");
+        return;
+      }
       setError(e instanceof Error ? e.message : "Erreur inconnue");
       setPhase(forMode === "friend" ? "mode-picker" : "configure");
     }
@@ -1427,16 +1444,14 @@ function ModePickerView({
   hasProfile: boolean;
   error: string | null;
   remainingRecs: number;
-  subscription: "free" | "basic" | "premium";
+  subscription: SubscriptionTier;
   onPick: (m: Mode) => void;
 }) {
   const unlimited = remainingRecs === Infinity;
   const tierLabel =
-    subscription === "premium"
-      ? "Abonné Illimité"
-      : subscription === "basic"
-        ? "Abonné Basic"
-        : "Gratuit";
+    subscription === "free"
+      ? "Découverte"
+      : `Abonné ${TIER_LABELS[subscription]}`;
   return (
     <div className="px-6 pt-4 pb-12 min-h-screen flex flex-col">
       <header className="mb-10">
@@ -1485,7 +1500,7 @@ function ModePickerView({
               : `${remainingRecs} recommandation${remainingRecs > 1 ? "s" : ""} restante${remainingRecs > 1 ? "s" : ""} ce mois-ci.`}
           </p>
         </div>
-        {subscription !== "premium" && (
+        {subscription !== "mecene" && (
           <Link
             href="/abonnement?from=recommendations"
             className="text-[10px] uppercase tracking-widest font-bold border-b border-primary pb-0.5 flex-shrink-0"

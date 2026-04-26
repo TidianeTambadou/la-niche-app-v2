@@ -4,9 +4,11 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
 import { ErrorBubble } from "@/components/ErrorBubble";
+import { PerfumeCardModal } from "@/components/PerfumeCardModal";
 import { agentAsk, type AskHistoryTurn } from "@/lib/agent-client";
 import { useAuth } from "@/lib/auth";
 import { onOpenConcierge } from "@/lib/concierge-bus";
+import type { PerfumeCardData, PerfumeAccord } from "@/lib/agent";
 import {
   readProfileFromUser,
   FAMILY_VULGAR,
@@ -441,7 +443,228 @@ function TypewriterText({
  * --------------------------------------------------------------------- */
 
 function MarkdownContent({ text }: { text: string }) {
-  return <div className="space-y-1">{parseMarkdown(text)}</div>;
+  // Pre-segment the text: anywhere the LLM emitted a ```carte-laniche
+  // block, render an inline ConciergeCardPreview instead of letting the
+  // markdown parser dump the raw lines.
+  const segments = useMemo(() => extractCarteLanicheBlocks(text), [text]);
+  return (
+    <div className="space-y-1">
+      {segments.map((seg, i) =>
+        seg.type === "card" ? (
+          <ConciergeCardPreview key={i} card={seg.data} />
+        ) : (
+          <div key={i} className="space-y-1">
+            {parseMarkdown(seg.content)}
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------
+ * ```carte-laniche``` block parser — picks up the structured card the
+ * concierge can emit when asked to "fais-moi la carte de X".
+ *
+ * Format (lines, free order, all optional except Brand + Name):
+ *   Brand: <maison>
+ *   Name: <nom>
+ *   Family: <famille>
+ *   Top:    <a, b, c>
+ *   Heart:  <a, b, c>
+ *   Base:   <a, b, c>
+ *   Accords: <accord1>:90, <accord2>:75
+ *   Longevity: <Long Lasting>
+ *   Sillage:   <Strong>
+ *   Seasons:   <winter,fall>
+ *   Daytime:   <night>
+ *   Description: <free text — supports a single line>
+ * --------------------------------------------------------------------- */
+
+type Segment =
+  | { type: "text"; content: string }
+  | { type: "card"; data: PerfumeCardData };
+
+function extractCarteLanicheBlocks(text: string): Segment[] {
+  const segments: Segment[] = [];
+  const regex = /```carte-laniche\s*\n([\s\S]*?)\n```/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({
+        type: "text",
+        content: text.slice(lastIndex, match.index),
+      });
+    }
+    const data = parseCarteLanicheBlock(match[1]);
+    if (data) segments.push({ type: "card", data });
+    else
+      segments.push({
+        type: "text",
+        content: `\n[carte mal formée — bloc ignoré]\n`,
+      });
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    segments.push({ type: "text", content: text.slice(lastIndex) });
+  }
+  return segments.length === 0
+    ? [{ type: "text", content: text }]
+    : segments;
+}
+
+function parseCarteLanicheBlock(block: string): PerfumeCardData | null {
+  const fields: Record<string, string> = {};
+  for (const raw of block.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const m = line.match(/^([A-Za-z][A-Za-z _-]*?)\s*:\s*(.+)$/);
+    if (!m) continue;
+    fields[m[1].toLowerCase().replace(/\s|_|-/g, "")] = m[2].trim();
+  }
+  const brand = fields.brand;
+  const name = fields.name;
+  if (!brand || !name) return null;
+
+  const splitList = (s: string | undefined): string[] =>
+    (s ?? "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+
+  const accords: PerfumeAccord[] = splitList(fields.accords).map((s) => {
+    const [n, w] = s.split(":").map((x) => x.trim());
+    const num = w ? Number(w) : NaN;
+    return isFinite(num) && num > 0
+      ? { name: n, weight: Math.max(0, Math.min(100, num)) }
+      : { name: s };
+  });
+
+  const seasons = splitList(fields.seasons)
+    .map((s) => s.toLowerCase())
+    .map((s) => (s === "fall" ? "autumn" : s))
+    .filter((s) => ["winter", "spring", "summer", "autumn"].includes(s));
+
+  const day_time = splitList(fields.daytime)
+    .map((s) => s.toLowerCase())
+    .filter((s) => ["day", "night"].includes(s));
+
+  return {
+    name,
+    brand,
+    image_url: null,
+    description: fields.description ?? null,
+    gender: fields.gender ?? null,
+    family: fields.family ?? null,
+    notes: {
+      top: splitList(fields.top).map((n) => ({ name: n })),
+      middle: splitList(fields.heart ?? fields.middle).map((n) => ({ name: n })),
+      base: splitList(fields.base).map((n) => ({ name: n })),
+    },
+    accords,
+    longevity: fields.longevity ?? null,
+    sillage: fields.sillage ?? null,
+    seasons,
+    day_time,
+    rating: null,
+    reviews_count: null,
+    source_url: null,
+  };
+}
+
+/* -------------------------------------------------------------------------
+ * Inline preview rendered in the chat when the concierge produced a card.
+ * Compact thumbnail + brand/name + family + "Voir" CTA opening the full
+ * PerfumeCardModal. Tries to enrich with Fragella's image via the modal's
+ * own lazy lookup (the modal will hit /api/agent card mode if needed).
+ * --------------------------------------------------------------------- */
+
+function ConciergeCardPreview({ card }: { card: PerfumeCardData }) {
+  const [open, setOpen] = useState(false);
+  const allAccords = card.accords.slice(0, 3).map((a) => a.name);
+  const peekNotes = [
+    ...card.notes.top.slice(0, 2),
+    ...card.notes.middle.slice(0, 2),
+    ...card.notes.base.slice(0, 1),
+  ]
+    .slice(0, 4)
+    .map((n) => n.name);
+
+  return (
+    <>
+      <div className="my-2 border border-outline bg-surface-container-low relative overflow-hidden">
+        {/* Faint logo watermark behind the content */}
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          aria-hidden
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-laniche.png"
+            alt=""
+            className="w-3/4 h-3/4 object-contain opacity-[0.06]"
+          />
+        </div>
+
+        <div className="relative p-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[9px] uppercase tracking-[0.3em] text-outline font-mono">
+              Carte signée La Niche
+            </span>
+            {card.family && (
+              <span className="text-[8px] uppercase tracking-widest font-bold bg-on-background text-background px-1.5 py-0.5">
+                {card.family}
+              </span>
+            )}
+          </div>
+
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.25em] text-outline">
+              {card.brand}
+            </p>
+            <p className="text-base font-serif italic font-light leading-tight">
+              {card.name}
+            </p>
+          </div>
+
+          {allAccords.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {allAccords.map((a) => (
+                <span
+                  key={a}
+                  className="text-[8px] uppercase tracking-widest font-bold border border-outline-variant px-1.5 py-0.5 bg-background"
+                >
+                  {a}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {peekNotes.length > 0 && (
+            <p className="text-[10px] text-on-surface-variant leading-snug line-clamp-2">
+              {peekNotes.join(" · ")}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="self-start mt-1 text-[10px] uppercase tracking-widest font-bold text-on-background hover:text-primary border-b border-primary pb-px flex items-center gap-1"
+          >
+            <Icon name="style" size={11} />
+            Voir la carte complète
+          </button>
+        </div>
+      </div>
+
+      <PerfumeCardModal
+        open={open}
+        onClose={() => setOpen(false)}
+        card={card}
+      />
+    </>
+  );
 }
 
 function parseMarkdown(text: string): ReactNode[] {

@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: blob: https://*.supabase.co https://*.tile.openstreetmap.org https://staticmap.openstreetmap.de https://placehold.co https://fimgs.net https://*.fimgs.net https://*.fragrantica.com https://*.fragrantica.fr https://www.fragrantica.fr",
+              "img-src 'self' data: blob: https://*.supabase.co https://*.tile.openstreetmap.org https://staticmap.openstreetmap.de https://placehold.co https://fimgs.net https://*.fimgs.net https://*.fragrantica.com https://*.fragrantica.fr https://www.fragrantica.fr https://cdn.fragella.com https://*.fragella.com https://cdn.fragrancenet.com https://*.fragrancenet.com https://www.dior.com https://*.dior.com",
               "frame-src 'self' https://www.openstreetmap.org",
               [
                 "connect-src 'self'",

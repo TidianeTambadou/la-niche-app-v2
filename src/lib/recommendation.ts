@@ -54,6 +54,8 @@ export type RecommendationReason = {
     | "family_disliked"
     | "wishlist_liked_already"
     | "wishlist_disliked"
+    | "shared_notes"
+    | "disliked_notes"
     // History
     | "history_brand_liked"
     | "history_family_liked"
@@ -125,6 +127,10 @@ const WEIGHTS = {
   family_disliked: -20,
   wishlist_liked_already: -30,
   wishlist_disliked: -100,
+  shared_notes_each: 6, // per overlapping note with a liked fragrance, capped
+  shared_notes_cap: 4, // max notes counted (avoid runaway when 10+ overlap)
+  disliked_notes_each: -7, // per overlapping note with a disliked fragrance
+  disliked_notes_cap: 3,
 
   // History
   history_brand_liked_each: 4, // per past like in same brand, capped at 3
@@ -278,6 +284,10 @@ type Context = {
   avgLikedPrice: number | null;
   wishlistedKeys: Set<string>;
   wishlistStatus: Map<string, "liked" | "disliked">;
+  /** Lower-cased note names accumulated from liked / disliked fragrances —
+   *  drives the "shared_notes" / "disliked_notes" reasons. */
+  likedNotes: Set<string>;
+  dislikedNotes: Set<string>;
   // History
   historyTestedKeys: Set<string>;
   historyLikedBrands: Map<string, number>; // brand → count
@@ -308,10 +318,13 @@ function buildContext(input: RecommendationInput): Context {
   const dislikedFamilies = new Set<string>();
   const familyLikeCount = new Map<string, number>();
   const likedPrices: number[] = [];
+  const likedNotes = new Set<string>();
+  const dislikedNotes = new Set<string>();
 
   for (const w of wishlist) {
     const f = lookup.get(w.fragranceId);
     if (!f) continue;
+    const noteNames = (f.notes ?? []).map((n) => n.name.trim().toLowerCase());
     if (w.status === "liked") {
       likedBrands.add(f.brand);
       if (f.family) {
@@ -322,9 +335,11 @@ function buildContext(input: RecommendationInput): Context {
         );
       }
       if (f.bestPrice != null) likedPrices.push(f.bestPrice);
+      for (const n of noteNames) if (n) likedNotes.add(n);
     } else {
       dislikedBrands.add(f.brand);
       if (f.family) dislikedFamilies.add(f.family);
+      for (const n of noteNames) if (n) dislikedNotes.add(n);
     }
   }
 
@@ -373,6 +388,8 @@ function buildContext(input: RecommendationInput): Context {
     avgLikedPrice,
     wishlistedKeys: new Set(wishlistStatus.keys()),
     wishlistStatus,
+    likedNotes,
+    dislikedNotes,
     historyTestedKeys,
     historyLikedBrands,
     historyLikedFamilies,
@@ -530,6 +547,40 @@ function scoreFragrance(f: Fragrance, ctx: Context): Recommendation {
         "price_sweet_spot",
         `Prix dans ton sweet spot (~${Math.round(ctx.avgLikedPrice)}€)`,
         WEIGHTS.price_sweet_spot,
+      );
+    }
+  }
+
+  // Note overlap with liked / disliked wishlist items. The boutique stock
+  // is enriched with a note pyramid at import time (see /api/boutique/stock),
+  // so this is what makes the balade-guidée pull "from the notes of the
+  // boutique perfumes" the user has signalled affinity for.
+  const candidateNotes = (f.notes ?? []).map((n) =>
+    n.name.trim().toLowerCase(),
+  );
+  if (candidateNotes.length > 0) {
+    const sharedLiked = candidateNotes.filter((n) => ctx.likedNotes.has(n));
+    if (sharedLiked.length > 0) {
+      const counted = Math.min(WEIGHTS.shared_notes_cap, sharedLiked.length);
+      const sample = sharedLiked.slice(0, 2).join(", ");
+      add(
+        "shared_notes",
+        `Notes en commun avec tes coups de cœur (${sample})`,
+        counted * WEIGHTS.shared_notes_each,
+      );
+    }
+    const sharedDisliked = candidateNotes.filter((n) =>
+      ctx.dislikedNotes.has(n),
+    );
+    if (sharedDisliked.length > 0) {
+      const counted = Math.min(
+        WEIGHTS.disliked_notes_cap,
+        sharedDisliked.length,
+      );
+      add(
+        "disliked_notes",
+        `Note présente dans un parfum que tu as rejeté`,
+        counted * WEIGHTS.disliked_notes_each,
       );
     }
   }
@@ -739,7 +790,19 @@ export function buildRecommendationPrompt(
       const price = f.bestPrice != null ? `${f.bestPrice}€` : "prix n/c";
       const fam = f.family ? ` · ${f.family}` : "";
       const intensity = f.intensity ? ` · ${f.intensity}` : "";
-      return `  - key="${f.key}" | ${f.name} — ${f.brand} (${price}${fam}${intensity})`;
+      const notesByLayer = (layer: "top" | "heart" | "base") =>
+        (f.notes ?? [])
+          .filter((n) => n.layer === layer)
+          .map((n) => n.name)
+          .join(", ");
+      const top = notesByLayer("top");
+      const heart = notesByLayer("heart");
+      const base = notesByLayer("base");
+      const pyramid =
+        top || heart || base
+          ? `\n      tête: ${top || "—"}\n      cœur: ${heart || "—"}\n      fond: ${base || "—"}`
+          : "";
+      return `  - key="${f.key}" | ${f.name} — ${f.brand} (${price}${fam}${intensity})${pyramid}`;
     })
     .join("\n");
 

@@ -12,12 +12,33 @@ import type {
   RecommendationCandidate,
   SearchCandidate,
 } from "@/lib/agent";
+import { supabase } from "@/lib/supabase";
 
-async function call(body: unknown, signal?: AbortSignal): Promise<AgentResponse> {
+/** Reads the current Supabase session token. Returned undefined for
+ *  anonymous users — the API decides whether the mode requires auth. */
+async function authHeader(): Promise<Record<string, string>> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
+async function call(
+  body: unknown,
+  signal?: AbortSignal,
+  options?: { auth?: boolean },
+): Promise<AgentResponse> {
   async function once(): Promise<AgentResponse> {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (options?.auth) {
+      Object.assign(headers, await authHeader());
+    }
     const res = await fetch("/api/agent", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers,
       body: JSON.stringify(body),
       signal,
     });
@@ -38,17 +59,22 @@ async function call(body: unknown, signal?: AbortSignal): Promise<AgentResponse>
 }
 
 /* -------------------------------------------------------------------------
- * LRU cache for search results.
+ * Search cache + cost-saving prefix dedup.
  *
- * The default Anthropic Tier 1 plan is 10K input tokens / minute. Each web-
- * search call burns 3-8K tokens (system + prompt + scraped page content).
- * Without a cache, 2-3 quick searches blow the rate limit. Same query within
- * 5 minutes hits the cache instead.
+ * Fragella has per-day quotas. To minimise calls:
+ *   1. 30-minute TTL — same exact query hits the in-memory cache.
+ *   2. Prefix dedup — when the user types "Sauvage" then deletes back to
+ *      "Sauv", we don't re-fetch: we filter the cached "Sauvage" results
+ *      client-side (any candidate whose brand+name contains the new query).
+ *      This cuts per-keystroke calls to ZERO once the LLM has produced the
+ *      "right" set for a longer prefix.
+ *   3. The page-side debounce (1500 ms + min 4 chars) prevents most calls
+ *      altogether.
  * --------------------------------------------------------------------- */
 
 const SEARCH_CACHE = new Map<string, { ts: number; value: SearchCandidate[] }>();
-const SEARCH_CACHE_MAX = 40;
-const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
+const SEARCH_CACHE_MAX = 80;
+const SEARCH_CACHE_TTL_MS = 30 * 60 * 1000;
 
 function cachedSearchResults(key: string): SearchCandidate[] | null {
   const hit = SEARCH_CACHE.get(key);
@@ -61,6 +87,28 @@ function cachedSearchResults(key: string): SearchCandidate[] | null {
   SEARCH_CACHE.delete(key);
   SEARCH_CACHE.set(key, hit);
   return hit.value;
+}
+
+/** Look for any cached entry whose key STARTS WITH the current query OR
+ *  for which the current query is a substring. Returns filtered candidates
+ *  (only those that still match the current query in brand or name).
+ *
+ *  Example: cache has "sauvage" → ["Dior Sauvage", "Eau Sauvage", …].
+ *  User types "sauv" → we return the same list filtered (all match).
+ *  No new API call. */
+function cachedPrefixResults(key: string): SearchCandidate[] | null {
+  // Try every cached key — small N (≤80), cheap.
+  for (const [cachedKey, entry] of SEARCH_CACHE) {
+    if (Date.now() - entry.ts > SEARCH_CACHE_TTL_MS) continue;
+    if (cachedKey.startsWith(key) || cachedKey.includes(key)) {
+      const filtered = entry.value.filter((c) => {
+        const hay = `${c.brand} ${c.name}`.toLowerCase();
+        return hay.includes(key);
+      });
+      if (filtered.length > 0) return filtered;
+    }
+  }
+  return null;
 }
 
 function rememberSearchResults(key: string, value: SearchCandidate[]): void {
@@ -80,9 +128,20 @@ export async function agentSearch(
   const key = query.trim().toLowerCase();
   if (key.length < 3) return [];
 
+  // 1) exact cache hit
   const cached = cachedSearchResults(key);
   if (cached) return cached;
 
+  // 2) prefix/substring of a previous cache entry → reuse, no API call
+  const reused = cachedPrefixResults(key);
+  if (reused) {
+    // Memoise under the new key too so subsequent identical queries are
+    // instant without re-scanning the cache.
+    rememberSearchResults(key, reused);
+    return reused;
+  }
+
+  // 3) actually call the API
   const res = await call(
     { mode: "search", payload: { query: key } },
     signal,
@@ -94,11 +153,11 @@ export async function agentSearch(
   if (!res.ok) {
     const msg =
       res.error === "agent_disabled"
-        ? "Agent IA désactivé (OPENROUTER_API_KEY non configurée)"
+        ? "Service indisponible"
         : res.error === "upstream_error" && res.detail?.startsWith("429")
-          ? "Limite de débit atteinte. Patiente une minute."
+          ? "Trop de requêtes. Patiente une minute."
           : res.error === "upstream_error"
-            ? `Erreur IA : ${res.detail ?? "?"}`
+            ? `Erreur du service : ${res.detail ?? "?"}`
             : `${res.error}${res.detail ? ` — ${res.detail}` : ""}`;
     throw new Error(msg);
   }
@@ -133,6 +192,20 @@ export type RecommendResult = {
   dna: OlfactiveDNA;
 };
 
+export class QuotaExceededError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "QuotaExceededError";
+  }
+}
+
+export class AuthRequiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AuthRequiredError";
+  }
+}
+
 export async function agentRecommend(
   count: number,
   profileContext: string,
@@ -146,11 +219,22 @@ export async function agentRecommend(
       payload: { count, profileContext, likedFragrances, dislikedFragrances },
     },
     signal,
+    { auth: true },
   );
   if (res.ok && res.mode === "recommend") {
     return { recommendations: res.recommendations, dna: res.dna };
   }
   if (!res.ok) {
+    if (res.error === "quota_exceeded") {
+      throw new QuotaExceededError(
+        res.detail ?? "Quota mensuel atteint. Passe à un palier supérieur.",
+      );
+    }
+    if (res.error === "auth_required") {
+      throw new AuthRequiredError(
+        res.detail ?? "Connecte-toi pour utiliser cette fonctionnalité.",
+      );
+    }
     const msg =
       res.error === "agent_disabled"
         ? "Agent IA désactivé (OPENROUTER_API_KEY non configurée)"

@@ -31,6 +31,12 @@ import {
   searchFragella,
   type FragellaPerfume,
 } from "@/lib/fragella";
+import {
+  checkQuota,
+  consumeQuota,
+  refundQuota,
+  requireUserId,
+} from "@/lib/quota";
 
 /* ─── In-memory search cache (per Vercel instance) ─────────────────────── */
 
@@ -57,14 +63,50 @@ function rememberSearch(key: string, candidates: SearchCandidate[]) {
 
 /* ─── Tavily web search ─────────────────────────────────────────────────── */
 
-/** Fragrance knowledge base — notes, pyramid, reviews. */
+/** Fragrance knowledge base — generalist note/pyramid/review databases
+ *  PLUS niche perfumery editorial sites and retailers that frequently ship
+ *  the kind of detailed olfactive data the concierge needs to surface
+ *  rare/independent maisons. */
 const FRAGRANCE_KB_DOMAINS = [
+  // Generalist databases
   "fragrantica.com",
   "fragrantica.fr",
   "basenotes.com",
   "parfumo.net",
+  "parfumo.de",
   "fragrancex.com",
   "nstperfume.com",
+  // Editorial / critic blogs
+  "auparfum.com",
+  "nezvrogue.com",
+  "persolaise.com",
+  "fragranceguy.com",
+  "jasminandginja.com",
+  "perfumeposse.com",
+  "thedryowndown.com",
+  "olfactif.com",
+  "scenthurdle.com",
+  "monsieur-de-france.com",
+  // Niche retailers / curated catalogues
+  "luckyscent.com",
+  "twistedlily.com",
+  "bloomperfumery.com",
+  "scentbar.com",
+  "scentbird.com",
+  "nicheofficial.com",
+  "fragrancesline.com",
+  "essenza-nobile.com",
+  "first-in-fragrance.com",
+  "scentsplit.com",
+  // Maison directs (frequently the most authoritative source)
+  "amouage.com",
+  "diptyqueparis.com",
+  "fredericmalle.com",
+  "byredo.com",
+  "lartisanparfumeur.com",
+  "serge-lutens.com",
+  "guerlain.com",
+  "tomford.com",
 ];
 
 type TavilyResult = {
@@ -130,8 +172,13 @@ function isValidPerfumeImageUrl(url: unknown): url is string {
 /** Build a short ≤50 char `notes_brief` from a Fragella perfume — picks
  *  the most distinctive notes per layer and trims. */
 function buildBriefFromFragella(p: FragellaPerfume): string {
+  const noteNames = [
+    ...p.notes.top.map((n) => n.name),
+    ...p.notes.middle.map((n) => n.name),
+    ...p.notes.base.map((n) => n.name),
+  ];
   const accordNames = p.accords.map((a) => a.name);
-  const all = [...p.notes.top, ...p.notes.middle, ...p.notes.base, ...accordNames];
+  const all = [...noteNames, ...accordNames];
   const seen = new Set<string>();
   const unique: string[] = [];
   for (const v of all) {
@@ -149,6 +196,8 @@ function buildBriefFromFragella(p: FragellaPerfume): string {
  *  consumes. Same shape as FragellaPerfume but typed in the shared agent
  *  module so it can travel over the wire. */
 function fragellaToCardData(p: FragellaPerfume): PerfumeCardData {
+  const mapNotes = (ns: typeof p.notes.top) =>
+    ns.map((n) => (n.imageUrl ? { name: n.name, imageUrl: n.imageUrl } : { name: n.name }));
   return {
     name: p.name,
     brand: p.brand,
@@ -156,7 +205,11 @@ function fragellaToCardData(p: FragellaPerfume): PerfumeCardData {
     description: p.description,
     gender: p.gender,
     family: p.family,
-    notes: { ...p.notes },
+    notes: {
+      top: mapNotes(p.notes.top),
+      middle: mapNotes(p.notes.middle),
+      base: mapNotes(p.notes.base),
+    },
     accords: p.accords.map((a) => ({
       name: a.name,
       ...(a.weight !== undefined ? { weight: a.weight } : {}),
@@ -420,27 +473,29 @@ export async function POST(req: Request) {
     if (cached) return NextResponse.json({ ok: true, mode: "search", candidates: cached } satisfies AgentResponse);
 
     // PRIMARY — Fragella (single round trip, no LLM, real images).
+    // Three outcomes drive different paths:
+    //   - hits[]   (length > 0) → return them, done
+    //   - hits[]   (length 0)   → Fragella reached, no match → return empty
+    //                              so the UI shows the concierge CTA
+    //   - null                  → Fragella unreachable / quota'd → fall
+    //                              through to Tavily scrape pipeline below
+    let fragellaHits: Awaited<ReturnType<typeof searchFragella>> = null;
     try {
-      const fragellaHits = await searchFragella(query, 5);
-      if (fragellaHits && fragellaHits.length > 0) {
-        const candidates = fragellaHits.map(fragellaToSearchCandidate);
-        rememberSearch(cacheKey, candidates);
-        return NextResponse.json({ ok: true, mode: "search", candidates } satisfies AgentResponse);
-      }
-      // Empty / unreachable → return empty list. The front-end shows the
-      // "demande à la conciergerie" CTA when candidates.length === 0, which
-      // routes the user to the ConciergeWidget (Tavily + Fragrantica scrape).
-      const emptyCandidates: SearchCandidate[] = [];
-      rememberSearch(cacheKey, emptyCandidates);
+      fragellaHits = await searchFragella(query, 5);
+    } catch (e) {
+      console.error("[search] Fragella threw:", e);
+      fragellaHits = null;
+    }
+    if (fragellaHits !== null) {
+      const candidates = fragellaHits.map(fragellaToSearchCandidate);
+      rememberSearch(cacheKey, candidates);
       return NextResponse.json({
         ok: true,
         mode: "search",
-        candidates: emptyCandidates,
+        candidates,
       } satisfies AgentResponse);
-    } catch (e) {
-      console.error("[search] Fragella threw:", e);
-      // Fall through to the legacy Tavily pipeline below.
     }
+    // fragellaHits === null → Fragella down/quota → continue to Tavily.
 
     try {
       // Tavily with raw_content → we get the actual Fragrantica HTML, which
@@ -675,7 +730,32 @@ JSON STRICT, sans markdown :
       };
     const safeCount = Math.min(20, Math.max(3, Math.round(count)));
 
+    // ── Quota gate ──
+    // The recommend pipeline is the most expensive call in the app
+    // (~$0.08-0.13). Require auth, deduct atomically before doing the work,
+    // refund on upstream failure so a flaky API doesn't burn user credits.
+    const userId = await requireUserId(req);
+    if (!userId) {
+      return NextResponse.json(
+        { ok: false, error: "auth_required", detail: "Connecte-toi pour générer des recommandations." } satisfies AgentResponse,
+        { status: 401 },
+      );
+    }
+    const gate = await checkQuota(userId, "recos");
+    if (!gate.allowed) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "quota_exceeded",
+          detail: `Tu as utilisé tes ${gate.limit} recommandations ce mois-ci. Passe à un palier supérieur pour continuer.`,
+        } satisfies AgentResponse,
+        { status: 402 },
+      );
+    }
+    let consumed = false;
     try {
+      await consumeQuota(userId, "recos");
+      consumed = true;
       /* Stage 1 — real Fragrantica data for the user's liked parfums */
       const topLiked = likedFragrances.slice(0, 3);
       const likedNotesWeb = topLiked.length
@@ -867,6 +947,12 @@ Sélectionne EXACTEMENT ${safeCount} parfums DIFFÉRENTS des parfums aimés/reje
         dna,
       } satisfies AgentResponse);
     } catch (e) {
+      // Refund the credit so a flaky upstream doesn't punish the user.
+      if (consumed) {
+        await refundQuota(userId, "recos").catch((err) =>
+          console.warn("[recommend] refund failed:", err),
+        );
+      }
       return NextResponse.json(
         {
           ok: false,

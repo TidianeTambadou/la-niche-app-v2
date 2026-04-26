@@ -11,6 +11,7 @@ import {
 } from "react";
 import type { BodyZone, Fragrance } from "@/lib/fragrances";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
 export type WishlistStatus = "liked" | "disliked";
 export type WishlistOrigin = "search" | "scan" | "balade" | "manual";
@@ -107,7 +108,9 @@ export type FinishedBalade = ActiveBalade & { finishedAt: number };
  * lands, mirror the same state on the server and keep this as a local cache.
  * ----------------------------------------------------------------------- */
 
-export type SubscriptionTier = "free" | "basic" | "premium";
+export type SubscriptionTier = "free" | "curieux" | "initie" | "mecene";
+
+export type BillingCycle = "monthly" | "annual";
 
 export type UsageState = {
   /** Sessions consumed in the current billing window. */
@@ -124,28 +127,62 @@ export type TierLimits = {
 
 export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   // Infinity encodes "unlimited" — checked as `count < limit` so it never trips.
-  free: { recommendations: 5, guidedBalades: 2 },
-  basic: { recommendations: 30, guidedBalades: 10 },
-  premium: { recommendations: Infinity, guidedBalades: Infinity },
+  free: { recommendations: 3, guidedBalades: 1 },
+  curieux: { recommendations: 25, guidedBalades: 10 },
+  initie: { recommendations: 60, guidedBalades: 25 },
+  // Mécène = fair-use illimité ; le cap 200/50 sert de garde-fou anti-abus
+  // côté serveur quand la phase 2 (quota DB) sera branchée.
+  mecene: { recommendations: 200, guidedBalades: 50 },
 };
 
 export const TIER_PRICE_EUR: Record<SubscriptionTier, number> = {
   free: 0,
-  basic: 2.99,
-  premium: 9.99,
+  curieux: 4.99,
+  initie: 12.99,
+  mecene: 24.99,
+};
+
+/** Annual price (full year, ~2 months free vs monthly billing). */
+export const TIER_PRICE_EUR_ANNUAL: Record<SubscriptionTier, number> = {
+  free: 0,
+  curieux: 49.9,
+  initie: 129,
+  mecene: 249,
 };
 
 export const TIER_LABELS: Record<SubscriptionTier, string> = {
-  free: "Gratuit",
-  basic: "Basic",
-  premium: "Illimité",
+  free: "Découverte",
+  curieux: "Curieux",
+  initie: "Initié",
+  mecene: "Mécène",
 };
+
+/** Whether the tier participates in the monthly contest ("concours du mois"). */
+export const TIER_HAS_CONTEST: Record<SubscriptionTier, boolean> = {
+  free: false,
+  curieux: false,
+  initie: true,
+  mecene: true,
+};
+
+/** Migration of legacy tier names persisted in localStorage from MVP-v1. */
+function migrateTier(raw: unknown): SubscriptionTier {
+  if (raw === "basic") return "curieux";
+  if (raw === "premium") return "initie";
+  if (raw === "free" || raw === "curieux" || raw === "initie" || raw === "mecene") {
+    return raw;
+  }
+  return "free";
+}
 
 type StoreState = {
   wishlist: WishlistEntry[];
   activeBalade: ActiveBalade | null;
   history: FinishedBalade[];
   subscription: SubscriptionTier;
+  /** "monthly" or "annual" — drives the price label and (later) the Stripe /
+   *  PayPal recurrence interval. Free users default to "monthly" cosmetically. */
+  billingCycle: BillingCycle;
   /** Unix ms of the most recent subscription upgrade — shown as "Membre
    *  depuis" on the profile. `null` for free users. */
   subscribedAt: number | null;
@@ -213,10 +250,15 @@ type StoreActions = {
   consumeRecommendation: () => void;
   canUseGuidedBalade: () => boolean;
   consumeGuidedBalade: () => void;
-  /** Fake "subscribe" — flips the local tier. Real Stripe plugs in later. */
-  setSubscription: (tier: SubscriptionTier) => void;
+  /** Fake "subscribe" — flips the local tier. Real PayPal plugs in later.
+   *  Cycle defaults to "monthly" if omitted. */
+  setSubscription: (tier: SubscriptionTier, cycle?: BillingCycle) => void;
   /** Remaining count for the current tier; Infinity if unlimited. */
   remaining: (kind: "recommendations" | "guidedBalades") => number;
+  /** Pulls /api/usage and reconciles tier + counters with the server.
+   *  No-op for anonymous users (no Bearer token). Call after any metered
+   *  agent call so the displayed remaining quota matches reality. */
+  refreshUsage: () => Promise<void>;
 };
 
 type StoreContextValue = StoreState & StoreActions;
@@ -249,7 +291,9 @@ function readStorage(userId: string | null): StoreState | null {
       wishlist: parsed.wishlist ?? [],
       activeBalade: parsed.activeBalade ?? null,
       history: parsed.history ?? [],
-      subscription: parsed.subscription ?? "free",
+      subscription: migrateTier(parsed.subscription),
+      billingCycle:
+        parsed.billingCycle === "annual" ? "annual" : "monthly",
       subscribedAt: parsed.subscribedAt ?? null,
       usage: rolloverUsage(parsed.usage ?? freshUsage()),
     };
@@ -288,6 +332,7 @@ const initialState: StoreState = {
   activeBalade: null,
   history: [],
   subscription: "free",
+  billingCycle: "monthly",
   subscribedAt: null,
   usage: freshUsage(),
 };
@@ -610,15 +655,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setSubscription = useCallback<StoreActions["setSubscription"]>(
-    (tier) => {
+    (tier, cycle) => {
+      const nextCycle: BillingCycle =
+        tier === "free" ? "monthly" : (cycle ?? "monthly");
       setState((s) => ({
         ...s,
         subscription: tier,
+        billingCycle: nextCycle,
         subscribedAt: tier === "free" ? null : Date.now(),
         // Reset counters on upgrade so a user who just maxed out free
         // immediately benefits from their new plan.
         usage: freshUsage(),
       }));
+      // Notify referral system to grant points (best-effort, fire-and-forget)
+      if (tier !== "free") {
+        supabase.auth.getSession().then(({ data }) => {
+          const token = data.session?.access_token;
+          if (!token) return;
+          fetch("/api/referral", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ action: "subscribe", tier, cycle: nextCycle }),
+          }).catch(() => { /* best effort */ });
+        });
+      }
     },
     [],
   );
@@ -632,6 +695,48 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     },
     [state.usage, state.subscription],
   );
+
+  const refreshUsage = useCallback<StoreActions["refreshUsage"]>(async () => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/usage", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const payload = (await res.json()) as {
+        tier: SubscriptionTier;
+        billing_cycle: BillingCycle;
+        usage: {
+          recos: { used: number; limit: number | null };
+          balades: { used: number; limit: number | null };
+        };
+      };
+      setState((s) => ({
+        ...s,
+        // Server is the truth for tier + cycle.
+        subscription: payload.tier,
+        billingCycle: payload.billing_cycle,
+        // Mirror server counters into the client shape used by the UI.
+        usage: {
+          recommendations: payload.usage.recos.used,
+          guidedBalades: payload.usage.balades.used,
+          // Keep the local rolloverAt — server has its own monthly window
+          // (date_trunc('month', now()::date)). Both eventually agree.
+          resetAt: rolloverUsage(s.usage).resetAt,
+        },
+      }));
+    } catch {
+      // Silent fail — UX falls back on the local cache.
+    }
+  }, []);
+
+  // Sync from server whenever the signed-in user changes (login, switch).
+  useEffect(() => {
+    if (authLoading || !userId) return;
+    refreshUsage();
+  }, [userId, authLoading, refreshUsage]);
 
   const value = useMemo<StoreContextValue>(
     () => ({
@@ -656,6 +761,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       consumeGuidedBalade,
       setSubscription,
       remaining,
+      refreshUsage,
     }),
     [
       state,
@@ -679,6 +785,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       consumeGuidedBalade,
       setSubscription,
       remaining,
+      refreshUsage,
     ],
   );
 

@@ -1,11 +1,17 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
-import { useStore, TIER_LIMITS, TIER_LABELS } from "@/lib/store";
+import {
+  useStore,
+  TIER_LIMITS,
+  TIER_LABELS,
+  type SubscriptionTier,
+} from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 import { useFragrances } from "@/lib/data";
 import {
   BUDGET_VULGAR,
@@ -29,8 +35,36 @@ export default function ProfilePage() {
   const { user, loading: authLoading, signOut } = useAuth();
   const fragrances = useFragrances();
   const [signingOut, setSigningOut] = useState(false);
+  const [referralData, setReferralData] = useState<{
+    code: string | null;
+    link: string | null;
+    points: number;
+    rank: number | null;
+    referrals: { subscription_tier: string | null }[];
+  } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const profile = readProfileFromUser(user);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token;
+      if (!token) return;
+      fetch("/api/referral", { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => { if (d) setReferralData(d); })
+        .catch(() => {});
+    });
+  }, [user]);
+
+  function copyLink() {
+    if (!referralData?.link) return;
+    navigator.clipboard.writeText(referralData.link).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  }
 
   async function onSignOut() {
     setSigningOut(true);
@@ -148,6 +182,125 @@ export default function ProfilePage() {
             baladesUsed={usage.guidedBalades}
             baladesRemaining={remaining("guidedBalades")}
           />
+        </div>
+      )}
+
+      {/* ── Parrainage ────────────────────────────────────────────── */}
+      {user && (
+        <div className="px-6 mb-2">
+          <div className="border border-outline-variant/40 p-5">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-[9px] uppercase tracking-[0.3em] text-outline mb-1">
+                  Concours lancement
+                </p>
+                <p className="text-base font-bold tracking-tight">
+                  Gagne{" "}
+                  <span className="text-primary">400€</span>
+                </p>
+              </div>
+              <Link
+                href="/classement"
+                className="flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold border-b border-primary pb-0.5"
+              >
+                <Icon name="leaderboard" size={12} />
+                Classement
+              </Link>
+            </div>
+
+            {/* Points + Rank */}
+            <div className="grid grid-cols-2 gap-px bg-outline-variant/30 mb-4">
+              <div className="bg-background py-4 text-center">
+                <p className="text-[2rem] font-black leading-none font-mono">
+                  {referralData?.points ?? 0}
+                </p>
+                <p className="text-[9px] uppercase tracking-widest text-outline mt-1">
+                  Points
+                </p>
+              </div>
+              <div className="bg-background py-4 text-center">
+                <p className="text-[2rem] font-black leading-none font-mono">
+                  {referralData?.rank != null ? `#${referralData.rank}` : "–"}
+                </p>
+                <p className="text-[9px] uppercase tracking-widest text-outline mt-1">
+                  Classement
+                </p>
+              </div>
+            </div>
+
+            {/* Referral count */}
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[10px] text-outline">
+                Filleuls inscrits :{" "}
+                <span className="font-bold text-on-background">
+                  {referralData?.referrals.length ?? 0}
+                </span>
+              </p>
+              <p className="text-[10px] text-outline">
+                Abonnés :{" "}
+                <span className="font-bold text-on-background">
+                  {referralData?.referrals.filter((r) => r.subscription_tier).length ?? 0}
+                </span>
+              </p>
+            </div>
+
+            {/* Link + copy */}
+            {referralData?.link ? (
+              <div className="space-y-2">
+                <p className="text-[9px] uppercase tracking-widest text-outline">
+                  Ton lien de parrainage
+                </p>
+                <div className="flex gap-2">
+                  <div className="flex-1 min-w-0 border border-outline-variant/40 px-3 py-2 bg-surface-container-low">
+                    <p className="text-[10px] font-mono truncate text-on-surface-variant">
+                      {referralData.link}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={copyLink}
+                    className="px-3 py-2 bg-primary text-on-primary flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold shrink-0 active:scale-95 transition-transform"
+                  >
+                    <Icon name={linkCopied ? "check" : "content_copy"} size={14} />
+                    {linkCopied ? "Copié !" : "Copier"}
+                  </button>
+                </div>
+                {typeof navigator !== "undefined" && navigator.share && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigator.share({
+                        title: "La Niche — Rejoins-moi",
+                        text: "Découvre La Niche, l'app parfum premium. Inscris-toi via mon lien 👇",
+                        url: referralData.link!,
+                      })
+                    }
+                    className="w-full py-2.5 border border-outline-variant/40 flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest font-bold hover:bg-surface-container-low transition-colors"
+                  >
+                    <Icon name="share" size={14} />
+                    Partager
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="h-14 bg-surface-container animate-pulse" />
+            )}
+
+            {/* Barème mini */}
+            <div className="mt-4 pt-4 border-t border-outline-variant/30 space-y-1">
+              {[
+                ["Ami inscrit", "+100 pts"],
+                ["Ami → Basic", "+200 pts"],
+                ["Ami → Premium", "+500 pts"],
+              ].map(([label, pts]) => (
+                <div key={label} className="flex justify-between">
+                  <span className="text-[9px] text-outline">{label}</span>
+                  <span className="text-[9px] font-bold text-primary">{pts}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -502,7 +655,7 @@ function SubscriptionCard({
   baladesUsed,
   baladesRemaining,
 }: {
-  subscription: "free" | "basic" | "premium";
+  subscription: SubscriptionTier;
   subscribedAt: number | null;
   recommendationsUsed: number;
   recommendationsRemaining: number;
@@ -557,7 +710,7 @@ function SubscriptionCard({
           </Link>
         </div>
 
-        {subscription === "premium" ? (
+        {recLimit === Infinity && baladeLimit === Infinity ? (
           <p className="text-[11px] text-on-surface-variant leading-relaxed">
             Recommandations et balades guidées illimitées ce mois-ci.
           </p>

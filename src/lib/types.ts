@@ -43,4 +43,11 @@ export type StockItem = {
   private_sale_enabled_at: string | null;
   image_url: string | null;
   created_at: string;
+  /** Olfactive pyramid + family — auto-enriched by /api/boutique/stock when
+   *  the boutique imports a perfume. Empty arrays / null when enrichment
+   *  hasn't run yet (e.g. legacy rows or perfume not in Fragella). */
+  notes_top: string[];
+  notes_heart: string[];
+  notes_base: string[];
+  family: string | null;
 };

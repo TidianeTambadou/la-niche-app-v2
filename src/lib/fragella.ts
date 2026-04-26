@@ -22,6 +22,14 @@ export type FragellaAccord = {
   weight?: number;
 };
 
+/** A single olfactive note with its small icon URL (Fragella ships a
+ *  thumbnail per note: sugar cube for "Sugar", vanilla flower for
+ *  "Vanilla", etc.). UI consumers use it as inline thumbnail. */
+export type FragellaNote = {
+  name: string;
+  imageUrl?: string;
+};
+
 /** Normalised perfume shape — what every consumer in the app expects.
  *  We keep field names tolerant since Fragella's actual schema isn't fully
  *  documented yet; the normaliser falls through several common keys. */
@@ -39,9 +47,9 @@ export type FragellaPerfume = {
   /** Olfactive family (single string). */
   family: string | null;
   notes: {
-    top: string[];
-    middle: string[];
-    base: string[];
+    top: FragellaNote[];
+    middle: FragellaNote[];
+    base: FragellaNote[];
   };
   accords: FragellaAccord[];
   /** Free-form longevity (e.g. "7h", "Long lasting"). */
@@ -55,6 +63,18 @@ export type FragellaPerfume = {
   /** Average rating 0..5. */
   rating: number | null;
   reviews_count: number | null;
+  /** Concentration / oil type ("Eau de Toilette", "Extrait de Parfum", …). */
+  oil_type: string | null;
+  /** Year of release. */
+  year: string | null;
+  /** Country of origin. */
+  country: string | null;
+  /** Popularity tier from Fragella ("Very high", "High", "Medium", "Low"). */
+  popularity: string | null;
+  /** Identification confidence ("high" / "medium" / "low"). */
+  confidence: string | null;
+  /** Top occasion (e.g. "night out", "professional"), used for "Best Moment". */
+  best_occasion: string | null;
   /** Best-effort canonical URL (Fragella public page or Fragrantica). */
   source_url: string | null;
 };
@@ -184,6 +204,37 @@ function toSeasons(raw: unknown): string[] {
   return [...new Set(out)];
 }
 
+/** Notes are shipped as `[{name, imageUrl}, …]` per layer. We preserve the
+ *  imageUrl so the modal can render Fragella's note thumbnails inline. */
+function toNotes(v: unknown): FragellaNote[] {
+  if (!Array.isArray(v)) return [];
+  const out: FragellaNote[] = [];
+  const seen = new Set<string>();
+  for (const item of v) {
+    if (typeof item === "string") {
+      const t = item.trim();
+      if (!t) continue;
+      const k = t.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push({ name: t });
+      continue;
+    }
+    if (item && typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      const name =
+        toStr(o.name) ?? toStr(o.label) ?? toStr(o.note) ?? toStr(o.title);
+      if (!name) continue;
+      const k = name.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      const imageUrl = toStr(o.imageUrl) ?? toStr(o.image_url) ?? toStr(o.image);
+      out.push(imageUrl ? { name, imageUrl } : { name });
+    }
+  }
+  return out;
+}
+
 function toDayTime(raw: unknown): string[] {
   const allowed = new Set(["day", "night"]);
   const out: string[] = [];
@@ -206,65 +257,212 @@ function toDayTime(raw: unknown): string[] {
   return [...new Set(out)];
 }
 
+/** Fragella ranks accords with vague labels — convert to a 0..100 weight
+ *  so the UI can render bar widths consistently. */
+const ACCORD_LABEL_TO_WEIGHT: Record<string, number> = {
+  dominant: 100,
+  prominent: 78,
+  moderate: 55,
+  subtle: 35,
+  mild: 25,
+  trace: 15,
+};
+
 function normalizeOne(raw: unknown): FragellaPerfume | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
-  const name = toStr(r.name) ?? toStr(r.fragrance) ?? toStr(r.title);
-  const brand =
-    toStr(r.brand) ?? toStr(r.house) ?? toStr(r.brand_name);
+
+  // Fragella's actual schema uses PascalCase keys with spaces. Snake/camel
+  // fallbacks kept for safety in case the API ships an alt shape.
+  const name = toStr(r.Name) ?? toStr(r.name) ?? toStr(r.fragrance);
+  const brand = toStr(r.Brand) ?? toStr(r.brand) ?? toStr(r.house);
   if (!name || !brand) return null;
 
-  // Notes: try {top, middle/heart, base} object first, then flat array.
-  const notesRaw = r.notes;
-  let top: string[] = [];
-  let middle: string[] = [];
-  let base: string[] = [];
+  // Notes: { Top: [{name, imageUrl}, …], Middle: …, Base: … }. We keep the
+  // imageUrl per note so the card can render the small Fragella icons.
+  const notesRaw = r.Notes ?? r.notes;
+  let top: FragellaNote[] = [];
+  let middle: FragellaNote[] = [];
+  let base: FragellaNote[] = [];
   if (notesRaw && typeof notesRaw === "object" && !Array.isArray(notesRaw)) {
     const n = notesRaw as Record<string, unknown>;
-    top = toArr(n.top);
-    middle = toArr(n.middle ?? n.heart);
-    base = toArr(n.base);
+    top = toNotes(n.Top ?? n.top);
+    middle = toNotes(n.Middle ?? n.middle ?? n.heart);
+    base = toNotes(n.Base ?? n.base);
   } else if (Array.isArray(notesRaw)) {
-    middle = toArr(notesRaw);
+    middle = toNotes(notesRaw);
   }
-  // Fragella sometimes ships flat top/middle/base at the root.
-  if (top.length === 0) top = toArr(r.top);
-  if (middle.length === 0) middle = toArr(r.middle ?? r.heart);
-  if (base.length === 0) base = toArr(r.base);
 
-  const image_url =
+  // Image — primary "Image URL", fall back to first "Image Fallbacks" entry.
+  let image_url =
+    toStr(r["Image URL"]) ??
     toStr(r.image_url) ??
     toStr(r.imageUrl) ??
     toStr(r.image) ??
-    toStr(r.thumbnail) ??
     null;
+  if (!image_url) {
+    const fb = r["Image Fallbacks"] ?? r.image_fallbacks;
+    if (Array.isArray(fb)) {
+      for (const v of fb) {
+        if (typeof v === "string" && v.trim()) {
+          image_url = v.trim();
+          break;
+        }
+      }
+    }
+  }
+
+  // Accords: fuse `Main Accords` (string[]) with `Main Accords Percentage`
+  // (record of label strings) so each accord carries a numeric weight.
+  const mainAccords = r["Main Accords"] ?? r.accords;
+  const percentMap = (r["Main Accords Percentage"] ?? {}) as Record<string, unknown>;
+  let accords: FragellaAccord[] = [];
+  if (Array.isArray(mainAccords)) {
+    for (const a of mainAccords) {
+      const acc =
+        typeof a === "string"
+          ? a.trim()
+          : a && typeof a === "object"
+            ? toStr((a as Record<string, unknown>).name)
+            : null;
+      if (!acc) continue;
+      const labelOrNum = percentMap[acc];
+      let weight: number | undefined;
+      if (typeof labelOrNum === "string") {
+        weight = ACCORD_LABEL_TO_WEIGHT[labelOrNum.toLowerCase().trim()];
+      } else if (typeof labelOrNum === "number" && isFinite(labelOrNum)) {
+        weight = Math.max(0, Math.min(100, labelOrNum));
+      }
+      accords.push(weight !== undefined ? { name: acc, weight } : { name: acc });
+    }
+  } else {
+    // Fallback for the {name, percent} array shape supported earlier.
+    accords = toAccords(r.accords);
+  }
+
+  // Family: no dedicated field on Fragella — the dominant accord is the
+  // closest equivalent and reads naturally in the UI ("Vanilla", "Woody"…).
+  const dominantAccord =
+    accords.find((a) => (a.weight ?? 0) >= 90)?.name ??
+    accords[0]?.name ??
+    null;
+  const family =
+    toStr(r.family) ?? toStr(r.olfactive_family) ?? dominantAccord;
+
+  // Seasons: pick the entries from `Season Ranking` with score >= 1. Map
+  // Fragella's "fall" to the canonical "autumn" used in PerfumeCardData.
+  const seasons: string[] = [];
+  const seasonRanking = r["Season Ranking"] ?? r.seasons;
+  if (Array.isArray(seasonRanking)) {
+    for (const s of seasonRanking) {
+      if (!s || typeof s !== "object") continue;
+      const o = s as Record<string, unknown>;
+      const sname = typeof o.name === "string" ? o.name.toLowerCase() : "";
+      const score = typeof o.score === "number" ? o.score : 0;
+      if (score < 1) continue;
+      const mapped = sname === "fall" ? "autumn" : sname;
+      if (["winter", "spring", "summer", "autumn"].includes(mapped) && !seasons.includes(mapped)) {
+        seasons.push(mapped);
+      }
+    }
+  } else {
+    seasons.push(...toSeasons(seasonRanking));
+  }
+
+  // Day/Night — Fragella has no direct field, derive from occasions:
+  //   "night out" / "evening" → night
+  //   "professional" / "casual" / "daily" / "office" → day
+  const day_time: string[] = [];
+  const occasionRanking = r["Occasion Ranking"] ?? r.occasions;
+  if (Array.isArray(occasionRanking)) {
+    for (const o of occasionRanking) {
+      if (!o || typeof o !== "object") continue;
+      const obj = o as Record<string, unknown>;
+      const oname = typeof obj.name === "string" ? obj.name.toLowerCase() : "";
+      const score = typeof obj.score === "number" ? obj.score : 0;
+      if (score < 1) continue;
+      if (
+        (oname.includes("night") || oname.includes("evening")) &&
+        !day_time.includes("night")
+      ) {
+        day_time.push("night");
+      }
+      if (
+        (oname === "professional" ||
+          oname === "casual" ||
+          oname === "daily" ||
+          oname === "office" ||
+          oname === "work") &&
+        !day_time.includes("day")
+      ) {
+        day_time.push("day");
+      }
+    }
+  }
+
+  // Description: Fragella doesn't ship one, so we synthesise a short editorial
+  // tagline from the metadata when available. Reads naturally on the card.
+  const oilType = toStr(r.OilType) ?? toStr(r.oilType);
+  const year = toStr(r.Year) ?? toStr(r.year);
+  const country = toStr(r.Country) ?? toStr(r.country);
+  const taglineParts = [oilType, year, country].filter(Boolean);
+  const description =
+    toStr(r.description) ??
+    toStr(r.summary) ??
+    (taglineParts.length ? taglineParts.join(" · ") : null);
 
   const id =
     toStr(r.id) ??
     toStr(r.slug) ??
     `${brand}-${name}`.toLowerCase().replace(/\s+/g, "-");
 
-  const ratingNum = toNum(r.rating) ?? toNum(r.score);
+  const ratingNum = toNum(r.rating) ?? toNum(r.Rating) ?? toNum(r.score);
   const reviewsRaw = toNum(r.reviews_count) ?? toNum(r.reviews);
+
+  // Top occasion = highest-scoring entry from Occasion Ranking (used to
+  // derive a "Best Moment" insight on the card).
+  let bestOccasion: string | null = null;
+  if (Array.isArray(occasionRanking)) {
+    let bestScore = 0;
+    for (const o of occasionRanking) {
+      if (!o || typeof o !== "object") continue;
+      const obj = o as Record<string, unknown>;
+      const oname = typeof obj.name === "string" ? obj.name : "";
+      const score = typeof obj.score === "number" ? obj.score : 0;
+      if (score > bestScore && oname) {
+        bestScore = score;
+        bestOccasion = oname;
+      }
+    }
+  }
 
   return {
     id,
     name,
     brand,
     image_url,
-    description: toStr(r.description) ?? toStr(r.summary) ?? null,
-    gender: toStr(r.gender) ?? toStr(r.sex) ?? null,
-    family: toStr(r.family) ?? toStr(r.olfactive_family) ?? null,
+    description,
+    gender: toStr(r.Gender) ?? toStr(r.gender) ?? toStr(r.sex) ?? null,
+    family,
     notes: { top, middle, base },
-    accords: toAccords(r.accords),
-    longevity: toStr(r.longevity) ?? toStr(r.duration) ?? null,
-    sillage: toStr(r.sillage) ?? toStr(r.projection) ?? null,
-    seasons: toSeasons(r.seasons ?? r.season),
-    day_time: toDayTime(r.day_time ?? r.daytime ?? r.time_of_day),
+    accords,
+    longevity: toStr(r.Longevity) ?? toStr(r.longevity) ?? null,
+    sillage: toStr(r.Sillage) ?? toStr(r.sillage) ?? null,
+    seasons,
+    day_time,
     rating: ratingNum,
     reviews_count: reviewsRaw !== null ? Math.round(reviewsRaw) : null,
+    oil_type: oilType,
+    year,
+    country,
+    popularity: toStr(r.Popularity) ?? toStr(r.popularity) ?? null,
+    confidence: toStr(r.Confidence) ?? toStr(r.confidence) ?? null,
+    best_occasion: bestOccasion,
     source_url:
-      toStr(r.source_url) ?? toStr(r.url) ?? toStr(r.fragrantica_url) ?? null,
+      toStr(r["Purchase URL"]) ??
+      toStr(r.source_url) ??
+      toStr(r.url) ??
+      null,
   };
 }
 
@@ -287,12 +485,15 @@ function extractList(data: unknown): unknown[] {
 /**
  * Multi-candidate search — used by the autocomplete + search page.
  *
- * Returns:
- *   - `FragellaPerfume[]`  : matches found
- *   - `null`               : Fragella unreachable / unconfigured / no match
- *
- * Caller distinguishes "API down" from "no match" by treating both as
- * `null` and surfacing the concierge fallback in either case.
+ * Return values are MEANINGFUL:
+ *   - `FragellaPerfume[]` (length > 0) : matches found
+ *   - `[]` (empty array)               : Fragella reached, NO match (404, or
+ *                                        empty response). Caller should show
+ *                                        the concierge CTA.
+ *   - `null`                           : Fragella unreachable / unconfigured
+ *                                        / quota'd / 5xx. Caller should fall
+ *                                        back to the Tavily pipeline so the
+ *                                        user still gets results.
  */
 export async function searchFragella(
   query: string,
@@ -303,10 +504,19 @@ export async function searchFragella(
 
   const path = `/fragrances?search=${encodeURIComponent(q)}&limit=${limit}`;
   const res = await fragellaFetch(path);
-  if (!res) return null;
-  if (res.status === 404) return null;
+  if (!res) return null; // network / no API key
+
+  if (res.status === 404) return []; // reached, no match for this query
+  if (res.status === 429) {
+    console.warn("[fragella] 429 — quota exhausted, falling back");
+    return null;
+  }
+  if (res.status === 401 || res.status === 403) {
+    console.warn(`[fragella] ${res.status} — auth issue, falling back`);
+    return null;
+  }
   if (!res.ok) {
-    console.warn(`[fragella] search ${res.status}`);
+    console.warn(`[fragella] search ${res.status} — falling back`);
     return null;
   }
 
@@ -314,7 +524,7 @@ export async function searchFragella(
   try {
     data = await res.json();
   } catch {
-    return null;
+    return null; // garbage response → treat as outage
   }
 
   const list = extractList(data);
@@ -323,7 +533,9 @@ export async function searchFragella(
     .filter((p): p is FragellaPerfume => p !== null)
     .slice(0, limit);
 
-  return normalised.length > 0 ? normalised : null;
+  // Reached + parseable response, even if empty → return [] so the caller
+  // distinguishes "no match" from "API down".
+  return normalised;
 }
 
 /** Single-perfume lookup by brand + name — used by /scan after the vision

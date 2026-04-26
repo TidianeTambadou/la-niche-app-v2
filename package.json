@@ -6,9 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "paypal:bootstrap": "node scripts/paypal-bootstrap.mjs"
   },
   "dependencies": {
+    "@paypal/react-paypal-js": "^9.1.1",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.0",
     "@supabase/supabase-js": "^2.104.0",
