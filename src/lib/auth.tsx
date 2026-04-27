@@ -8,7 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
@@ -136,22 +136,28 @@ export function useAuth(): AuthState {
  * If the auth state is settled and there's no user, replaces the URL with
  * `/login?redirect=<current-path>` so the user lands back here after signup.
  *
+ * Reads the URL directly via `window.location` inside the effect (instead of
+ * `useSearchParams()` / `usePathname()`) so the page stays statically
+ * prerenderable — Next.js 16 fails the build for any client component using
+ * `useSearchParams()` outside a Suspense boundary.
+ *
  * Returns the same `{user, loading}` you'd get from useAuth — components can
  * still render a spinner while loading=true, and check user before doing
  * anything that needs an authenticated identity.
  */
 export function useRequireAuth(): { user: User | null; loading: boolean } {
   const router = useRouter();
-  const pathname = usePathname();
-  const search = useSearchParams();
   const { user, loading } = useAuth();
 
   useEffect(() => {
     if (loading) return;
     if (user) return;
-    const here = pathname + (search.toString() ? `?${search.toString()}` : "");
+    const here =
+      typeof window !== "undefined"
+        ? window.location.pathname + window.location.search
+        : "/";
     router.replace(`/login?redirect=${encodeURIComponent(here)}`);
-  }, [user, loading, pathname, search, router]);
+  }, [user, loading, router]);
 
   return { user, loading };
 }
