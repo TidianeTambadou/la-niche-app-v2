@@ -127,11 +127,14 @@ export type TierLimits = {
 
 export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   // Infinity encodes "unlimited" — checked as `count < limit` so it never trips.
-  free: { recommendations: 3, guidedBalades: 1 },
+  // Free = portail d'évaluation strict : 2 recos pour goûter, 0 balade
+  // guidée, scan/recherche très limités. L'utilisateur doit upgrader pour
+  // tout usage récurrent — chaque appel coûte des tokens IA.
+  free: { recommendations: 2, guidedBalades: 0 },
   curieux: { recommendations: 25, guidedBalades: 10 },
   initie: { recommendations: 60, guidedBalades: 25 },
   // Mécène = fair-use illimité ; le cap 200/50 sert de garde-fou anti-abus
-  // côté serveur quand la phase 2 (quota DB) sera branchée.
+  // côté serveur.
   mecene: { recommendations: 200, guidedBalades: 50 },
 };
 

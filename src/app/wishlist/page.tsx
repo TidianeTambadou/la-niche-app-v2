@@ -5,6 +5,7 @@ import Link from "next/link";
 import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
 import { FragranceImage } from "@/components/FragranceImage";
+import { useRequireAuth } from "@/lib/auth";
 import { useFragrances } from "@/lib/data";
 import {
   useStore,
@@ -38,6 +39,7 @@ const CATEGORY_FILTERS: { id: Filter; label: string }[] = [
 ];
 
 export default function WishlistPage() {
+  useRequireAuth();
   const { wishlist, removeFromWishlist, setWishlistCategory } = useStore();
   const fragrances = useFragrances();
   const [filter, setFilter] = useState<Filter>("all");

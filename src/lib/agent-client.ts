@@ -145,12 +145,23 @@ export async function agentSearch(
   const res = await call(
     { mode: "search", payload: { query: key } },
     signal,
+    { auth: true },
   );
   if (res.ok && res.mode === "search") {
     rememberSearchResults(key, res.candidates);
     return res.candidates;
   }
   if (!res.ok) {
+    if (res.error === "quota_exceeded") {
+      throw new QuotaExceededError(
+        res.detail ?? "Quota de recherches atteint. Passe à un palier supérieur.",
+      );
+    }
+    if (res.error === "auth_required") {
+      throw new AuthRequiredError(
+        res.detail ?? "Crée un compte pour rechercher.",
+      );
+    }
     const msg =
       res.error === "agent_disabled"
         ? "Service indisponible"
@@ -168,12 +179,26 @@ export async function agentIdentify(
   imageBase64: string,
   imageMediaType: string,
 ): Promise<IdentifyResult | null> {
-  const res = await call({
-    mode: "identify",
-    payload: { imageBase64, imageMediaType },
-  });
+  const res = await call(
+    {
+      mode: "identify",
+      payload: { imageBase64, imageMediaType },
+    },
+    undefined,
+    { auth: true },
+  );
   if (res.ok && res.mode === "identify") return res.result;
   if (!res.ok) {
+    if (res.error === "quota_exceeded") {
+      throw new QuotaExceededError(
+        res.detail ?? "Quota de scans atteint. Passe à un palier supérieur.",
+      );
+    }
+    if (res.error === "auth_required") {
+      throw new AuthRequiredError(
+        res.detail ?? "Crée un compte pour scanner un parfum.",
+      );
+    }
     const msg =
       res.error === "agent_disabled"
         ? "Agent IA désactivé (OPENROUTER_API_KEY non configurée)"
@@ -305,9 +330,20 @@ export async function agentAsk(
   const res = await call(
     { mode: "ask", payload: { question, history, profileContext } },
     signal,
+    { auth: true },
   );
   if (res.ok && res.mode === "ask") return res.answer;
   if (!res.ok) {
+    if (res.error === "quota_exceeded") {
+      throw new QuotaExceededError(
+        res.detail ?? "Quota concierge atteint. Passe à un palier supérieur.",
+      );
+    }
+    if (res.error === "auth_required") {
+      throw new AuthRequiredError(
+        res.detail ?? "Crée un compte pour parler au concierge.",
+      );
+    }
     if (res.error === "agent_disabled") {
       return `Agent désactivé — ${res.detail ?? "OPENROUTER_API_KEY manquante"}`;
     }

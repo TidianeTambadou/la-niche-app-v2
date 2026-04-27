@@ -20,6 +20,7 @@ import {
   type BodyPlacement,
   type FinishedBalade,
 } from "@/lib/store";
+import { useRequireAuth } from "@/lib/auth";
 
 /* -------------------------------------------------------------------------
  * Review row data — one row per placement we ask the user to rate at the
@@ -42,6 +43,7 @@ type ReviewItem = {
 };
 
 export default function EndOfBaladePage() {
+  useRequireAuth();
   const router = useRouter();
   const fragrances = useFragrances();
   const { activeBalade, history, addToWishlist, isWishlisted, endBalade } =

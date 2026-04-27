@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { useStore } from "@/lib/store";
+import { useRequireAuth } from "@/lib/auth";
 
 export default function BaladeEntryPage() {
+  useRequireAuth();
   const router = useRouter();
   const { activeBalade, cancelBalade, startBalade } = useStore();
 

@@ -7,7 +7,7 @@ import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
 import { ErrorBubble } from "@/components/ErrorBubble";
 import { PerfumeArtwork } from "@/components/PerfumeArtwork";
-import { useAuth } from "@/lib/auth";
+import { useAuth, useRequireAuth } from "@/lib/auth";
 import { findBoutiqueById } from "@/lib/boutiques";
 import { useStore, TIER_LABELS, type SubscriptionTier } from "@/lib/store";
 import {
@@ -104,6 +104,7 @@ function recFragranceId(card: RecommendationCandidate): string {
  * ====================================================================== */
 
 export default function RecommendationsPage() {
+  useRequireAuth();
   const router = useRouter();
   const { user } = useAuth();
   const {

@@ -468,9 +468,33 @@ export async function POST(req: Request) {
     const query = (body.payload?.query ?? "").trim();
     if (!query) return NextResponse.json({ ok: true, mode: "search", candidates: [] } satisfies AgentResponse);
 
+    // Auth + quota gate. Even autocomplete burns tokens (Fragella + Tavily
+    // fallback) — anonymous users get redirected to signup, free users have
+    // a hard monthly cap.
+    const userId = await requireUserId(req);
+    if (!userId) {
+      return NextResponse.json(
+        { ok: false, error: "auth_required", detail: "Crée un compte pour rechercher." } satisfies AgentResponse,
+        { status: 401 },
+      );
+    }
+
     const cacheKey = query.toLowerCase();
     const cached = cachedSearch(cacheKey);
+    // Cache hits don't bump the quota — only outbound API calls cost tokens.
     if (cached) return NextResponse.json({ ok: true, mode: "search", candidates: cached } satisfies AgentResponse);
+
+    const gate = await checkQuota(userId, "searches");
+    if (!gate.allowed) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "quota_exceeded",
+          detail: `Tu as utilisé tes ${gate.limit} recherches ce mois-ci. Passe à un palier supérieur pour continuer.`,
+        } satisfies AgentResponse,
+        { status: 402 },
+      );
+    }
 
     // PRIMARY — Fragella (single round trip, no LLM, real images).
     // Three outcomes drive different paths:
@@ -489,6 +513,10 @@ export async function POST(req: Request) {
     if (fragellaHits !== null) {
       const candidates = fragellaHits.map(fragellaToSearchCandidate);
       rememberSearch(cacheKey, candidates);
+      // Compte 1 search seulement quand on a effectivement appelé Fragella
+      // (pas en cache hit). On ne refund pas en cas d'empty-result : Fragella
+      // a quand même consommé du quota côté provider.
+      void consumeQuota(userId, "searches").catch(() => {});
       return NextResponse.json({
         ok: true,
         mode: "search",
@@ -587,6 +615,8 @@ JSON STRICT, sans markdown :
         });
 
       rememberSearch(cacheKey, candidates);
+      // Tavily fallback = ~$0.01 par appel. On compte aussi.
+      void consumeQuota(userId, "searches").catch(() => {});
       return NextResponse.json({ ok: true, mode: "search", candidates } satisfies AgentResponse);
     } catch (e) {
       return NextResponse.json(
@@ -601,6 +631,33 @@ JSON STRICT, sans markdown :
     const { imageBase64, imageMediaType } = body.payload ?? {};
     if (!imageBase64 || !imageMediaType) {
       return NextResponse.json({ ok: false, error: "missing_image" } satisfies AgentResponse, { status: 400 });
+    }
+
+    // Auth + quota gate (scan = vision Claude + Tavily ≈ $0.02-0.04/appel).
+    const userId = await requireUserId(req);
+    if (!userId) {
+      return NextResponse.json(
+        { ok: false, error: "auth_required", detail: "Crée un compte pour scanner un parfum." } satisfies AgentResponse,
+        { status: 401 },
+      );
+    }
+    const scanGate = await checkQuota(userId, "scans");
+    if (!scanGate.allowed) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "quota_exceeded",
+          detail: `Tu as utilisé tes ${scanGate.limit} scans ce mois-ci. Passe à un palier supérieur pour continuer.`,
+        } satisfies AgentResponse,
+        { status: 402 },
+      );
+    }
+    let scanConsumed = false;
+    try {
+      await consumeQuota(userId, "scans");
+      scanConsumed = true;
+    } catch (e) {
+      console.warn("[scan] consumeQuota failed:", e);
     }
 
     try {
@@ -653,6 +710,11 @@ JSON STRICT, sans markdown :
 
       return NextResponse.json({ ok: true, mode: "identify", result } satisfies AgentResponse);
     } catch (e) {
+      // Refund le scan si le pipeline a planté (l'utilisateur ne doit pas
+      // perdre un crédit pour une erreur upstream).
+      if (scanConsumed) {
+        await refundQuota(userId, "scans").catch(() => {});
+      }
       return NextResponse.json(
         { ok: false, error: "upstream_error", detail: e instanceof Error ? e.message : String(e) } satisfies AgentResponse,
         { status: 502 },
@@ -664,6 +726,33 @@ JSON STRICT, sans markdown :
   if (body.mode === "ask") {
     const question = (body.payload?.question ?? "").trim();
     if (!question) return NextResponse.json({ ok: false, error: "missing_question" } satisfies AgentResponse, { status: 400 });
+
+    // Auth + quota gate (concierge IA = Tavily + LLM ≈ $0.012/appel).
+    const askUserId = await requireUserId(req);
+    if (!askUserId) {
+      return NextResponse.json(
+        { ok: false, error: "auth_required", detail: "Crée un compte pour parler au concierge." } satisfies AgentResponse,
+        { status: 401 },
+      );
+    }
+    const askGate = await checkQuota(askUserId, "asks");
+    if (!askGate.allowed) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "quota_exceeded",
+          detail: `Tu as utilisé tes ${askGate.limit} questions au concierge ce mois-ci. Passe à un palier supérieur.`,
+        } satisfies AgentResponse,
+        { status: 402 },
+      );
+    }
+    let askConsumed = false;
+    try {
+      await consumeQuota(askUserId, "asks");
+      askConsumed = true;
+    } catch (e) {
+      console.warn("[ask] consumeQuota failed:", e);
+    }
 
     try {
       // Web search to ground the answer
@@ -687,6 +776,9 @@ JSON STRICT, sans markdown :
       const answer = await openRouterCall(apiKey, messages, 1200);
       return NextResponse.json({ ok: true, mode: "ask", answer } satisfies AgentResponse);
     } catch (e) {
+      if (askConsumed) {
+        await refundQuota(askUserId, "asks").catch(() => {});
+      }
       return NextResponse.json(
         { ok: false, error: "upstream_error", detail: e instanceof Error ? e.message : String(e) } satisfies AgentResponse,
         { status: 502 },

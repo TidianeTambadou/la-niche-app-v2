@@ -10,6 +10,7 @@ import {
   TIER_LABELS,
   type SubscriptionTier,
 } from "@/lib/store";
+import { useRequireAuth } from "@/lib/auth";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useFragrances } from "@/lib/data";
@@ -23,6 +24,7 @@ import {
 } from "@/lib/profile";
 
 export default function ProfilePage() {
+  useRequireAuth();
   const router = useRouter();
   const {
     wishlist,

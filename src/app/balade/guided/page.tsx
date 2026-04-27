@@ -5,8 +5,10 @@ import { useState } from "react";
 import { Icon } from "@/components/Icon";
 import { ErrorBubble } from "@/components/ErrorBubble";
 import { shopOpenNow, useData, useShops } from "@/lib/data";
+import { useRequireAuth } from "@/lib/auth";
 
 export default function GuidedShopPickPage() {
+  useRequireAuth();
   const { loading, error } = useData();
   const shops = useShops();
   const [q, setQ] = useState("");

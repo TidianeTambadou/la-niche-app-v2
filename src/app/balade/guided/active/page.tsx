@@ -9,12 +9,14 @@ import {
 } from "@/lib/fragrances";
 import { useFragrances, type Fragrance } from "@/lib/data";
 import { useStore } from "@/lib/store";
+import { useRequireAuth } from "@/lib/auth";
 import {
   BodySilhouette,
   fragranceInitials,
 } from "@/components/BodySilhouette";
 
 export default function GuidedActivePage() {
+  useRequireAuth();
   const router = useRouter();
   const fragrances = useFragrances();
   const {

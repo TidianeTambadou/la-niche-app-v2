@@ -2,13 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { ErrorBubble } from "@/components/ErrorBubble";
 import { PerfumeArtwork } from "@/components/PerfumeArtwork";
-import { agentSearch } from "@/lib/agent-client";
+import {
+  agentSearch,
+  AuthRequiredError,
+  QuotaExceededError,
+} from "@/lib/agent-client";
 import type { SearchCandidate } from "@/lib/agent";
 import { fragranceKey, useFragrances } from "@/lib/data";
 import { useStore } from "@/lib/store";
+import { useRequireAuth } from "@/lib/auth";
 import { openConcierge } from "@/lib/concierge-bus";
 
 const SUGGESTIONS = [
@@ -20,6 +26,8 @@ const SUGGESTIONS = [
 ];
 
 export default function SearchPage() {
+  useRequireAuth();
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchCandidate[]>([]);
   const [loading, setLoading] = useState(false);
@@ -52,10 +60,20 @@ export default function SearchPage() {
           setLoading(false);
         }
       } catch (e: unknown) {
-        if (!ctrl.signal.aborted) {
-          setError(e instanceof Error ? e.message : "search failed");
-          setLoading(false);
+        if (ctrl.signal.aborted) return;
+        // Quota épuisé → bounce sur /abonnement avec banner contextuel.
+        // Le but : frustrer le free user à chaque fois qu'il tape, pour
+        // pousser à l'upgrade.
+        if (e instanceof QuotaExceededError) {
+          router.push("/abonnement?from=search");
+          return;
         }
+        if (e instanceof AuthRequiredError) {
+          router.push("/login?redirect=/search");
+          return;
+        }
+        setError(e instanceof Error ? e.message : "search failed");
+        setLoading(false);
       }
     }, 1500);
     return () => {

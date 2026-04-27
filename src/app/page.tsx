@@ -8,7 +8,7 @@ import { ErrorBubble } from "@/components/ErrorBubble";
 import { PerfumeArtwork } from "@/components/PerfumeArtwork";
 import { NewsRail } from "@/components/NewsRail";
 import { latestNews } from "@/lib/news";
-import { useAuth } from "@/lib/auth";
+import { useAuth, useRequireAuth } from "@/lib/auth";
 import { readProfileFromUser, FAMILY_VULGAR } from "@/lib/profile";
 import { useDailyPicks, type DailyPicksHook } from "@/lib/daily-picks";
 import type { SearchCandidate } from "@/lib/agent";
@@ -43,6 +43,9 @@ function phraseOfDay(): string {
 /* ─── Page ─────────────────────────────────────────────────────────────── */
 
 export default function HomePage() {
+  // Auth gate : utilisateur non connecté → redirige vers /login.
+  // L'app entière est verrouillée derrière auth — aucune action sans compte.
+  useRequireAuth();
   const { user } = useAuth();
   const profile = readProfileFromUser(user);
   const news = latestNews(6);

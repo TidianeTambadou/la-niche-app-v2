@@ -2,13 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { ErrorBubble } from "@/components/ErrorBubble";
 import { PerfumeArtwork } from "@/components/PerfumeArtwork";
 import { fragranceKey, useFragrances, type Fragrance } from "@/lib/data";
 import { useStore } from "@/lib/store";
-import { agentIdentify } from "@/lib/agent-client";
+import {
+  agentIdentify,
+  AuthRequiredError,
+  QuotaExceededError,
+} from "@/lib/agent-client";
 import type { IdentifyResult } from "@/lib/agent";
+import { useRequireAuth } from "@/lib/auth";
 
 type Stage = "intro" | "camera" | "scanning" | "result" | "no-match" | "error";
 
@@ -20,6 +26,8 @@ type Identified =
   | { kind: "external"; agent: IdentifyResult };
 
 export default function ScanPage() {
+  useRequireAuth();
+  const router = useRouter();
   const fragrances = useFragrances();
   const [stage, setStage] = useState<Stage>("intro");
   const [identified, setIdentified] = useState<Identified | null>(null);
@@ -132,6 +140,16 @@ export default function ScanPage() {
       setStage("result");
     } catch (e) {
       console.error("agentIdentify failed:", e);
+      stopCamera();
+      // Quota épuisé → on bounce l'utilisateur sur /abonnement avec banner.
+      if (e instanceof QuotaExceededError) {
+        router.push("/abonnement?from=scan");
+        return;
+      }
+      if (e instanceof AuthRequiredError) {
+        router.push("/login?redirect=/scan");
+        return;
+      }
       setError(e instanceof Error ? e.message : "identify failed");
       setStage("error");
     }

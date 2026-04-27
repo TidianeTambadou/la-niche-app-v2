@@ -5,9 +5,16 @@ import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
 import { ErrorBubble } from "@/components/ErrorBubble";
 import { PerfumeCardModal } from "@/components/PerfumeCardModal";
-import { agentAsk, type AskHistoryTurn } from "@/lib/agent-client";
+import {
+  agentAsk,
+  AuthRequiredError,
+  QuotaExceededError,
+  type AskHistoryTurn,
+} from "@/lib/agent-client";
 import { useAuth } from "@/lib/auth";
+import { useStore } from "@/lib/store";
 import { onOpenConcierge } from "@/lib/concierge-bus";
+import { useRouter } from "next/navigation";
 import type { PerfumeCardData, PerfumeAccord } from "@/lib/agent";
 import {
   readProfileFromUser,
@@ -60,10 +67,17 @@ function buildProfileContext(user: ReturnType<typeof useAuth>["user"]): string |
 
 export function ConciergeWidget() {
   const { user } = useAuth();
+  const { subscription } = useStore();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+
+  // Mécène = concierge HUMAIN. On bypasse l'IA et on ouvre WhatsApp Business
+  // avec un message pré-rempli incluant le profil olfactif + la question.
+  const isMecene = subscription === "mecene";
+  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -142,6 +156,18 @@ export function ConciergeWidget() {
         { id: nextId(), role: "assistant", content: answer },
       ]);
     } catch (e) {
+      // Quota épuisé ou pas connecté → bounce vers /abonnement ou /login
+      // (l'objectif business : frustrer pour pousser à l'upgrade).
+      if (e instanceof QuotaExceededError) {
+        setOpen(false);
+        router.push("/abonnement?from=concierge");
+        return;
+      }
+      if (e instanceof AuthRequiredError) {
+        setOpen(false);
+        router.push("/login?redirect=/");
+        return;
+      }
       setMessages((curr) => [
         ...curr,
         {
@@ -160,12 +186,51 @@ export function ConciergeWidget() {
     setInput("");
   }
 
+  /** Construit l'URL wa.me avec un message pré-rempli (profil + dernier
+   *  message si présent). Tombe en arrière sur le message générique si pas
+   *  de profil. */
+  function buildWhatsappUrl(initialMessage?: string): string | null {
+    if (!whatsappNumber) return null;
+    const cleaned = whatsappNumber.replace(/\D/g, ""); // wa.me veut le numéro sans + ni espaces
+    const profileCtx = buildProfileContext(user);
+    const userName =
+      user?.user_metadata?.full_name ||
+      user?.email?.split("@")[0] ||
+      "un Mécène";
+    const lines = [
+      `Bonjour, je suis ${userName} (abonné Mécène La Niche).`,
+      "",
+      initialMessage ? `Ma question : ${initialMessage}` : "J'aimerais discuter d'un parfum / d'une recommandation.",
+    ];
+    if (profileCtx) {
+      lines.push("", "---", profileCtx);
+    }
+    const text = encodeURIComponent(lines.join("\n"));
+    return `https://wa.me/${cleaned}?text=${text}`;
+  }
+
+  function openWhatsappConcierge(initialMessage?: string) {
+    const url = buildWhatsappUrl(initialMessage);
+    if (!url) {
+      // PAYPAL_WHATSAPP_BUSINESS_NUMBER pas configuré — fallback sur l'IA
+      // pour ne pas laisser le user dans le vide.
+      console.warn("[concierge] NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER not set");
+      return false;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+    return true;
+  }
+
   return (
     <>
-      {/* Floating trigger */}
+      {/* Floating trigger — Mécène ouvre WhatsApp direct, autres tiers
+          ouvrent le chat IA. */}
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (isMecene && openWhatsappConcierge()) return;
+          setOpen((v) => !v);
+        }}
         className={clsx(
           "fixed left-4 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300",
           "active:scale-90",
@@ -174,7 +239,13 @@ export function ConciergeWidget() {
             : "bottom-24 bg-background text-on-background border border-outline hover:scale-105",
         )}
         style={{ marginBottom: "env(safe-area-inset-bottom)" }}
-        aria-label={open ? "Fermer l'expert" : "Parler à l'expert"}
+        aria-label={
+          isMecene
+            ? "Parler à un humain sur WhatsApp"
+            : open
+              ? "Fermer l'expert"
+              : "Parler à l'expert"
+        }
         aria-expanded={open}
       >
         {open ? (

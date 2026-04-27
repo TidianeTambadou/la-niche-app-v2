@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
@@ -128,4 +129,29 @@ export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
   return ctx;
+}
+
+/**
+ * Hard auth gate. Use at the top of any page that requires a logged-in user.
+ * If the auth state is settled and there's no user, replaces the URL with
+ * `/login?redirect=<current-path>` so the user lands back here after signup.
+ *
+ * Returns the same `{user, loading}` you'd get from useAuth — components can
+ * still render a spinner while loading=true, and check user before doing
+ * anything that needs an authenticated identity.
+ */
+export function useRequireAuth(): { user: User | null; loading: boolean } {
+  const router = useRouter();
+  const pathname = usePathname();
+  const search = useSearchParams();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (loading) return;
+    if (user) return;
+    const here = pathname + (search.toString() ? `?${search.toString()}` : "");
+    router.replace(`/login?redirect=${encodeURIComponent(here)}`);
+  }, [user, loading, pathname, search, router]);
+
+  return { user, loading };
 }

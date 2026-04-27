@@ -50,11 +50,12 @@ const PLANS: Plan[] = [
     tier: "free",
     badge: null,
     tagline: "Pour découvrir l'app",
-    pitch: "Goûte le système, sans engagement.",
+    pitch: "Aperçu strict du système — l'usage régulier passe par un palier payant.",
     features: [
-      "3 recommandations / mois",
-      "1 balade guidée / mois",
-      "5 scans de flacon / mois",
+      "2 recommandations / mois",
+      "0 balade guidée",
+      "10 recherches / mois",
+      "1 scan de flacon / mois",
       "Wishlist illimitée",
     ],
     perks: [],
@@ -67,10 +68,10 @@ const PLANS: Plan[] = [
     features: [
       "25 recommandations / mois",
       "10 balades guidées / mois",
+      "200 recherches / mois",
       "20 scans / mois",
-      "30 questions au concierge",
+      "30 questions au concierge IA",
       "Mode « pour un ami » + rapport vendeur",
-      "Recherche avec fallback IA",
     ],
     perks: ["Badge Curieux sur ton profil"],
   },
@@ -83,9 +84,8 @@ const PLANS: Plan[] = [
     features: [
       "60 recommandations / mois",
       "25 balades guidées / mois",
-      "Scans + concierge illimités",
+      "Recherches + scans + concierge illimités",
       "Carte signée La Niche illimitée",
-      "Drops & nouveautés en avant-première (24h)",
     ],
     perks: [
       "Badge Initié distinctif",
@@ -98,14 +98,13 @@ const PLANS: Plan[] = [
     tagline: "Pour les collectionneurs",
     pitch: "Tu soutiens une parfumerie indépendante. Et tu en récoltes les fruits.",
     features: [
-      "Tout illimité (fair-use 200/mois)",
-      "Concierge prioritaire — réponse humaine sous 24h",
+      "Tout illimité (fair-use 200 recos / 50 balades par mois)",
+      "Concierge HUMAIN — WhatsApp direct, réponse sous 24h",
       "Tout ce qui est dans Initié",
     ],
     perks: [
       "Badge Mécène (rareté visuelle)",
       "Concours du mois — chances doublées",
-      "Accès anticipé aux événements physiques",
     ],
   },
 ];
@@ -140,7 +139,25 @@ function AbonnementContent() {
     cycle: BillingCycle;
   } | null>(null);
 
-  const limitHit = from === "recommendations" || from === "balade";
+  const limitHit =
+    from === "recommendations" ||
+    from === "balade" ||
+    from === "search" ||
+    from === "scan" ||
+    from === "concierge";
+
+  const limitMessage =
+    from === "recommendations"
+      ? "Tu as utilisé tes recommandations gratuites ce mois-ci. Passe à un palier supérieur pour continuer à découvrir."
+      : from === "balade"
+        ? "Tes balades guidées sont réservées aux paliers payants. Passe Curieux pour relancer."
+        : from === "search"
+          ? "Quota de recherches atteint. Chaque autocomplete consomme des tokens IA — débride avec un palier payant."
+          : from === "scan"
+            ? "Quota de scans atteint. Chaque scan = vision IA + extraction Fragrantica. Passe à un palier supérieur."
+            : from === "concierge"
+              ? "Concierge IA verrouillé. Curieux débloque 30 questions/mois, Initié + Mécène c'est illimité."
+              : "";
 
   function pickTier(tier: SubscriptionTier) {
     if (tier === subscription && cycle === billingCycle) return;
@@ -185,11 +202,7 @@ function AbonnementContent() {
           />
           <div className="flex-1 text-[12px] leading-relaxed">
             <p className="font-bold mb-0.5">Limite atteinte.</p>
-            <p className="text-on-surface-variant">
-              {from === "recommendations"
-                ? "Tu as utilisé tes recommandations gratuites ce mois-ci. Passe à un plan supérieur pour continuer à découvrir."
-                : "Tu as utilisé ta balade guidée gratuite ce mois-ci. Passe à un plan supérieur pour relancer."}
-            </p>
+            <p className="text-on-surface-variant">{limitMessage}</p>
           </div>
         </motion.div>
       )}

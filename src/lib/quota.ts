@@ -25,7 +25,7 @@
 import { createAdminClient } from "@/lib/supabase-server";
 
 /** Counter buckets tracked per user × month. */
-export type QuotaKind = "recos" | "balades" | "scans" | "asks";
+export type QuotaKind = "recos" | "balades" | "scans" | "asks" | "searches";
 
 /** Subscription tier (must match SubscriptionTier in src/lib/store.tsx). */
 export type Tier = "free" | "curieux" | "initie" | "mecene";
@@ -33,13 +33,17 @@ export type Tier = "free" | "curieux" | "initie" | "mecene";
 /* ─── Limits — source of truth, mirrored from the client store ─────────── */
 
 /** Per-tier monthly caps. Infinity = no cap (UI shows "Illimité").
- *  Keep in sync with TIER_LIMITS in src/lib/store.tsx — only the structure
- *  differs (extra fields scans/asks not yet in the client). */
+ *  - searches : Fragella autocomplete + Tavily fallback (token-cost real)
+ *  - recos    : pipeline 4 étapes (cher : ~$0.08-0.13/appel)
+ *  - balades  : balade guidée (route generation, ~$0.05/appel)
+ *  - scans    : caméra → vision Claude + Fragrantica scrape
+ *  - asks     : concierge IA chat
+ *  Free = vitrine stricte : aucune balade, recherche très limitée. */
 const TIER_QUOTA: Record<Tier, Record<QuotaKind, number>> = {
-  free:    { recos: 3,        balades: 1,        scans: 5,        asks: 0        },
-  curieux: { recos: 25,       balades: 10,       scans: 20,       asks: 30       },
-  initie:  { recos: 60,       balades: 25,       scans: Infinity, asks: Infinity },
-  mecene:  { recos: 200,      balades: 50,       scans: Infinity, asks: Infinity },
+  free:    { recos: 2,   balades: 0,        scans: 1,        asks: 0,        searches: 10       },
+  curieux: { recos: 25,  balades: 10,       scans: 20,       asks: 30,       searches: 200      },
+  initie:  { recos: 60,  balades: 25,       scans: Infinity, asks: Infinity, searches: Infinity },
+  mecene:  { recos: 200, balades: 50,       scans: Infinity, asks: Infinity, searches: Infinity },
 };
 
 /* ─── Auth helper ──────────────────────────────────────────────────────── */
@@ -128,11 +132,11 @@ export async function checkQuota(
 
   const period = currentPeriodStart();
   const admin = createAdminClient();
-  // Select all 4 columns and pick `kind` after — Supabase's typed select
+  // Select all 5 columns and pick `kind` after — Supabase's typed select
   // narrows to a per-column union that doesn't allow dynamic indexing.
   const { data } = await admin
     .from("user_usage")
-    .select("recos, balades, scans, asks")
+    .select("recos, balades, scans, asks, searches")
     .eq("user_id", userId)
     .eq("period_start", period)
     .maybeSingle();
@@ -201,7 +205,7 @@ export async function getUsageSummary(userId: string): Promise<UsageSummary> {
       .maybeSingle(),
     admin
       .from("user_usage")
-      .select("recos, balades, scans, asks")
+      .select("recos, balades, scans, asks, searches")
       .eq("user_id", userId)
       .eq("period_start", currentPeriodStart())
       .maybeSingle(),
@@ -211,7 +215,7 @@ export async function getUsageSummary(userId: string): Promise<UsageSummary> {
   const sub = await getSubscription(userId);
   const tier = sub.tier;
   const limits = TIER_QUOTA[tier];
-  const usage = usageRes.data ?? { recos: 0, balades: 0, scans: 0, asks: 0 };
+  const usage = usageRes.data ?? { recos: 0, balades: 0, scans: 0, asks: 0, searches: 0 };
 
   const serialise = (n: number) => (n === Infinity ? null : n);
   return {
@@ -222,10 +226,11 @@ export async function getUsageSummary(userId: string): Promise<UsageSummary> {
       "monthly",
     current_period_end: subRes.data?.current_period_end ?? null,
     usage: {
-      recos:   { used: usage.recos,   limit: serialise(limits.recos) },
-      balades: { used: usage.balades, limit: serialise(limits.balades) },
-      scans:   { used: usage.scans,   limit: serialise(limits.scans) },
-      asks:    { used: usage.asks,    limit: serialise(limits.asks) },
+      recos:    { used: usage.recos,    limit: serialise(limits.recos) },
+      balades:  { used: usage.balades,  limit: serialise(limits.balades) },
+      scans:    { used: usage.scans,    limit: serialise(limits.scans) },
+      asks:     { used: usage.asks,     limit: serialise(limits.asks) },
+      searches: { used: usage.searches, limit: serialise(limits.searches) },
     },
   };
 }

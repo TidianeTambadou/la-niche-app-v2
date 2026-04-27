@@ -19,9 +19,11 @@ import { fragranceKey, useFragrances, type Fragrance } from "@/lib/data";
 import { useStore, type BodyPlacement } from "@/lib/store";
 import { agentAsk, agentIdentify, agentSearch } from "@/lib/agent-client";
 import type { IdentifyResult, SearchCandidate } from "@/lib/agent";
+import { useRequireAuth } from "@/lib/auth";
 import { openConcierge } from "@/lib/concierge-bus";
 
 export default function FreeBaladePage() {
+  useRequireAuth();
   const router = useRouter();
   const fragrances = useFragrances();
   const {
