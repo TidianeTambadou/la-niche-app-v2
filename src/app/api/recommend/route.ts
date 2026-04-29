@@ -10,6 +10,9 @@ import {
   type Recommendation,
 } from "@/lib/recommendation";
 
+export const maxDuration = 60;
+export const runtime = "nodejs";
+
 /**
  * POST /api/recommend
  *

@@ -53,7 +53,7 @@ export function TopHeader() {
             <img
               src="/logo-laniche.png"
               alt="La Niche"
-              className="h-6 w-auto object-contain dark:invert"
+              className="h-12 w-auto object-contain dark:invert"
             />
           </Link>
 

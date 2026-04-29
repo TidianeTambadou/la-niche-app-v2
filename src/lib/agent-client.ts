@@ -36,13 +36,42 @@ async function call(
     if (options?.auth) {
       Object.assign(headers, await authHeader());
     }
-    const res = await fetch("/api/agent", {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-      signal,
-    });
-    return (await res.json()) as AgentResponse;
+    let res: Response;
+    try {
+      res = await fetch("/api/agent", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal,
+      });
+    } catch (e) {
+      if (signal?.aborted) throw e;
+      return {
+        ok: false,
+        error: "network_error",
+        detail:
+          e instanceof Error
+            ? e.message
+            : "Connexion impossible au service.",
+      };
+    }
+    // Read as text first so a non-JSON body (Vercel 504 HTML page, proxy
+    // error, etc.) doesn't surface as a cryptic native parse error
+    // ("the string did not match the expected pattern" on iOS Safari).
+    const text = await res.text();
+    try {
+      return JSON.parse(text) as AgentResponse;
+    } catch {
+      const detail =
+        res.status === 504
+          ? "Le service met trop de temps à répondre. Réessaie dans un instant."
+          : res.status >= 500
+            ? `Service indisponible (HTTP ${res.status}). Réessaie dans un instant.`
+            : res.status >= 400
+              ? `Erreur ${res.status}.`
+              : "Réponse non-JSON du service.";
+      return { ok: false, error: "upstream_error", detail };
+    }
   }
   // Single retry on 429s: every model in the fallback chain can be throttled
   // at once; waiting a couple seconds often unblocks at least one.

@@ -38,6 +38,14 @@ import {
   requireUserId,
 } from "@/lib/quota";
 
+// The recommend pipeline runs 4 LLM rounds + Tavily searches and routinely
+// exceeds Vercel's default 10 s timeout. Without this, /api/agent returns a
+// 504 HTML page whose body the client can't parse as JSON ("the string did
+// not match the expected pattern" on iOS Safari). 60 s is the Hobby cap; Pro
+// can go higher if needed.
+export const maxDuration = 60;
+export const runtime = "nodejs";
+
 /* ─── In-memory search cache (per Vercel instance) ─────────────────────── */
 
 type CachedSearch = { ts: number; candidates: SearchCandidate[] };

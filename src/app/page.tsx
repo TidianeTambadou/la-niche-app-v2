@@ -70,6 +70,7 @@ export default function HomePage() {
         </p>
         <blockquote className="text-[2rem] font-extralight italic tracking-tight leading-[1.2] text-on-background mb-8">
           &laquo;&thinsp;{phraseOfDay()}&thinsp;&raquo;
+          <span className="ml-2 align-super text-[0.65rem] font-mono not-italic tracking-widest text-outline">v2</span>
         </blockquote>
         <div className="h-px bg-outline-variant/50" />
       </section>
