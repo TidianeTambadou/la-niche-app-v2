@@ -139,7 +139,12 @@ export function Drawer({ open, onClose }: Props) {
               </p>
               <Link
                 href="/boutique"
-                className="flex items-center gap-4 px-4 py-3 hover:bg-surface-container-low transition-colors"
+                className={clsx(
+                  "flex items-center gap-4 px-4 py-3 transition-colors",
+                  pathname === "/boutique" || pathname.startsWith("/boutique/import")
+                    ? "bg-primary text-on-primary"
+                    : "hover:bg-surface-container-low",
+                )}
               >
                 <Icon
                   name="storefront"
@@ -150,11 +155,35 @@ export function Drawer({ open, onClose }: Props) {
                   <span className="block text-sm uppercase tracking-widest font-medium">
                     Mon stock
                   </span>
-                  <span className="block text-[10px] uppercase tracking-widest text-outline mt-0.5">
+                  <span className="block text-[10px] uppercase tracking-widest opacity-70 mt-0.5">
                     Importer & enrichir
                   </span>
                 </div>
-                <Icon name="arrow_forward" size={16} className="text-outline" />
+                <Icon name="arrow_forward" size={16} className="opacity-60" />
+              </Link>
+              <Link
+                href="/boutique/clients"
+                className={clsx(
+                  "flex items-center gap-4 px-4 py-3 transition-colors",
+                  pathname.startsWith("/boutique/clients")
+                    ? "bg-primary text-on-primary"
+                    : "hover:bg-surface-container-low",
+                )}
+              >
+                <Icon
+                  name="contact_page"
+                  filled={pathname.startsWith("/boutique/clients")}
+                  size={20}
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="block text-sm uppercase tracking-widest font-medium">
+                    Mes clients
+                  </span>
+                  <span className="block text-[10px] uppercase tracking-widest opacity-70 mt-0.5">
+                    Fiches & rapports vendeur
+                  </span>
+                </div>
+                <Icon name="arrow_forward" size={16} className="opacity-60" />
               </Link>
             </div>
           )}

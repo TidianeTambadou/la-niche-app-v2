@@ -422,32 +422,51 @@ async function openRouterCall(
   messages: ORMessage[],
   maxTokens: number,
 ): Promise<string> {
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`,
-      "http-referer": "https://laniche.app",
-      "x-title": "La Niche",
-    },
-    body: JSON.stringify({
-      // `models` (array) instead of `model` (string) → OpenRouter tries each
-      // in order on failure; auto-falls-back when Gemini is rate-limited.
-      models: OPENROUTER_MODELS,
-      route: "fallback",
-      max_tokens: maxTokens,
-      temperature: 0.3,
-      messages,
-    }),
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`OpenRouter ${res.status}: ${txt.slice(0, 400)}`);
+  async function once(tokens: number): Promise<{ ok: true; text: string } | { ok: false; status: number; body: string }> {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`,
+        "http-referer": "https://laniche.app",
+        "x-title": "La Niche",
+      },
+      body: JSON.stringify({
+        // `models` (array) instead of `model` (string) → OpenRouter tries each
+        // in order on failure; auto-falls-back when Gemini is rate-limited.
+        models: OPENROUTER_MODELS,
+        route: "fallback",
+        max_tokens: tokens,
+        temperature: 0.3,
+        messages,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, status: res.status, body };
+    }
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    return { ok: true, text: data.choices?.[0]?.message?.content?.trim() ?? "" };
   }
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  return data.choices?.[0]?.message?.content?.trim() ?? "";
+
+  let attempt = await once(maxTokens);
+  // Self-heal on 402 "can only afford X tokens" — OpenRouter tells us the
+  // exact remaining budget. Retry once with a safe margin under that cap.
+  if (!attempt.ok && attempt.status === 402) {
+    const m = /can only afford (\d+)/i.exec(attempt.body);
+    if (m) {
+      const afford = Math.max(64, Math.floor(Number(m[1]) * 0.9));
+      if (afford < maxTokens) {
+        attempt = await once(afford);
+      }
+    }
+  }
+  if (!attempt.ok) {
+    throw new Error(`OpenRouter ${attempt.status}: ${attempt.body.slice(0, 400)}`);
+  }
+  return attempt.text;
 }
 
 /* ─── Route handler ─────────────────────────────────────────────────────── */
@@ -682,7 +701,9 @@ JSON STRICT, sans markdown :
             ],
           },
         ],
-        400,
+        // 220 tokens fits comfortably under low-credit OpenRouter accounts
+        // (the 402 we saw was at 342-token budget). The output is tiny JSON.
+        220,
       );
 
       const vision = extractJson(visionText) as Partial<IdentifyResult & { error?: string }>;

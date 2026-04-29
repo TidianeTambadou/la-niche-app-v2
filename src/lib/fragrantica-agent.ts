@@ -326,36 +326,55 @@ async function callOpenRouter(
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY not set");
 
-  const body: Record<string, unknown> = {
-    models: FRAGRANTICA_AGENT_MODELS,
-    route: "fallback",
-    messages,
-    temperature: 0,
-    max_tokens: 1500,
-  };
-  if (useTools) {
-    body.tools = [SEARCH_TOOL];
-    body.tool_choice = "auto";
-  } else {
-    body.response_format = { type: "json_object" };
+  async function once(tokens: number): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; status: number; body: string }> {
+    const body: Record<string, unknown> = {
+      models: FRAGRANTICA_AGENT_MODELS,
+      route: "fallback",
+      messages,
+      temperature: 0,
+      max_tokens: tokens,
+    };
+    if (useTools) {
+      body.tools = [SEARCH_TOOL];
+      body.tool_choice = "auto";
+    } else {
+      body.response_format = { type: "json_object" };
+    }
+
+    const res = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`,
+        "http-referer": "https://laniche.app",
+        "x-title": "La Niche · Fragrantica Agent",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      return { ok: false, status: res.status, body: txt };
+    }
+    return { ok: true, data: (await res.json()) as Record<string, unknown> };
   }
 
-  const res = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`,
-      "http-referer": "https://laniche.app",
-      "x-title": "La Niche · Fragrantica Agent",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`OpenRouter ${res.status}: ${txt.slice(0, 400)}`);
+  // 800 tokens is enough for a JSON Fragrantica payload; lower than the old
+  // 1500 keeps low-credit OpenRouter accounts under their hard cap.
+  let attempt = await once(800);
+  if (!attempt.ok && attempt.status === 402) {
+    const m = /can only afford (\d+)/i.exec(attempt.body);
+    if (m) {
+      const afford = Math.max(64, Math.floor(Number(m[1]) * 0.9));
+      if (afford < 800) {
+        attempt = await once(afford);
+      }
+    }
   }
-  return (await res.json()) as Record<string, unknown>;
+  if (!attempt.ok) {
+    throw new Error(`OpenRouter ${attempt.status}: ${attempt.body.slice(0, 400)}`);
+  }
+  return attempt.data;
 }
 
 /* -------------------------------------------------------------------------

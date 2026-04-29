@@ -9,6 +9,8 @@ import { ErrorBubble } from "@/components/ErrorBubble";
 import { PerfumeArtwork } from "@/components/PerfumeArtwork";
 import { useAuth, useRequireAuth } from "@/lib/auth";
 import { findBoutiqueById } from "@/lib/boutiques";
+import { useIsBoutiqueAccount } from "@/lib/data";
+import { supabase } from "@/lib/supabase";
 import { useStore, TIER_LABELS, type SubscriptionTier } from "@/lib/store";
 import {
   readProfileFromUser,
@@ -36,6 +38,7 @@ import {
 
 type Phase =
   | "mode-picker"
+  | "client-info"
   | "quiz"
   | "configure"
   | "loading"
@@ -45,6 +48,10 @@ type Phase =
   | "report";
 type Mode = "self" | "friend";
 type Count = 5 | 10 | 20;
+
+/** Identité du client réel quand une boutique fait une session
+ *  "Pour un client". Vide en mode "Pour un ami" classique. */
+type ClientInfo = { firstName: string; lastName: string };
 
 /* -------------------------------------------------------------------------
  * Friend / self quiz — uses the shared QUIZ_QUESTIONS bank from src/lib/quiz.
@@ -117,6 +124,8 @@ export default function RecommendationsPage() {
     refreshUsage,
   } = useStore();
 
+  const isBoutique = useIsBoutiqueAccount();
+
   const [phase, setPhase] = useState<Phase>("mode-picker");
   const [mode, setMode] = useState<Mode>("self");
   const [quizAnswers, setQuizAnswers] = useState<Record<string, QuizAnswer>>({});
@@ -131,6 +140,12 @@ export default function RecommendationsPage() {
   const [matchedCards, setMatchedCards] = useState<RecommendationCandidate[]>([]);
   const [dislikedCards, setDislikedCards] = useState<RecommendationCandidate[]>([]);
   const [report, setReport] = useState<FriendReport | null>(null);
+  // Boutique seulement : identité du client réel quand on est en mode "Pour un client"
+  const [clientInfo, setClientInfo] = useState<ClientInfo>({
+    firstName: "",
+    lastName: "",
+  });
+  const [savedClientId, setSavedClientId] = useState<string | null>(null);
 
   // Drag state
   const [dragX, setDragX] = useState(0);
@@ -232,6 +247,40 @@ export default function RecommendationsPage() {
       );
       setReport(r);
       setPhase("report");
+
+      // Boutique seulement : on persiste la fiche client pour pouvoir la
+      // retrouver depuis /boutique/clients. Best-effort — un échec
+      // d'enregistrement ne bloque pas l'affichage du rapport.
+      if (isBoutique && clientInfo.firstName && clientInfo.lastName) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          const token = data.session?.access_token;
+          if (token) {
+            const res = await fetch("/api/boutique/clients", {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                firstName: clientInfo.firstName,
+                lastName: clientInfo.lastName,
+                quizAnswers,
+                dna,
+                matchedCards,
+                dislikedCards,
+                report: r,
+              }),
+            });
+            if (res.ok) {
+              const payload = (await res.json()) as { id?: string };
+              if (payload.id) setSavedClientId(payload.id);
+            }
+          }
+        } catch (persistErr) {
+          console.warn("[boutique-clients] persist failed:", persistErr);
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur rapport");
       setPhase("done");
@@ -325,6 +374,8 @@ export default function RecommendationsPage() {
     setLiked(0);
     setPassed(0);
     setIdx(0);
+    setClientInfo({ firstName: "", lastName: "" });
+    setSavedClientId(null);
   }
 
   if (phase === "mode-picker") {
@@ -334,6 +385,7 @@ export default function RecommendationsPage() {
         error={error}
         remainingRecs={remaining("recommendations")}
         subscription={subscription}
+        isBoutique={isBoutique}
         onPick={(m) => {
           // Hard gate before the quiz/configure screens so the user
           // doesn't fill a long form only to discover they're out of credits.
@@ -343,9 +395,27 @@ export default function RecommendationsPage() {
           }
           setMode(m);
           setError(null);
-          if (m === "self") setPhase("configure");
-          else setPhase("quiz");
+          if (m === "self") {
+            setPhase("configure");
+          } else if (isBoutique) {
+            // Boutique : on capture d'abord l'identité du client réel
+            // avant de lancer le quiz et de sauver la fiche.
+            setPhase("client-info");
+          } else {
+            setPhase("quiz");
+          }
         }}
+      />
+    );
+  }
+
+  if (phase === "client-info") {
+    return (
+      <ClientInfoView
+        value={clientInfo}
+        setValue={setClientInfo}
+        onContinue={() => setPhase("quiz")}
+        onBack={() => setPhase("mode-picker")}
       />
     );
   }
@@ -355,10 +425,12 @@ export default function RecommendationsPage() {
       <QuizView
         answers={quizAnswers}
         setAnswers={setQuizAnswers}
+        isBoutique={isBoutique}
+        clientInfo={isBoutique ? clientInfo : null}
         onComplete={(finalAnswers) => {
           void generate("friend", finalAnswers);
         }}
-        onBack={() => setPhase("mode-picker")}
+        onBack={() => setPhase(isBoutique ? "client-info" : "mode-picker")}
       />
     );
   }
@@ -407,6 +479,8 @@ export default function RecommendationsPage() {
         dna={dna}
         onBack={() => setPhase("done")}
         onRestart={restart}
+        savedClientId={savedClientId}
+        clientInfo={isBoutique ? clientInfo : null}
       />
     );
   }
@@ -1421,7 +1495,99 @@ function NotesLayer({
 }
 
 /* ========================================================================
- * Mode picker — "Pour moi" vs "Pour un ami"
+ * Client info capture (boutique only) — saisie prénom + nom du client
+ * réel avant de lancer le quiz "Pour un client".
+ * ====================================================================== */
+
+function ClientInfoView({
+  value,
+  setValue,
+  onContinue,
+  onBack,
+}: {
+  value: ClientInfo;
+  setValue: (v: ClientInfo) => void;
+  onContinue: () => void;
+  onBack: () => void;
+}) {
+  const ready = value.firstName.trim() !== "" && value.lastName.trim() !== "";
+  return (
+    <div className="px-6 pt-4 pb-12 min-h-screen flex flex-col">
+      <div className="flex items-center gap-3 mb-8">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Retour"
+          className="w-8 h-8 flex items-center justify-center text-outline hover:text-on-background transition-colors"
+        >
+          <Icon name="arrow_back" size={18} />
+        </button>
+      </div>
+
+      <header className="mb-10">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-outline mb-2">
+          Nouvelle fiche client
+        </p>
+        <h1 className="text-4xl font-medium leading-[0.95] tracking-tighter">
+          Qui est ce client ?
+        </h1>
+        <p className="text-sm text-on-surface-variant mt-4 leading-relaxed max-w-md">
+          On enregistre la fiche au nom de cette personne — ADN olfactif,
+          rapport vendeur et parfums swipés. Tu pourras la retrouver depuis
+          « Mes clients ».
+        </p>
+      </header>
+
+      <div className="flex flex-col gap-4 max-w-md">
+        <label className="block">
+          <span className="block text-[10px] uppercase tracking-widest text-outline mb-2 font-mono">
+            Prénom
+          </span>
+          <input
+            type="text"
+            value={value.firstName}
+            onChange={(e) =>
+              setValue({ ...value, firstName: e.target.value })
+            }
+            placeholder="Sarah"
+            className="w-full bg-transparent border-b-2 border-outline-variant focus:border-primary outline-none py-3 text-lg font-light placeholder:text-outline/60"
+            autoComplete="given-name"
+            autoFocus
+          />
+        </label>
+
+        <label className="block">
+          <span className="block text-[10px] uppercase tracking-widest text-outline mb-2 font-mono">
+            Nom
+          </span>
+          <input
+            type="text"
+            value={value.lastName}
+            onChange={(e) =>
+              setValue({ ...value, lastName: e.target.value })
+            }
+            placeholder="Dupont"
+            className="w-full bg-transparent border-b-2 border-outline-variant focus:border-primary outline-none py-3 text-lg font-light placeholder:text-outline/60"
+            autoComplete="family-name"
+          />
+        </label>
+      </div>
+
+      <button
+        type="button"
+        onClick={onContinue}
+        disabled={!ready}
+        className="mt-10 w-full max-w-md py-4 bg-primary text-on-primary rounded-full text-xs uppercase tracking-[0.25em] font-bold active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-2"
+      >
+        <Icon name="arrow_forward" size={16} />
+        Lancer le quiz
+      </button>
+    </div>
+  );
+}
+
+/* ========================================================================
+ * Mode picker — "Pour moi" vs "Pour un ami / Pour un client"
  * ====================================================================== */
 
 function ModePickerView({
@@ -1429,14 +1595,20 @@ function ModePickerView({
   error,
   remainingRecs,
   subscription,
+  isBoutique,
   onPick,
 }: {
   hasProfile: boolean;
   error: string | null;
   remainingRecs: number;
   subscription: SubscriptionTier;
+  isBoutique: boolean;
   onPick: (m: Mode) => void;
 }) {
+  const friendLabel = isBoutique ? "Pour un client" : "Pour un ami";
+  const friendBlurb = isBoutique
+    ? "Capture le prénom + nom du client, lance le quiz, swipe les parfums, et la fiche client (ADN + rapport vendeur) reste sauvegardée dans « Mes clients »."
+    : "Quiz ultra-direct sur ses goûts, sa vibe, son budget. On te génère des parfums à swiper, puis un rapport clair à transmettre à un vendeur.";
   const unlimited = remainingRecs === Infinity;
   const tierLabel =
     subscription === "free"
@@ -1532,7 +1704,7 @@ function ModePickerView({
           </div>
         </button>
 
-        {/* Pour un ami */}
+        {/* Pour un ami / Pour un client (boutique) */}
         <button
           type="button"
           onClick={() => onPick("friend")}
@@ -1540,19 +1712,17 @@ function ModePickerView({
         >
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 flex-shrink-0 bg-surface-container-high text-on-background border border-outline-variant flex items-center justify-center">
-              <Icon name="groups" size={22} />
+              <Icon name={isBoutique ? "badge" : "groups"} size={22} />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[9px] uppercase tracking-[0.3em] text-outline mb-1">
                 Option 02
               </p>
               <h2 className="text-2xl font-semibold tracking-tight mb-2">
-                Pour un ami
+                {friendLabel}
               </h2>
               <p className="text-[12px] text-on-surface-variant leading-relaxed">
-                Quiz ultra-direct sur ses goûts, sa vibe, son budget. On te
-                génère des parfums à swiper, puis un rapport clair à
-                transmettre à un vendeur.
+                {friendBlurb}
               </p>
             </div>
             <Icon
@@ -1590,11 +1760,15 @@ function QuizView({
   setAnswers,
   onComplete,
   onBack,
+  isBoutique,
+  clientInfo,
 }: {
   answers: Record<string, QuizAnswer>;
   setAnswers: (a: Record<string, QuizAnswer>) => void;
   onComplete: (answers: Record<string, QuizAnswer>) => void;
   onBack: () => void;
+  isBoutique: boolean;
+  clientInfo: ClientInfo | null;
 }) {
   const [step, setStep] = useState(0);
   const q = QUIZ_QUESTIONS[step];
@@ -1661,7 +1835,9 @@ function QuizView({
 
       <div key={q.id} className="quiz-in flex-1 flex flex-col">
         <p className="text-[10px] uppercase tracking-[0.3em] text-outline mb-3">
-          Pour un ami · question {step + 1}
+          {isBoutique && clientInfo
+            ? `${clientInfo.firstName} ${clientInfo.lastName} · question ${step + 1}`
+            : `Pour un ami · question ${step + 1}`}
           {q.multi ? " · choix multiples" : ""}
         </p>
         <h1 className="text-3xl font-medium leading-[1.05] tracking-tighter mb-3">
@@ -1764,11 +1940,15 @@ function ReportView({
   dna,
   onBack,
   onRestart,
+  savedClientId,
+  clientInfo,
 }: {
   report: FriendReport;
   dna: OlfactiveDNA | null;
   onBack: () => void;
   onRestart: () => void;
+  savedClientId: string | null;
+  clientInfo: ClientInfo | null;
 }) {
   function share() {
     const parts: string[] = [];
@@ -1840,9 +2020,35 @@ function ReportView({
             Brief actionnable
           </p>
           <h1 className="text-4xl font-medium leading-[0.95] tracking-tighter">
-            Rapport olfactif.
+            {clientInfo
+              ? `${clientInfo.firstName} ${clientInfo.lastName}.`
+              : "Rapport olfactif."}
           </h1>
         </section>
+
+        {/* Boutique : bannière "fiche enregistrée" + CTA "Voir mes clients" */}
+        {clientInfo && savedClientId && (
+          <section
+            className="report-section mb-10 border border-primary/40 bg-primary/5 p-4 flex items-center gap-3"
+            style={{ animationDelay: "60ms" }}
+          >
+            <Icon name="badge" size={20} className="text-primary flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] uppercase tracking-widest text-primary font-bold mb-0.5">
+                Fiche client enregistrée
+              </p>
+              <p className="text-xs text-on-background">
+                Retrouve cette session dans « Mes clients ».
+              </p>
+            </div>
+            <Link
+              href="/boutique/clients"
+              className="text-[10px] uppercase tracking-widest font-bold border-b border-primary pb-0.5 flex-shrink-0"
+            >
+              Voir
+            </Link>
+          </section>
+        )}
 
         {/* 01 — summary */}
         <section
