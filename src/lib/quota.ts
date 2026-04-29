@@ -28,7 +28,7 @@ import { createAdminClient } from "@/lib/supabase-server";
 export type QuotaKind = "recos" | "balades" | "scans" | "asks" | "searches";
 
 /** Subscription tier (must match SubscriptionTier in src/lib/store.tsx). */
-export type Tier = "free" | "curieux" | "initie" | "mecene";
+export type Tier = "free" | "curieux" | "initie" | "mecene" | "admin";
 
 /* ─── Limits — source of truth, mirrored from the client store ─────────── */
 
@@ -38,12 +38,14 @@ export type Tier = "free" | "curieux" | "initie" | "mecene";
  *  - balades  : balade guidée (route generation, ~$0.05/appel)
  *  - scans    : caméra → vision Claude + Fragrantica scrape
  *  - asks     : concierge IA chat
- *  Free = vitrine stricte : aucune balade, recherche très limitée. */
+ *  Free = vitrine stricte : aucune balade, recherche très limitée.
+ *  Admin = tout illimité, jamais facturé — réservé à l'équipe La Niche. */
 const TIER_QUOTA: Record<Tier, Record<QuotaKind, number>> = {
-  free:    { recos: 2,   balades: 0,        scans: 1,        asks: 0,        searches: 10       },
-  curieux: { recos: 25,  balades: 10,       scans: 20,       asks: 30,       searches: 200      },
-  initie:  { recos: 60,  balades: 25,       scans: Infinity, asks: Infinity, searches: Infinity },
-  mecene:  { recos: 200, balades: 50,       scans: Infinity, asks: Infinity, searches: Infinity },
+  free:    { recos: 2,        balades: 0,        scans: 1,        asks: 0,        searches: 10       },
+  curieux: { recos: 25,       balades: 10,       scans: 20,       asks: 30,       searches: 200      },
+  initie:  { recos: 60,       balades: 25,       scans: Infinity, asks: Infinity, searches: Infinity },
+  mecene:  { recos: 200,      balades: 50,       scans: Infinity, asks: Infinity, searches: Infinity },
+  admin:   { recos: Infinity, balades: Infinity, scans: Infinity, asks: Infinity, searches: Infinity },
 };
 
 /* ─── Auth helper ──────────────────────────────────────────────────────── */

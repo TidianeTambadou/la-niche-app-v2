@@ -108,7 +108,12 @@ export type FinishedBalade = ActiveBalade & { finishedAt: number };
  * lands, mirror the same state on the server and keep this as a local cache.
  * ----------------------------------------------------------------------- */
 
-export type SubscriptionTier = "free" | "curieux" | "initie" | "mecene";
+export type SubscriptionTier =
+  | "free"
+  | "curieux"
+  | "initie"
+  | "mecene"
+  | "admin";
 
 export type BillingCycle = "monthly" | "annual";
 
@@ -136,6 +141,8 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   // Mécène = fair-use illimité ; le cap 200/50 sert de garde-fou anti-abus
   // côté serveur.
   mecene: { recommendations: 200, guidedBalades: 50 },
+  // Admin = équipe La Niche, aucun cap, jamais facturé.
+  admin: { recommendations: Infinity, guidedBalades: Infinity },
 };
 
 export const TIER_PRICE_EUR: Record<SubscriptionTier, number> = {
@@ -143,6 +150,7 @@ export const TIER_PRICE_EUR: Record<SubscriptionTier, number> = {
   curieux: 4.99,
   initie: 12.99,
   mecene: 24.99,
+  admin: 0,
 };
 
 /** Annual price (full year, ~2 months free vs monthly billing). */
@@ -151,6 +159,7 @@ export const TIER_PRICE_EUR_ANNUAL: Record<SubscriptionTier, number> = {
   curieux: 49.9,
   initie: 129,
   mecene: 249,
+  admin: 0,
 };
 
 export const TIER_LABELS: Record<SubscriptionTier, string> = {
@@ -158,6 +167,7 @@ export const TIER_LABELS: Record<SubscriptionTier, string> = {
   curieux: "Curieux",
   initie: "Initié",
   mecene: "Mécène",
+  admin: "Admin",
 };
 
 /** Whether the tier participates in the monthly contest ("concours du mois"). */
@@ -166,13 +176,20 @@ export const TIER_HAS_CONTEST: Record<SubscriptionTier, boolean> = {
   curieux: false,
   initie: true,
   mecene: true,
+  admin: true,
 };
 
 /** Migration of legacy tier names persisted in localStorage from MVP-v1. */
 function migrateTier(raw: unknown): SubscriptionTier {
   if (raw === "basic") return "curieux";
   if (raw === "premium") return "initie";
-  if (raw === "free" || raw === "curieux" || raw === "initie" || raw === "mecene") {
+  if (
+    raw === "free" ||
+    raw === "curieux" ||
+    raw === "initie" ||
+    raw === "mecene" ||
+    raw === "admin"
+  ) {
     return raw;
   }
   return "free";
