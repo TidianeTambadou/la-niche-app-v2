@@ -345,87 +345,78 @@ BEGIN
       CONTINUE;
     END IF;
 
-    -- Reprend l'esprit v1 : questions formulées en termes de VIBE et de
-    -- LIFESTYLE plutôt que de jargon olfactif. Chaque option contient un
-    -- exemple entre parenthèses pour qu'un client qui n'y connaît rien
-    -- puisse répondre sans réfléchir.
+    -- Questions ultra-vulgarisées : chaque option est une SCÈNE ou un
+    -- OBJET CONCRET (plage, goûter, forêt, bibliothèque…) qu'un enfant
+    -- peut visualiser. Aucun terme olfactif technique ; le mapping vers
+    -- les familles de parfumerie se fait côté IA dans olfactive-report.
     INSERT INTO public.shop_questions (shop_id, position, label, kind, options, required) VALUES
-      (s.id, 1, 'Quelle vibe générale ?', 'single',
+      (s.id, 1, 'Pour quel moment cherchez-vous un parfum ?', 'single',
         jsonb_build_array(
-          'Jeune frais — street, décontracté',
-          'Classique distingué — pro chic',
-          'Rockstar — nuit, clubbing',
-          'Bohème — naturel, sans prise de tête'
+          'Tous les jours, sans réfléchir',
+          'Pour le travail',
+          'Pour sortir le soir',
+          'Pour une grande occasion (mariage, anniversaire…)'
         ),
         true),
 
-      (s.id, 2, 'À qui veut plaire le client ?', 'single',
+      (s.id, 2, 'À quoi ce parfum doit faire penser ? (cochez tout ce qui plaît)', 'multi',
         jsonb_build_array(
-          'Aux femmes — faire tourner la tête',
-          'Aux hommes',
-          'Tout le monde — bonne vibe globale',
-          'À soi d''abord — faut kiffer avant tout'
+          'Une journée à la plage — vent, sel, embruns',
+          'Un goûter chez mamie — vanille, caramel, gâteau',
+          'Une promenade en forêt — bois mouillé, mousse, écorce',
+          'Un bouquet de fleurs fraîches — rose, jasmin',
+          'Un verger en été — orange, citron, mandarine',
+          'Un feu de cheminée l''hiver — bois fumé, épices chaudes',
+          'Une vieille bibliothèque — cuir de canapé, papier ancien',
+          'Une cuisine d''herbes — basilic, menthe, romarin'
         ),
         true),
 
-      (s.id, 3, 'Plutôt chaud ou plutôt frais ?', 'single',
+      (s.id, 3, 'Plutôt frais ou plutôt chaud ?', 'single',
         jsonb_build_array(
-          'Frais — agrumes, menthe, marin',
-          'Chaud — cuir, épices, vanille',
-          'Entre les deux, selon l''humeur'
+          'Frais, comme un sorbet citron',
+          'Chaud, comme un chocolat chaud',
+          'Entre les deux, ça dépend de l''humeur'
         ),
         true),
 
-      (s.id, 4, 'Qu''est-ce qui le fait kiffer ? (plusieurs choix)', 'multi',
+      (s.id, 4, 'C''est pour qui ?', 'single',
         jsonb_build_array(
-          'Sucré / gourmand (vanille, caramel)',
-          'Fruité (pêche, pomme, fruits rouges)',
-          'Boisé / sec (cèdre, santal)',
-          'Floral (rose, jasmin, iris)',
-          'Citrus / frais (bergamote, citron)',
-          'Fumé / mystérieux (oud, encens, tabac)',
-          'Cuir, musqué, animal'
+          'Plutôt pour un homme',
+          'Plutôt pour une femme',
+          'Mixte — peu importe'
         ),
         true),
 
-      (s.id, 5, 'Quelle intensité ?', 'single',
+      (s.id, 5, 'Le parfum doit se sentir comment ?', 'single',
         jsonb_build_array(
-          'Discret — sillage intime',
-          'Présent — sentu à 1 mètre',
-          'Marquant — on se retourne dans la rue'
+          'Tout doux — juste pour soi, presque caché',
+          'Normal — on le sent quand on s''approche',
+          'Fort — on se retourne dans la rue'
         ),
         true),
 
-      (s.id, 6, 'Pour quelle occasion ?', 'single',
-        jsonb_build_array(
-          'Tous les jours / casual',
-          'Bosser, réunions, pro',
-          'Dates, séduction',
-          'Soirées, clubs, la nuit'
-        ),
-        true),
-
-      (s.id, 7, 'Budget par flacon ?', 'single',
+      (s.id, 6, 'Quel budget environ ?', 'single',
         jsonb_build_array(
           'Moins de 100 €',
-          '100 à 200 €',
+          'Entre 100 et 200 €',
           'Plus de 200 €',
-          'Sans limite particulière'
+          'Pas de budget particulier'
         ),
         false),
 
-      (s.id, 8, 'Qu''est-ce qu''il DÉTESTE ?', 'single',
+      (s.id, 7, 'Qu''est-ce que vous N''AIMEZ PAS ?', 'single',
         jsonb_build_array(
-          'Trop sucré / écœurant',
-          'Trop fleuri / mémé',
-          'Trop marin / savonneux',
-          'Trop animal / cuir lourd',
-          'Rien de particulier'
+          'Quand c''est trop sucré (genre bonbon)',
+          'Quand c''est trop fleur (genre pot-pourri de mamie)',
+          'Quand ça sent le savon ou l''eau de bain',
+          'Quand c''est trop fort, lourd, animal',
+          'Rien de particulier, je suis ouvert(e)'
         ),
         true),
 
-      (s.id, 9,  'Email',     'email', NULL, false),
-      (s.id, 10, 'Téléphone', 'phone', NULL, false);
+      (s.id, 8,  'Email',     'email', NULL, false),
+      (s.id, 9,  'Téléphone', 'phone', NULL, false);
   END LOOP;
 END $$;
 

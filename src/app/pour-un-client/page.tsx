@@ -7,6 +7,7 @@ import { Icon } from "@/components/Icon";
 import { QuestionInput } from "@/components/QuestionInput";
 import { ClientReport } from "@/components/ClientReport";
 import { ExistingClientSuggestions } from "@/components/ExistingClientSuggestions";
+import { PerfumeGlossary } from "@/components/PerfumeGlossary";
 import {
   AddressAutocomplete,
   type ResolvedAddress,
@@ -394,6 +395,7 @@ export default function PourUnClientPage() {
 
       {step.kind === "question" && (
         <section className="flex flex-col gap-4">
+          <PerfumeGlossary />
           <h2 className="text-xl font-semibold tracking-tight leading-tight">
             {wizardQuestions[step.index].label}
             {wizardQuestions[step.index].required && (
