@@ -29,6 +29,7 @@ type WizardStep =
       clientId: string;
       olfactiveProfile: unknown;
       report: unknown;
+      llmError: string | null;
     };
 
 /** How many olfactive questions each time bucket allows. Email/phone are
@@ -169,6 +170,7 @@ export default function PourUnClientPage() {
         id: string;
         olfactive_profile: unknown;
         report: unknown;
+        llm_error: string | null;
       }>("/api/clients", {
         method: "POST",
         body: JSON.stringify({
@@ -191,6 +193,7 @@ export default function PourUnClientPage() {
         clientId: json.id,
         olfactiveProfile: json.olfactive_profile,
         report: json.report,
+        llmError: json.llm_error,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");
@@ -218,6 +221,21 @@ export default function PourUnClientPage() {
             Synthèse IA · fiche enregistrée
           </p>
         </header>
+
+        {step.llmError && (
+          <div className="border border-error/40 bg-error-container/30 rounded-2xl px-4 py-3 flex flex-col gap-1">
+            <p className="text-xs uppercase tracking-widest font-bold text-error">
+              Rapport IA échoué
+            </p>
+            <p className="text-xs text-on-surface-variant break-words">
+              {step.llmError}
+            </p>
+            <p className="text-[11px] text-outline mt-1">
+              La fiche est bien enregistrée. Tu peux relancer l'analyse depuis
+              la fiche client (à venir) ou réessayer un nouveau client.
+            </p>
+          </div>
+        )}
 
         <ClientReport
           profile={step.olfactiveProfile as never}

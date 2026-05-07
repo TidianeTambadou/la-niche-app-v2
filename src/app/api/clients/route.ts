@@ -152,6 +152,7 @@ export async function POST(req: NextRequest) {
 
   let olfactiveProfile: unknown = null;
   let report: unknown = null;
+  let llmError: string | null = null;
   try {
     const generated = await buildOlfactiveReport(
       (questions ?? []) as { id: string; label: string; kind: string }[],
@@ -162,9 +163,12 @@ export async function POST(req: NextRequest) {
     report = generated.report;
   } catch (err) {
     // We don't fail the whole POST when the LLM hiccups — the boutique can
-    // still re-run the analysis later from the detail page. Persist null
-    // and return a soft warning.
-    console.warn("[clients.POST] LLM failed:", err instanceof Error ? err.message : err);
+    // still re-run the analysis later from the detail page. We surface the
+    // error message in the response so the UI can display it instead of
+    // silently rendering an empty rapport.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("[clients.POST] LLM failed:", msg);
+    llmError = msg.slice(0, 500);
   }
 
   const { data, error } = await admin
@@ -199,6 +203,7 @@ export async function POST(req: NextRequest) {
       created_at: data.created_at,
       olfactive_profile: olfactiveProfile,
       report,
+      llm_error: llmError,
     },
     201,
   );
