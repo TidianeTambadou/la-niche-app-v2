@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 
   const ids = body.recipients.map((r) => r.client_id);
   const { data: clientRows, error: cErr } = await admin
-    .from("boutique_clients")
+    .from("clients_v2")
     .select("id, first_name, email, phone")
     .in("id", ids)
     .eq("shop_id", shopId);

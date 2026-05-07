@@ -28,7 +28,7 @@ export async function GET(
 
   const admin = createAdminClient();
   const { data, error } = await admin
-    .from("boutique_clients")
+    .from("clients_v2")
     .select("*")
     .eq("id", id)
     .eq("shop_id", shopId)
@@ -79,7 +79,7 @@ export async function PATCH(
 
   const admin = createAdminClient();
   const { data, error } = await admin
-    .from("boutique_clients")
+    .from("clients_v2")
     .update(update)
     .eq("id", id)
     .eq("shop_id", shopId)
@@ -101,7 +101,7 @@ export async function DELETE(
 
   const admin = createAdminClient();
   const { error } = await admin
-    .from("boutique_clients")
+    .from("clients_v2")
     .delete()
     .eq("id", id)
     .eq("shop_id", shopId);

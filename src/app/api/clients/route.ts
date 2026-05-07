@@ -14,7 +14,7 @@
  *             - validates inputs (name, contact, channel)
  *             - fetches the shop's questions to label the answers
  *             - calls the LLM to generate the olfactive profile + report
- *             - persists everything in `boutique_clients`
+ *             - persists everything in `clients_v2`
  */
 
 import type { NextRequest } from "next/server";
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient();
   let query = admin
-    .from("boutique_clients")
+    .from("clients_v2")
     .select(
       "id, source, first_name, last_name, email, phone, preferred_channel, " +
       "consent_marketing, olfactive_profile, report, notes, created_at, updated_at",
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data, error } = await admin
-    .from("boutique_clients")
+    .from("clients_v2")
     .insert({
       shop_id: shopId,
       user_id: userIdForRow,

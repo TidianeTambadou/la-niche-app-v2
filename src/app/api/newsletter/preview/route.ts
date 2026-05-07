@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   if (!perfume) return jsonError("perfume_not_found", 404);
 
   const { data: clients, error: cErr } = await admin
-    .from("boutique_clients")
+    .from("clients_v2")
     .select(
       "id, first_name, last_name, email, phone, preferred_channel, consent_marketing, olfactive_profile",
     )
