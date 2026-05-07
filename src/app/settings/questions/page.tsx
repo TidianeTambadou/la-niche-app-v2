@@ -20,6 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Icon } from "@/components/Icon";
+import { QuestionsConcierge } from "@/components/QuestionsConcierge";
 import { useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
 import { useGuardOutOfService } from "@/lib/service-mode";
@@ -156,6 +157,8 @@ export default function QuestionsSettingsPage() {
           }}
         />
       )}
+
+      <QuestionsConcierge questions={items} onChange={refresh} />
     </div>
   );
 }

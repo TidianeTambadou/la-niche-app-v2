@@ -36,6 +36,8 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const search = (url.searchParams.get("search") ?? "").trim();
+  const firstNameLike = (url.searchParams.get("firstNameLike") ?? "").trim();
+  const lastNameLike = (url.searchParams.get("lastNameLike") ?? "").trim();
   const source = url.searchParams.get("source");
   const channel = url.searchParams.get("channel");
   const from = url.searchParams.get("from");
@@ -69,6 +71,11 @@ export async function GET(req: NextRequest) {
       `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`,
     );
   }
+  // Strict per-column filters used by the de-dupe widget on the wizard intro.
+  // Combining `search` (OR across columns) with these would AND them — the
+  // dedupe widget never sets `search` so there's no conflict in practice.
+  if (firstNameLike) query = query.ilike("first_name", `%${firstNameLike}%`);
+  if (lastNameLike) query = query.ilike("last_name", `%${lastNameLike}%`);
 
   const { data, error } = await query;
   if (error) return jsonError("db_error", 500, error.message);

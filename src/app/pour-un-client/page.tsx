@@ -230,6 +230,16 @@ export default function PourUnClientPage() {
             <p className="text-xs text-on-surface-variant break-words">
               {step.llmError}
             </p>
+            {step.llmError.includes("402") && (
+              <a
+                href="https://openrouter.ai/settings/credits"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs uppercase tracking-widest font-bold text-primary border-b border-primary self-start mt-2"
+              >
+                Recharger OpenRouter ↗
+              </a>
+            )}
             <p className="text-[11px] text-outline mt-1">
               La fiche est bien enregistrée. Tu peux relancer l'analyse depuis
               la fiche client (à venir) ou réessayer un nouveau client.

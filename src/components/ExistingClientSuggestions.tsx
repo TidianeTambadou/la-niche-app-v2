@@ -44,22 +44,20 @@ export function ExistingClientSuggestions({ firstName, lastName }: Props) {
     setLoading(true);
     const t = setTimeout(async () => {
       try {
-        const params = new URLSearchParams({ search: `${f} ${l}`, limit: "5" });
+        // Per-column ilike filters AND-ed by the API so we only get rows
+        // that match BOTH first AND last name. Using `search` instead does
+        // a substring search across (first_name OR last_name OR email),
+        // which fails for "Marie Dupont" because no single column ever
+        // contains both halves.
+        const params = new URLSearchParams({
+          firstNameLike: f,
+          lastNameLike: l,
+          limit: "5",
+        });
         const json = await authedFetch<{
           clients: Match[];
         }>(`/api/clients?${params.toString()}`);
-        // Server-side OR is on first_name OR last_name OR email — narrow
-        // again here to require BOTH name parts so we don't show false
-        // positives when only the first name half-matches.
-        const fl = f.toLowerCase();
-        const ll = l.toLowerCase();
-        setMatches(
-          json.clients.filter(
-            (c) =>
-              c.first_name.toLowerCase().includes(fl) &&
-              c.last_name.toLowerCase().includes(ll),
-          ),
-        );
+        setMatches(json.clients);
       } catch {
         setMatches([]);
       } finally {

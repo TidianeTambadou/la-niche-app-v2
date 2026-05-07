@@ -136,7 +136,11 @@ Génère le JSON.`;
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
     ],
-    { temperature: 0.5, maxTokens: 2000 },
+    // Le rapport est riche (profile + 5 sections) mais 1200 tokens
+    // suffisent en pratique. On limite la borne haute pour minimiser le
+    // coût upfront que OpenRouter exige (estimé sur max_tokens, pas sur
+    // l'usage réel) — important quand le wallet est bas.
+    { temperature: 0.5, maxTokens: 1200 },
   );
 
   return out;
