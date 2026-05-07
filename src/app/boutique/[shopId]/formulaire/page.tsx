@@ -9,12 +9,21 @@ import { useAuth, useRequireAuth } from "@/lib/auth";
 import { authedFetch } from "@/lib/api-client";
 import type { CommChannel, ShopQuestion } from "@/lib/types";
 
+type TimeBudget = "express" | "classique" | "complet";
+
 type WizardStep =
+  | { kind: "time-budget" }
   | { kind: "intro" }
   | { kind: "question"; index: number }
   | { kind: "contact" }
   | { kind: "submitting" }
   | { kind: "done" };
+
+const QUESTIONS_PER_BUDGET: Record<TimeBudget, number> = {
+  express: 5,
+  classique: 9,
+  complet: Infinity,
+};
 
 /**
  * User-side equivalent of /pour-un-client. Differences :
@@ -45,12 +54,14 @@ export default function UserFormPage({
   const [channel, setChannel] = useState<CommChannel>("email");
   const [consent, setConsent] = useState(false);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
-  const [step, setStep] = useState<WizardStep>({ kind: "intro" });
+  const [timeBudget, setTimeBudget] = useState<TimeBudget>("classique");
+  const [step, setStep] = useState<WizardStep>({ kind: "time-budget" });
 
-  const wizardQuestions = useMemo(
-    () => questions.filter((q) => q.kind !== "email" && q.kind !== "phone"),
-    [questions],
-  );
+  const wizardQuestions = useMemo(() => {
+    const base = questions.filter((q) => q.kind !== "email" && q.kind !== "phone");
+    const limit = QUESTIONS_PER_BUDGET[timeBudget];
+    return Number.isFinite(limit) ? base.slice(0, limit) : base;
+  }, [questions, timeBudget]);
 
   useEffect(() => {
     (async () => {
@@ -79,6 +90,11 @@ export default function UserFormPage({
   }
 
   function next() {
+    if (step.kind === "time-budget") {
+      setError(null);
+      setStep({ kind: "intro" });
+      return;
+    }
     if (step.kind === "intro") {
       if (!firstName.trim() || !lastName.trim()) {
         setError("Prénom et nom requis.");
@@ -107,7 +123,9 @@ export default function UserFormPage({
   }
 
   function back() {
-    if (step.kind === "question") {
+    if (step.kind === "intro") {
+      setStep({ kind: "time-budget" });
+    } else if (step.kind === "question") {
       if (step.index === 0) setStep({ kind: "intro" });
       else setStep({ kind: "question", index: step.index - 1 });
     } else if (step.kind === "contact") {
@@ -187,6 +205,10 @@ export default function UserFormPage({
   return (
     <div className="px-6 py-6 flex flex-col gap-6">
       <Progress step={step} total={wizardQuestions.length} />
+
+      {step.kind === "time-budget" && (
+        <TimeBudgetStep selected={timeBudget} onSelect={setTimeBudget} />
+      )}
 
       {step.kind === "intro" && (
         <section className="flex flex-col gap-4">
@@ -284,7 +306,7 @@ export default function UserFormPage({
 
       {step.kind !== "submitting" && (
         <footer className="flex gap-3 mt-2">
-          {step.kind !== "intro" && (
+          {step.kind !== "time-budget" && (
             <button
               type="button"
               onClick={back}
@@ -307,7 +329,7 @@ export default function UserFormPage({
               onClick={next}
               className="flex-1 py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest"
             >
-              Suivant
+              {step.kind === "time-budget" ? "C'est parti" : "Suivant"}
             </button>
           )}
         </footer>
@@ -322,8 +344,14 @@ const inputCls =
 function Progress({ step, total }: { step: WizardStep; total: number }) {
   if (step.kind === "submitting" || step.kind === "done") return null;
   const done =
-    step.kind === "intro" ? 0 : step.kind === "question" ? step.index + 1 : total + 1;
-  const pct = total > 0 ? Math.min(100, (done / (total + 1)) * 100) : step.kind === "contact" ? 100 : 0;
+    step.kind === "time-budget"
+      ? 0
+      : step.kind === "intro"
+        ? 1
+        : step.kind === "question"
+          ? step.index + 2
+          : total + 2;
+  const pct = total > 0 ? Math.min(100, (done / (total + 2)) * 100) : 0;
   return (
     <div className="h-1 bg-outline-variant/30 rounded-full overflow-hidden">
       <div
@@ -331,6 +359,85 @@ function Progress({ step, total }: { step: WizardStep; total: number }) {
         style={{ width: `${pct}%` }}
       />
     </div>
+  );
+}
+
+function TimeBudgetStep({
+  selected,
+  onSelect,
+}: {
+  selected: TimeBudget;
+  onSelect: (b: TimeBudget) => void;
+}) {
+  const choices: {
+    key: TimeBudget;
+    minutes: string;
+    title: string;
+    desc: string;
+  }[] = [
+    {
+      key: "express",
+      minutes: "3 min",
+      title: "Express",
+      desc: "Réponses rapides. La boutique fera de son mieux mais devra deviner — risque qu'on te propose un parfum qui te va à 60 %.",
+    },
+    {
+      key: "classique",
+      minutes: "5-7 min",
+      title: "Classique",
+      desc: "Le bon compromis. La boutique cible bien tes goûts, peu de gaspillage. Recommandé.",
+    },
+    {
+      key: "complet",
+      minutes: "10 min",
+      title: "Complet",
+      desc: "Profil ultra-précis. La boutique trouve LE parfum, pas un compromis à 200 € qui finira dans un tiroir.",
+    },
+  ];
+
+  return (
+    <section className="flex flex-col gap-4">
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Combien de temps as-tu ?
+        </h1>
+        <p className="text-sm text-on-surface-variant mt-1 leading-relaxed">
+          Plus tu prends de temps, mieux la boutique cerne ton profil olfactif —
+          et moins tu risques de repartir avec un parfum qui ne te correspond pas.
+        </p>
+      </header>
+
+      <ul className="flex flex-col gap-2">
+        {choices.map((c) => {
+          const active = selected === c.key;
+          return (
+            <li key={c.key}>
+              <button
+                type="button"
+                onClick={() => onSelect(c.key)}
+                className={`w-full text-left px-4 py-4 border rounded-2xl transition-all ${
+                  active
+                    ? "border-primary bg-primary-container/40"
+                    : "border-outline-variant hover:border-on-surface-variant"
+                }`}
+              >
+                <div className="flex items-baseline justify-between gap-2 mb-1">
+                  <span className="text-base font-semibold tracking-tight">
+                    {c.title}
+                  </span>
+                  <span className="text-xs uppercase tracking-widest text-outline">
+                    {c.minutes}
+                  </span>
+                </div>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  {c.desc}
+                </p>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

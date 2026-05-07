@@ -14,12 +14,16 @@ type Props = {
 };
 
 /**
- * On `multi`/`single` questions whose label talks about families, accords or
- * notes, tapping a chip first opens a small sheet that pulls a 1-2 sentence
- * plain-language explanation from /api/explain. The sheet has a confirm
- * button to actually select the option. Lets a beginner understand "Chypré"
- * before committing. For non-technical questions (e.g. "Pour quel moment ?"
- * with options like "Travail", "Soir / sortie") tapping selects directly.
+ * Tap on a chip = SELECTS directly (default behaviour).
+ *
+ * For technical multi/single questions (label mentioning families, accords,
+ * notes), a long-press (or right-click on desktop) opens a sheet with a
+ * 1-2 sentence plain-language IA explanation. We use the native
+ * `contextmenu` event which fires both on right-click and mobile long-press.
+ *
+ * A small caption beneath the question advertises the gesture so the
+ * boutique's clients know they can ask the IA without disrupting people who
+ * already know what "Chypré" means.
  */
 export function QuestionInput({ q, value, onChange }: Props) {
   const [explain, setExplain] = useState<{ term: string; text: string; loading: boolean } | null>(null);
@@ -53,16 +57,24 @@ export function QuestionInput({ q, value, onChange }: Props) {
     }
   }
 
-  function ExplainSheet({
-    term,
-    isSelected,
-    onConfirm,
-  }: {
-    term: string;
-    isSelected: boolean;
-    onConfirm: () => void;
-  }) {
-    if (!explain || explain.term !== term) return null;
+  /**
+   * Wires up the long-press gesture. `contextmenu` fires :
+   *   - on desktop : right-click
+   *   - on mobile  : ~500ms press-and-hold
+   * preventDefault stops the browser's native context menu so we own the UX.
+   */
+  function explainBindings(opt: string) {
+    if (!isTechnical) return {};
+    return {
+      onContextMenu: (e: React.MouseEvent) => {
+        e.preventDefault();
+        fetchExplain(opt);
+      },
+    };
+  }
+
+  function ExplainSheet() {
+    if (!explain) return null;
     return (
       <div
         className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center"
@@ -73,7 +85,7 @@ export function QuestionInput({ q, value, onChange }: Props) {
           onClick={(e) => e.stopPropagation()}
         >
           <header className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">{term}</h3>
+            <h3 className="text-lg font-semibold">{explain.term}</h3>
             <button
               onClick={() => setExplain(null)}
               aria-label="Fermer"
@@ -94,21 +106,26 @@ export function QuestionInput({ q, value, onChange }: Props) {
 
           <button
             type="button"
-            onClick={() => {
-              onConfirm();
-              setExplain(null);
-            }}
-            className={clsx(
-              "w-full py-3 rounded-full text-sm font-bold uppercase tracking-widest mt-2",
-              isSelected
-                ? "border border-outline-variant"
-                : "bg-primary text-on-primary",
-            )}
+            onClick={() => setExplain(null)}
+            className="w-full py-3 rounded-full text-sm font-bold uppercase tracking-widest border border-outline-variant"
           >
-            {isSelected ? "Retirer ce choix" : "Sélectionner cette réponse"}
+            Fermer
           </button>
         </div>
       </div>
+    );
+  }
+
+  /**
+   * Discreet caption shown beneath technical multi/single questions to teach
+   * the long-press gesture. Only rendered for technical questions.
+   */
+  function ExplainHint() {
+    if (!isTechnical) return null;
+    return (
+      <p className="text-[11px] text-outline mt-1 leading-snug">
+        Tape long sur un mot que tu ne comprends pas pour que l'IA te l'explique.
+      </p>
     );
   }
 
@@ -154,37 +171,33 @@ export function QuestionInput({ q, value, onChange }: Props) {
 
     case "single": {
       const options = Array.isArray(q.options) ? (q.options as string[]) : [];
-      function tap(opt: string) {
-        if (isTechnical) fetchExplain(opt);
-        else onChange(opt);
-      }
       return (
-        <ul className="flex flex-col gap-2">
-          {options.map((opt) => {
-            const selected = value === opt;
-            return (
-              <li key={opt}>
-                <button
-                  type="button"
-                  onClick={() => tap(opt)}
-                  className={clsx(
-                    "w-full text-left px-4 py-3 border rounded-2xl text-sm transition-all",
-                    selected
-                      ? "border-primary bg-primary-container/40 font-semibold"
-                      : "border-outline-variant hover:border-on-surface-variant",
-                  )}
-                >
-                  {opt}
-                </button>
-                <ExplainSheet
-                  term={opt}
-                  isSelected={selected}
-                  onConfirm={() => onChange(opt)}
-                />
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <ul className="flex flex-col gap-2">
+            {options.map((opt) => {
+              const selected = value === opt;
+              return (
+                <li key={opt}>
+                  <button
+                    type="button"
+                    onClick={() => onChange(opt)}
+                    {...explainBindings(opt)}
+                    className={clsx(
+                      "w-full text-left px-4 py-3 border rounded-2xl text-sm transition-all",
+                      selected
+                        ? "border-primary bg-primary-container/40 font-semibold"
+                        : "border-outline-variant hover:border-on-surface-variant",
+                    )}
+                  >
+                    {opt}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <ExplainHint />
+          <ExplainSheet />
+        </>
       );
     }
 
@@ -197,37 +210,33 @@ export function QuestionInput({ q, value, onChange }: Props) {
           : [...current, opt];
         onChange(next);
       }
-      function tap(opt: string) {
-        if (isTechnical) fetchExplain(opt);
-        else toggle(opt);
-      }
       return (
-        <ul className="flex flex-wrap gap-2">
-          {options.map((opt) => {
-            const selected = current.includes(opt);
-            return (
-              <li key={opt}>
-                <button
-                  type="button"
-                  onClick={() => tap(opt)}
-                  className={clsx(
-                    "px-4 py-2 border rounded-full text-sm transition-all",
-                    selected
-                      ? "border-primary bg-primary-container/50 font-semibold"
-                      : "border-outline-variant hover:border-on-surface-variant",
-                  )}
-                >
-                  {opt}
-                </button>
-                <ExplainSheet
-                  term={opt}
-                  isSelected={selected}
-                  onConfirm={() => toggle(opt)}
-                />
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <ul className="flex flex-wrap gap-2">
+            {options.map((opt) => {
+              const selected = current.includes(opt);
+              return (
+                <li key={opt}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(opt)}
+                    {...explainBindings(opt)}
+                    className={clsx(
+                      "px-4 py-2 border rounded-full text-sm transition-all",
+                      selected
+                        ? "border-primary bg-primary-container/50 font-semibold"
+                        : "border-outline-variant hover:border-on-surface-variant",
+                    )}
+                  >
+                    {opt}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <ExplainHint />
+          <ExplainSheet />
+        </>
       );
     }
 
