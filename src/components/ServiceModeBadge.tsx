@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
@@ -73,16 +74,34 @@ export function ServiceModeBadge() {
         Boutique
       </button>
       {unlockOpen && (
-        <UnlockModal
-          onClose={() => setUnlockOpen(false)}
-          onSuccess={() => {
-            setUnlockOpen(false);
-            router.push("/settings");
-          }}
-        />
+        <PortalModal>
+          <UnlockModal
+            onClose={() => setUnlockOpen(false)}
+            onSuccess={() => {
+              setUnlockOpen(false);
+              router.push("/settings");
+            }}
+          />
+        </PortalModal>
       )}
     </>
   );
+}
+
+/**
+ * Renders children into <body> so they escape the TopHeader's stacking
+ * context — without this the modal ends up behind the BottomTabBar
+ * (both at z-40 globally) because z-index is scoped to its parent
+ * stacking root.
+ */
+function PortalModal({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+  if (!mounted || typeof document === "undefined") return null;
+  return createPortal(children, document.body);
 }
 
 /* ─── Password modal ─────────────────────────────────────────────── */
