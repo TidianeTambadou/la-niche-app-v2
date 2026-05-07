@@ -179,10 +179,13 @@ CREATE TABLE IF NOT EXISTS public.shop_perfumes (
   price_eur    numeric(10, 2),
   in_stock     boolean NOT NULL DEFAULT true,
   created_at   timestamptz NOT NULL DEFAULT now(),
-  updated_at   timestamptz NOT NULL DEFAULT now(),
-
-  UNIQUE (shop_id, lower(brand), lower(name))
+  updated_at   timestamptz NOT NULL DEFAULT now()
 );
+
+-- Unicité (shop, brand, name) en case-insensitive : Postgres n'autorise pas
+-- d'expressions dans une contrainte UNIQUE inline, on passe par un index.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_shop_perfumes_shop_brand_name
+  ON public.shop_perfumes (shop_id, lower(brand), lower(name));
 
 CREATE INDEX IF NOT EXISTS idx_shop_perfumes_shop ON public.shop_perfumes (shop_id);
 CREATE INDEX IF NOT EXISTS idx_shop_perfumes_in_stock ON public.shop_perfumes (shop_id, in_stock);
