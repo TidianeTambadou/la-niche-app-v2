@@ -1,73 +1,58 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
-import { Drawer } from "@/components/Drawer";
+import { useShopRole } from "@/lib/role";
 
-const ROOT_TABS = [
+const ROOT_PATHS = new Set([
   "/",
-  "/search",
-  "/scan",
-  "/balade",
-  "/wishlist",
-  "/profile",
-];
+  "/pour-un-client",
+  "/clients",
+  "/newsletter",
+  "/settings",
+  "/choix-boutique",
+]);
 
 export function TopHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  // On nested pages (anything that's not a root tab), show a back arrow
-  // instead of the menu button. The drawer is reachable from any root tab.
-  const isRootTab = ROOT_TABS.includes(pathname);
+  const { isBoutique } = useShopRole();
+  const isRoot = ROOT_PATHS.has(pathname);
 
   return (
-    <>
-      <header className="fixed top-0 left-0 w-full z-40 bg-background/70 backdrop-blur-xl border-b border-outline-variant/40">
-        <nav className="flex justify-between items-center px-6 py-4 w-full max-w-screen-md mx-auto safe-top">
-          {isRootTab ? (
-            <button
-              type="button"
-              className="text-on-background hover:opacity-70 active:scale-95 transition-all duration-200"
-              aria-label="Ouvrir le menu"
-              onClick={() => setDrawerOpen(true)}
-            >
-              <Icon name="menu" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="text-on-background hover:opacity-70 active:scale-95 transition-all duration-200"
-              aria-label="Retour"
-              onClick={() => router.back()}
-            >
-              <Icon name="arrow_back" />
-            </button>
-          )}
-
-          <Link href="/" aria-label="Accueil">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo-laniche.png"
-              alt="La Niche"
-              className="h-12 w-auto object-contain dark:invert"
-            />
-          </Link>
-
-          <Link
-            href="/profile"
+    <header className="fixed top-0 left-0 w-full z-40 bg-background/70 backdrop-blur-xl border-b border-outline-variant/40">
+      <nav className="flex justify-between items-center px-6 py-4 w-full max-w-screen-md mx-auto safe-top">
+        {isRoot ? (
+          <span className="w-6" aria-hidden />
+        ) : (
+          <button
+            type="button"
             className="text-on-background hover:opacity-70 active:scale-95 transition-all duration-200"
-            aria-label="Profil"
+            aria-label="Retour"
+            onClick={() => router.back()}
           >
-            <Icon name="person" />
-          </Link>
-        </nav>
-      </header>
+            <Icon name="arrow_back" />
+          </button>
+        )}
 
-      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
-    </>
+        <Link href={isBoutique ? "/pour-un-client" : "/choix-boutique"} aria-label="Accueil">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-laniche.png"
+            alt="La Niche"
+            className="h-12 w-auto object-contain dark:invert"
+          />
+        </Link>
+
+        <Link
+          href="/settings"
+          className="text-on-background hover:opacity-70 active:scale-95 transition-all duration-200"
+          aria-label="Réglages"
+        >
+          <Icon name="settings" />
+        </Link>
+      </nav>
+    </header>
   );
 }

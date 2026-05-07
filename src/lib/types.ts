@@ -1,3 +1,9 @@
+/**
+ * Shared DB shapes — narrow mirror of the Supabase tables actually used by
+ * the v2 app. `Shop` keeps the same identity convention as v1
+ * (`shops.id = auth.uid()` for boutique accounts).
+ */
+
 export type DayHours = {
   ouvert: boolean;
   debut: string;
@@ -30,24 +36,95 @@ export type Shop = {
   updated_at: string | null;
 };
 
-export type StockItem = {
+/* ─── v2 — questionnaire dynamique ──────────────────────────────────── */
+
+export type QuestionKind = "text" | "single" | "multi" | "scale" | "email" | "phone";
+
+export type ShopQuestion = {
   id: string;
   shop_id: string;
-  perfume_name: string;
-  brand: string;
-  price: number | null;
-  quantity: number;
-  is_private_sale: boolean;
-  private_sale_price: number | null;
-  sale_quantity: number | null;
-  private_sale_enabled_at: string | null;
-  image_url: string | null;
+  position: number;
+  label: string;
+  kind: QuestionKind;
+  /** For single/multi : array of choices. For scale : `{ min, max, minLabel, maxLabel }`. Null otherwise. */
+  options: unknown | null;
+  required: boolean;
   created_at: string;
-  /** Olfactive pyramid + family — auto-enriched by /api/boutique/stock when
-   *  the boutique imports a perfume. Empty arrays / null when enrichment
-   *  hasn't run yet (e.g. legacy rows or perfume not in Fragella). */
-  notes_top: string[];
-  notes_heart: string[];
-  notes_base: string[];
+  updated_at: string;
+};
+
+/* ─── v2 — fiche client ─────────────────────────────────────────────── */
+
+export type CommChannel = "email" | "sms" | "both";
+export type ClientSource = "in_shop" | "user_account";
+
+export type BoutiqueClient = {
+  id: string;
+  shop_id: string;
+  user_id: string | null;
+  source: ClientSource;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  preferred_channel: CommChannel;
+  consent_marketing: boolean;
+  consent_at: string | null;
+  quiz_answers: Record<string, unknown>;
+  /** Olfactive profile generated from the answers (families, accords, notes…). */
+  olfactive_profile: Record<string, unknown> | null;
+  /** Long-form report rendered for the boutique. */
+  report: Record<string, unknown> | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/* ─── v2 — stock parfums boutique ───────────────────────────────────── */
+
+export type ShopPerfume = {
+  id: string;
+  shop_id: string;
+  name: string;
+  brand: string;
   family: string | null;
+  top_notes: string[];
+  heart_notes: string[];
+  base_notes: string[];
+  accords: string[];
+  description: string | null;
+  image_url: string | null;
+  price_eur: number | null;
+  in_stock: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/* ─── v2 — newsletter ───────────────────────────────────────────────── */
+
+export type CampaignStatus = "draft" | "sending" | "sent" | "failed";
+export type RecipientStatus = "pending" | "sent" | "failed" | "skipped";
+
+export type NewsletterCampaign = {
+  id: string;
+  shop_id: string;
+  perfume_id: string;
+  target_count: number;
+  status: CampaignStatus;
+  /** Snapshot of the AI-selected panel + scores at preview time. */
+  preview: { client_id: string; score: number; reason: string }[] | null;
+  subject: string | null;
+  body_md: string | null;
+  created_at: string;
+  sent_at: string | null;
+};
+
+export type NewsletterRecipient = {
+  campaign_id: string;
+  client_id: string;
+  score: number;
+  channel: "email" | "sms";
+  status: RecipientStatus;
+  error: string | null;
+  sent_at: string | null;
 };

@@ -4,62 +4,69 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
+import { useShopRole } from "@/lib/role";
 
 type Tab = {
   href: string;
   label: string;
   icon: string;
-  /** Pathname prefixes that should mark this tab as active. */
   activeMatch: (pathname: string) => boolean;
 };
 
-const TABS: Tab[] = [
+const BOUTIQUE_TABS: Tab[] = [
   {
-    href: "/",
-    label: "Home",
-    icon: "home",
-    activeMatch: (p) => p === "/",
+    href: "/pour-un-client",
+    label: "Client",
+    icon: "person_add",
+    activeMatch: (p) => p.startsWith("/pour-un-client"),
   },
   {
-    href: "/recommendations",
-    label: "For you",
-    icon: "auto_awesome",
-    activeMatch: (p) =>
-      p.startsWith("/recommendations") || p.startsWith("/search"),
+    href: "/clients",
+    label: "Mes clients",
+    icon: "groups",
+    activeMatch: (p) => p.startsWith("/clients"),
   },
   {
-    href: "/scan",
-    label: "Scan",
-    icon: "qr_code_scanner",
-    activeMatch: (p) => p.startsWith("/scan"),
+    href: "/newsletter",
+    label: "Newsletter",
+    icon: "send",
+    activeMatch: (p) => p.startsWith("/newsletter"),
   },
   {
-    href: "/balade",
-    label: "Balade",
-    icon: "directions_walk",
-    activeMatch: (p) => p.startsWith("/balade"),
+    href: "/settings",
+    label: "Réglages",
+    icon: "tune",
+    activeMatch: (p) => p.startsWith("/settings"),
+  },
+];
+
+const USER_TABS: Tab[] = [
+  {
+    href: "/choix-boutique",
+    label: "Boutiques",
+    icon: "storefront",
+    activeMatch: (p) => p === "/" || p.startsWith("/choix-boutique") || p.startsWith("/boutique-form"),
   },
   {
-    href: "/wishlist",
-    label: "Wishlist",
-    icon: "favorite",
-    activeMatch: (p) => p.startsWith("/wishlist"),
-  },
-  {
-    href: "/profile",
-    label: "Profile",
+    href: "/settings",
+    label: "Compte",
     icon: "person",
-    activeMatch: (p) => p.startsWith("/profile"),
+    activeMatch: (p) => p.startsWith("/settings"),
   },
 ];
 
 export function BottomTabBar() {
   const pathname = usePathname();
+  const { isBoutique, loading } = useShopRole();
+
+  if (loading) return null;
+
+  const tabs = isBoutique ? BOUTIQUE_TABS : USER_TABS;
 
   return (
     <nav className="fixed bottom-0 left-0 w-full z-40 bg-background/85 backdrop-blur-xl border-t border-outline-variant/40">
       <ul className="flex justify-around items-center w-full max-w-screen-md mx-auto px-2 pt-3 safe-bottom">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const active = tab.activeMatch(pathname);
           return (
             <li key={tab.href} className="flex-1">

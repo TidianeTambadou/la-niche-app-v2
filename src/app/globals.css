@@ -397,6 +397,27 @@ a {
   animation: celebration-fade-out 0.4s ease-in forwards;
 }
 
+/* react-day-picker — dot indicator for days with clients */
+.rdp-day-has-client > button::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--primary);
+}
+.rdp-day-has-client > button {
+  position: relative;
+}
+.rdp {
+  --rdp-accent-color: var(--primary);
+  --rdp-background-color: var(--surface-container);
+  --rdp-accent-color-dark: var(--primary);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shimmer-bar,
   .caption-rise,

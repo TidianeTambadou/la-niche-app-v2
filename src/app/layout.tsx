@@ -1,9 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { StoreProvider } from "@/lib/store";
 import { AuthProvider } from "@/lib/auth";
-import { DataProvider } from "@/lib/data";
 import { AppShell } from "@/components/AppShell";
 import "./globals.css";
 
@@ -21,7 +19,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "LA NICHE",
-  description: "Découverte, test et mémoire de parfums de niche.",
+  description: "Fiches clients, profils olfactifs, newsletter intelligente.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -66,11 +64,7 @@ export default function RootLayout({
       <body className="min-h-[100dvh] bg-background text-on-background flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <AuthProvider>
-            <DataProvider>
-              <StoreProvider>
-                <AppShell>{children}</AppShell>
-              </StoreProvider>
-            </DataProvider>
+            <AppShell>{children}</AppShell>
           </AuthProvider>
         </ThemeProvider>
       </body>
