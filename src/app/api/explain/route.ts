@@ -62,7 +62,9 @@ export async function GET(req: NextRequest) {
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
         ],
-        { temperature: 0.5, maxTokens: 120 },
+        // 80 tokens = ~2 phrases courtes en français. On garde la borne basse
+        // pour minimiser le coût par tap (et éviter les 402 sur petit wallet).
+        { temperature: 0.5, maxTokens: 80 },
       )
     ).trim();
 

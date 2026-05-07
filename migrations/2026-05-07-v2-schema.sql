@@ -311,7 +311,15 @@ CREATE POLICY "shop_owner_updates_recipients"
   );
 
 -- ---------------------------------------------------------------------
--- 6. Seed : questionnaire par défaut pour chaque boutique existante
+-- 6. Seed : questionnaire par défaut pour chaque boutique existante.
+--
+-- ⚠️  Le seed ne touche PAS les boutiques qui ont déjà des questions.
+--     Pour repartir du seed à jour quand tu changes la liste, exécute
+--     d'abord (manuellement, hors migration) :
+--
+--         DELETE FROM public.shop_questions;
+--
+--     puis relance la migration.
 -- ---------------------------------------------------------------------
 
 DO $$
@@ -324,7 +332,11 @@ BEGIN
     END IF;
 
     INSERT INTO public.shop_questions (shop_id, position, label, kind, options, required) VALUES
-      (s.id, 1, 'Quelles familles olfactives vous attirent ?', 'multi',
+      (s.id, 1, 'Vous cherchez plutôt un parfum…', 'single',
+        jsonb_build_array('Pour homme', 'Pour femme', 'Mixte / unisexe'),
+        true),
+
+      (s.id, 2, 'Quelles familles olfactives vous attirent ?', 'multi',
         jsonb_build_array(
           'Floral', 'Boisé', 'Oriental', 'Ambré', 'Hespéridé',
           'Fougère', 'Chypré', 'Cuir', 'Gourmand', 'Aromatique',
@@ -332,7 +344,7 @@ BEGIN
         ),
         true),
 
-      (s.id, 2, 'Quels accords précis vous parlent ?', 'multi',
+      (s.id, 3, 'Quels accords précis vous parlent ?', 'multi',
         jsonb_build_array(
           'Boisé ambré',
           'Floral poudré',
@@ -349,7 +361,7 @@ BEGIN
         ),
         false),
 
-      (s.id, 3, 'Quelles notes adorez-vous ?', 'multi',
+      (s.id, 4, 'Quelles notes adorez-vous ?', 'multi',
         jsonb_build_array(
           'Vanille', 'Oud', 'Bergamote', 'Rose', 'Jasmin', 'Iris',
           'Patchouli', 'Cèdre', 'Santal', 'Ambre', 'Musc', 'Cuir',
@@ -357,7 +369,7 @@ BEGIN
         ),
         true),
 
-      (s.id, 4, 'Quelles notes vous rebutent ?', 'multi',
+      (s.id, 5, 'Quelles notes vous rebutent ?', 'multi',
         jsonb_build_array(
           'Vanille', 'Oud', 'Bergamote', 'Rose', 'Jasmin', 'Iris',
           'Patchouli', 'Cèdre', 'Santal', 'Ambre', 'Musc', 'Cuir',
@@ -365,19 +377,57 @@ BEGIN
         ),
         false),
 
-      (s.id, 5, 'Quel sillage cherchez-vous ?', 'scale',
+      (s.id, 6, 'Quel sillage cherchez-vous ?', 'scale',
         jsonb_build_object('min', 1, 'max', 5,
           'minLabel', 'Discret', 'maxLabel', 'Enveloppant'),
         true),
 
-      (s.id, 6, 'Pour quel moment ?', 'single',
+      (s.id, 7, 'Quelle tenue ?', 'scale',
+        jsonb_build_object('min', 1, 'max', 5,
+          'minLabel', 'Quelques heures', 'maxLabel', 'Toute la journée'),
+        true),
+
+      (s.id, 8, 'Pour quel moment ?', 'single',
         jsonb_build_array(
           'Tous les jours', 'Travail', 'Soir / sortie', 'Vacances', 'Occasion spéciale'
         ),
         true),
 
-      (s.id, 7, 'Email',     'email', NULL, false),
-      (s.id, 8, 'Téléphone', 'phone', NULL, false);
+      (s.id, 9, 'Pour quelle(s) saison(s) ?', 'multi',
+        jsonb_build_array('Printemps', 'Été', 'Automne', 'Hiver', 'Toute l''année'),
+        true),
+
+      (s.id, 10, 'Quel style olfactif vous ressemble ?', 'single',
+        jsonb_build_array(
+          'Classique et raffiné',
+          'Moderne et original',
+          'Audacieux et marquant',
+          'Discret et élégant',
+          'Confidentiel / niche'
+        ),
+        false),
+
+      (s.id, 11, 'Quel budget pour ce parfum ?', 'single',
+        jsonb_build_array(
+          'Moins de 80 €',
+          '80 à 150 €',
+          '150 à 250 €',
+          'Plus de 250 €',
+          'Pas de budget particulier'
+        ),
+        false),
+
+      (s.id, 12, 'Quelle concentration préférez-vous ?', 'single',
+        jsonb_build_array(
+          'Eau de toilette',
+          'Eau de parfum',
+          'Extrait de parfum',
+          'Peu importe'
+        ),
+        false),
+
+      (s.id, 13, 'Email',     'email', NULL, false),
+      (s.id, 14, 'Téléphone', 'phone', NULL, false);
   END LOOP;
 END $$;
 
