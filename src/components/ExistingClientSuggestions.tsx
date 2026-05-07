@@ -1,18 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { authedFetch } from "@/lib/api-client";
 
 /**
  * Live search inside the boutique's own clients while the vendor types a
  * name. Helps avoid creating a duplicate fiche when a returning client comes
- * back ("Marie Dupont" already exists → click to open the existing fiche).
+ * back ("Marie Dupont" already exists → click to load her last data into
+ * the wizard and skip straight to the existing report).
  *
  * Triggers only when both first and last name have ≥ 2 chars. Debounced
  * 300ms so we don't hammer the API on each keystroke. Hidden when nothing
  * matches.
+ *
+ * The parent wizard handles selection via `onSelect` — we never link out,
+ * which lets the wizard pre-fill its state and jump directly to the done
+ * step (existing report displayed).
  */
 
 type Match = {
@@ -27,9 +31,10 @@ type Match = {
 type Props = {
   firstName: string;
   lastName: string;
+  onSelect: (clientId: string) => void;
 };
 
-export function ExistingClientSuggestions({ firstName, lastName }: Props) {
+export function ExistingClientSuggestions({ firstName, lastName, onSelect }: Props) {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -80,9 +85,10 @@ export function ExistingClientSuggestions({ firstName, lastName }: Props) {
         <ul className="flex flex-col gap-1.5">
           {matches.map((m) => (
             <li key={m.id}>
-              <Link
-                href={`/clients/${m.id}`}
-                className="flex items-center justify-between gap-2 px-3 py-2 border border-outline-variant rounded-xl bg-surface hover:border-primary transition-colors"
+              <button
+                type="button"
+                onClick={() => onSelect(m.id)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 border border-outline-variant rounded-xl bg-surface hover:border-primary transition-colors text-left"
               >
                 <span className="flex flex-col min-w-0">
                   <span className="text-sm font-medium truncate">
@@ -94,14 +100,14 @@ export function ExistingClientSuggestions({ firstName, lastName }: Props) {
                   </span>
                 </span>
                 <Icon name="chevron_right" size={16} className="text-outline" />
-              </Link>
+              </button>
             </li>
           ))}
         </ul>
       )}
       {matches.length > 0 && (
         <p className="text-[10px] text-outline leading-snug">
-          Tape sur une fiche pour l'ouvrir, ou continue ci-dessous pour créer un nouveau client.
+          Tape sur une fiche pour la charger (le rapport s'affiche), ou continue ci-dessous pour créer un nouveau client.
         </p>
       )}
     </div>

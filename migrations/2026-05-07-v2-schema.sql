@@ -345,103 +345,87 @@ BEGIN
       CONTINUE;
     END IF;
 
+    -- Reprend l'esprit v1 : questions formulées en termes de VIBE et de
+    -- LIFESTYLE plutôt que de jargon olfactif. Chaque option contient un
+    -- exemple entre parenthèses pour qu'un client qui n'y connaît rien
+    -- puisse répondre sans réfléchir.
     INSERT INTO public.shop_questions (shop_id, position, label, kind, options, required) VALUES
-      (s.id, 1, 'Vous cherchez plutôt un parfum…', 'single',
-        jsonb_build_array('Pour homme', 'Pour femme', 'Mixte / unisexe'),
-        true),
-
-      (s.id, 2, 'Quelles familles olfactives vous attirent ?', 'multi',
+      (s.id, 1, 'Quelle vibe générale ?', 'single',
         jsonb_build_array(
-          'Floral', 'Boisé', 'Oriental', 'Ambré', 'Hespéridé',
-          'Fougère', 'Chypré', 'Cuir', 'Gourmand', 'Aromatique',
-          'Aquatique', 'Poudré'
+          'Jeune frais — street, décontracté',
+          'Classique distingué — pro chic',
+          'Rockstar — nuit, clubbing',
+          'Bohème — naturel, sans prise de tête'
         ),
         true),
 
-      (s.id, 3, 'Quels accords précis vous parlent ?', 'multi',
+      (s.id, 2, 'À qui veut plaire le client ?', 'single',
         jsonb_build_array(
-          'Boisé ambré',
-          'Floral poudré',
-          'Iris poudré',
-          'Oud oriental',
-          'Vanille gourmande',
-          'Cuir fumé',
-          'Cuir suédé',
-          'Musc blanc',
-          'Encens résineux',
-          'Vétiver vert',
-          'Patchouli sombre',
-          'Néroli solaire'
+          'Aux femmes — faire tourner la tête',
+          'Aux hommes',
+          'Tout le monde — bonne vibe globale',
+          'À soi d''abord — faut kiffer avant tout'
+        ),
+        true),
+
+      (s.id, 3, 'Plutôt chaud ou plutôt frais ?', 'single',
+        jsonb_build_array(
+          'Frais — agrumes, menthe, marin',
+          'Chaud — cuir, épices, vanille',
+          'Entre les deux, selon l''humeur'
+        ),
+        true),
+
+      (s.id, 4, 'Qu''est-ce qui le fait kiffer ? (plusieurs choix)', 'multi',
+        jsonb_build_array(
+          'Sucré / gourmand (vanille, caramel)',
+          'Fruité (pêche, pomme, fruits rouges)',
+          'Boisé / sec (cèdre, santal)',
+          'Floral (rose, jasmin, iris)',
+          'Citrus / frais (bergamote, citron)',
+          'Fumé / mystérieux (oud, encens, tabac)',
+          'Cuir, musqué, animal'
+        ),
+        true),
+
+      (s.id, 5, 'Quelle intensité ?', 'single',
+        jsonb_build_array(
+          'Discret — sillage intime',
+          'Présent — sentu à 1 mètre',
+          'Marquant — on se retourne dans la rue'
+        ),
+        true),
+
+      (s.id, 6, 'Pour quelle occasion ?', 'single',
+        jsonb_build_array(
+          'Tous les jours / casual',
+          'Bosser, réunions, pro',
+          'Dates, séduction',
+          'Soirées, clubs, la nuit'
+        ),
+        true),
+
+      (s.id, 7, 'Budget par flacon ?', 'single',
+        jsonb_build_array(
+          'Moins de 100 €',
+          '100 à 200 €',
+          'Plus de 200 €',
+          'Sans limite particulière'
         ),
         false),
 
-      (s.id, 4, 'Quelles notes adorez-vous ?', 'multi',
+      (s.id, 8, 'Qu''est-ce qu''il DÉTESTE ?', 'single',
         jsonb_build_array(
-          'Vanille', 'Oud', 'Bergamote', 'Rose', 'Jasmin', 'Iris',
-          'Patchouli', 'Cèdre', 'Santal', 'Ambre', 'Musc', 'Cuir',
-          'Encens', 'Vétiver', 'Néroli', 'Tabac', 'Fève tonka', 'Cardamome'
+          'Trop sucré / écœurant',
+          'Trop fleuri / mémé',
+          'Trop marin / savonneux',
+          'Trop animal / cuir lourd',
+          'Rien de particulier'
         ),
         true),
 
-      (s.id, 5, 'Quelles notes vous rebutent ?', 'multi',
-        jsonb_build_array(
-          'Vanille', 'Oud', 'Bergamote', 'Rose', 'Jasmin', 'Iris',
-          'Patchouli', 'Cèdre', 'Santal', 'Ambre', 'Musc', 'Cuir',
-          'Encens', 'Vétiver', 'Néroli', 'Tabac', 'Fève tonka', 'Cardamome'
-        ),
-        false),
-
-      (s.id, 6, 'Quel sillage cherchez-vous ?', 'scale',
-        jsonb_build_object('min', 1, 'max', 5,
-          'minLabel', 'Discret', 'maxLabel', 'Enveloppant'),
-        true),
-
-      (s.id, 7, 'Quelle tenue ?', 'scale',
-        jsonb_build_object('min', 1, 'max', 5,
-          'minLabel', 'Quelques heures', 'maxLabel', 'Toute la journée'),
-        true),
-
-      (s.id, 8, 'Pour quel moment ?', 'single',
-        jsonb_build_array(
-          'Tous les jours', 'Travail', 'Soir / sortie', 'Vacances', 'Occasion spéciale'
-        ),
-        true),
-
-      (s.id, 9, 'Pour quelle(s) saison(s) ?', 'multi',
-        jsonb_build_array('Printemps', 'Été', 'Automne', 'Hiver', 'Toute l''année'),
-        true),
-
-      (s.id, 10, 'Quel style olfactif vous ressemble ?', 'single',
-        jsonb_build_array(
-          'Classique et raffiné',
-          'Moderne et original',
-          'Audacieux et marquant',
-          'Discret et élégant',
-          'Confidentiel / niche'
-        ),
-        false),
-
-      (s.id, 11, 'Quel budget pour ce parfum ?', 'single',
-        jsonb_build_array(
-          'Moins de 80 €',
-          '80 à 150 €',
-          '150 à 250 €',
-          'Plus de 250 €',
-          'Pas de budget particulier'
-        ),
-        false),
-
-      (s.id, 12, 'Quelle concentration préférez-vous ?', 'single',
-        jsonb_build_array(
-          'Eau de toilette',
-          'Eau de parfum',
-          'Extrait de parfum',
-          'Peu importe'
-        ),
-        false),
-
-      (s.id, 13, 'Email',     'email', NULL, false),
-      (s.id, 14, 'Téléphone', 'phone', NULL, false);
+      (s.id, 9,  'Email',     'email', NULL, false),
+      (s.id, 10, 'Téléphone', 'phone', NULL, false);
   END LOOP;
 END $$;
 

@@ -71,7 +71,7 @@ export function ClientReport({ profile, report }: Props) {
     <div className="flex flex-col gap-5">
       {/* 1. Headline */}
       {r.summary && (
-        <Section title="Pour le vendeur">
+        <Section title="Pour le vendeur" delayMs={80}>
           <p className="text-sm font-semibold leading-relaxed">{r.summary}</p>
           {r.signature && (
             <p className="text-sm leading-relaxed text-on-surface-variant border-l-2 border-outline-variant pl-3">
@@ -83,7 +83,7 @@ export function ClientReport({ profile, report }: Props) {
 
       {/* 2. ADN olfactif synthétisé */}
       {(p.dominant_families?.length || p.key_notes?.length) && (
-        <Section title="ADN olfactif">
+        <Section title="ADN olfactif" delayMs={160}>
           {p.personality && (
             <p className="text-sm italic leading-relaxed">{p.personality}</p>
           )}
@@ -113,7 +113,7 @@ export function ClientReport({ profile, report }: Props) {
 
       {/* 3. Références à proposer */}
       {r.loved_references && r.loved_references.length > 0 && (
-        <Section title="Références qui devraient lui parler">
+        <Section title="Références qui devraient lui parler" delayMs={240}>
           <ul className="flex flex-col gap-3">
             {r.loved_references.map((ref, i) => (
               <li key={i} className="border-l-2 border-primary/60 pl-3">
@@ -143,7 +143,7 @@ export function ClientReport({ profile, report }: Props) {
 
       {/* 4. Références à éviter */}
       {r.rejected_references && r.rejected_references.length > 0 && (
-        <Section title="À éviter de pitcher">
+        <Section title="À éviter de pitcher" delayMs={320}>
           <ul className="flex flex-col gap-3">
             {r.rejected_references.map((ref, i) => (
               <li key={i} className="border-l-2 border-error/60 pl-3">
@@ -173,7 +173,7 @@ export function ClientReport({ profile, report }: Props) {
 
       {/* 5. Conseil vente */}
       {r.sales_advice && (
-        <Section title="Conseil vente">
+        <Section title="Conseil vente" delayMs={400}>
           <p className="text-sm leading-relaxed">{r.sales_advice}</p>
         </Section>
       )}
@@ -184,12 +184,17 @@ export function ClientReport({ profile, report }: Props) {
 function Section({
   title,
   children,
+  delayMs = 0,
 }: {
   title: string;
   children: React.ReactNode;
+  delayMs?: number;
 }) {
   return (
-    <section className="flex flex-col gap-3 border border-outline-variant rounded-3xl px-5 py-4">
+    <section
+      className="report-section flex flex-col gap-3 border border-outline-variant rounded-3xl px-5 py-4"
+      style={{ animationDelay: `${delayMs}ms` }}
+    >
       <h2 className="text-xs uppercase tracking-widest text-outline">{title}</h2>
       {children}
     </section>

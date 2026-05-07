@@ -14,7 +14,7 @@ import {
 import { useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
 import { authedFetch } from "@/lib/api-client";
-import type { CommChannel, ShopQuestion } from "@/lib/types";
+import type { BoutiqueClient, CommChannel, ShopQuestion } from "@/lib/types";
 
 type TimeBudget = "express" | "classique" | "complet";
 
@@ -30,6 +30,10 @@ type WizardStep =
       olfactiveProfile: unknown;
       report: unknown;
       llmError: string | null;
+      /** True quand la fiche a été chargée depuis l'auto-complétion sur le
+       *  nom (returning client) plutôt que créée à l'instant. Pilote le
+       *  texte des CTAs et permet d'afficher un bouton « Refaire ». */
+      fromExisting: boolean;
     };
 
 /** How many olfactive questions each time bucket allows. Email/phone are
@@ -145,6 +149,54 @@ export default function PourUnClientPage() {
     }
   }
 
+  /**
+   * Quand le boutiquier tape sur une fiche existante dans l'auto-complétion
+   * du step intro, on charge la fiche complète et on saute directement au
+   * rapport. Pas de re-passage par le wizard ; la boutique peut juste
+   * relire le rapport ou cliquer sur « Refaire le questionnaire » pour
+   * reprendre la session avec les anciennes réponses pré-remplies.
+   */
+  async function loadExistingClient(clientId: string) {
+    setError(null);
+    setStep({ kind: "submitting" });
+    try {
+      const json = await authedFetch<{ client: BoutiqueClient }>(
+        `/api/clients/${clientId}`,
+      );
+      const c = json.client;
+      setFirstName(c.first_name);
+      setLastName(c.last_name);
+      setEmail(c.email ?? "");
+      setPhone(c.phone ?? "");
+      setChannel(c.preferred_channel);
+      setConsent(c.consent_marketing);
+      setAnswers(c.quiz_answers ?? {});
+      if (c.address_line && c.postal_code && c.city) {
+        const label = `${c.address_line} ${c.postal_code} ${c.city}`;
+        setAddressInput(label);
+        setResolvedAddress({
+          label,
+          addressLine: c.address_line,
+          postalCode: c.postal_code,
+          city: c.city,
+          latitude: c.latitude ?? 0,
+          longitude: c.longitude ?? 0,
+        });
+      }
+      setStep({
+        kind: "done",
+        clientId: c.id,
+        olfactiveProfile: c.olfactive_profile,
+        report: c.report,
+        llmError: null,
+        fromExisting: true,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur");
+      setStep({ kind: "intro" });
+    }
+  }
+
   async function submit() {
     setError(null);
     if (!email && !phone) {
@@ -194,6 +246,7 @@ export default function PourUnClientPage() {
         olfactiveProfile: json.olfactive_profile,
         report: json.report,
         llmError: json.llm_error,
+        fromExisting: false,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");
@@ -212,13 +265,19 @@ export default function PourUnClientPage() {
   if (step.kind === "done") {
     return (
       <div className="px-6 py-6 flex flex-col gap-6">
-        <header className="flex flex-col items-center text-center gap-2 pt-2">
-          <Icon name="check_circle" size={48} className="text-primary" />
+        <header className="flex flex-col items-center text-center gap-2 pt-2 report-section">
+          <Icon
+            name={step.fromExisting ? "person" : "check_circle"}
+            size={48}
+            className="text-primary"
+          />
           <h1 className="text-2xl font-semibold tracking-tight">
             Rapport olfactif — {firstName} {lastName}
           </h1>
           <p className="text-xs uppercase tracking-widest text-outline">
-            Synthèse IA · fiche enregistrée
+            {step.fromExisting
+              ? "Fiche existante · dernière session"
+              : "Synthèse IA · fiche enregistrée"}
           </p>
         </header>
 
@@ -252,7 +311,18 @@ export default function PourUnClientPage() {
           report={step.report as never}
         />
 
-        <div className="flex flex-col gap-2 mt-2">
+        <div className="flex flex-col gap-2 mt-2 report-section">
+          {step.fromExisting && (
+            <button
+              type="button"
+              onClick={() =>
+                setStep({ kind: "question", index: 0 })
+              }
+              className="w-full py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest"
+            >
+              Refaire le questionnaire
+            </button>
+          )}
           <Link
             href={`/clients/${step.clientId}`}
             className="w-full py-3 border border-outline-variant rounded-full text-sm font-medium uppercase tracking-widest text-center"
@@ -272,7 +342,7 @@ export default function PourUnClientPage() {
               setAnswers({});
               setStep({ kind: "time-budget" });
             }}
-            className="w-full py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest"
+            className="w-full py-3 border border-outline-variant rounded-full text-sm font-medium uppercase tracking-widest"
           >
             Nouveau client
           </button>
@@ -314,7 +384,11 @@ export default function PourUnClientPage() {
               className="w-full px-4 py-3 bg-surface-container rounded-2xl border border-outline-variant text-sm"
             />
           </Field>
-          <ExistingClientSuggestions firstName={firstName} lastName={lastName} />
+          <ExistingClientSuggestions
+            firstName={firstName}
+            lastName={lastName}
+            onSelect={loadExistingClient}
+          />
         </section>
       )}
 
