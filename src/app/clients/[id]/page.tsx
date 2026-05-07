@@ -21,11 +21,19 @@ type ProfileShape = {
   wear_context?: string[];
 };
 
+type PerfumeRef = {
+  brand?: string;
+  name?: string;
+  family?: string;
+  why?: string;
+};
+
 type ReportShape = {
   summary?: string;
-  recommended_directions?: string[];
-  avoid_pitch?: string;
-  coaching_notes?: string;
+  signature?: string;
+  loved_references?: PerfumeRef[];
+  rejected_references?: PerfumeRef[];
+  sales_advice?: string;
 };
 
 export default function ClientDetailPage({
@@ -185,33 +193,75 @@ export default function ClientDetailPage({
         </Section>
       )}
 
-      {/* Sales report */}
-      {(report.summary || report.recommended_directions?.length) && (
+      {/* Sales report — format v1 FriendReport (summary / signature / loved /
+          rejected / advice). Affiché en sections distinctes pour qu'un vendeur
+          accède à l'info en 10 secondes. */}
+      {report.summary && (
         <Section title="Pour le vendeur">
-          {report.summary && <p className="text-sm leading-relaxed">{report.summary}</p>}
-          {report.recommended_directions && report.recommended_directions.length > 0 && (
-            <div>
-              <p className="text-xs uppercase tracking-widest text-outline mb-1">
-                Pistes à proposer
-              </p>
-              <ul className="list-disc list-inside text-sm leading-relaxed space-y-1">
-                {report.recommended_directions.map((d, i) => (
-                  <li key={i}>{d}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {report.avoid_pitch && (
-            <p className="text-sm leading-relaxed">
-              <span className="text-xs uppercase tracking-widest text-outline">À éviter — </span>
-              {report.avoid_pitch}
+          <p className="text-sm font-semibold leading-relaxed">{report.summary}</p>
+          {report.signature && (
+            <p className="text-sm leading-relaxed text-on-surface-variant border-l-2 border-outline-variant pl-3">
+              {report.signature}
             </p>
           )}
-          {report.coaching_notes && (
-            <p className="text-sm leading-relaxed text-on-surface-variant">
-              {report.coaching_notes}
-            </p>
-          )}
+        </Section>
+      )}
+
+      {report.loved_references && report.loved_references.length > 0 && (
+        <Section title="Références qui devraient lui parler">
+          <ul className="flex flex-col gap-3">
+            {report.loved_references.map((r, i) => (
+              <li key={i} className="border-l-2 border-primary/60 pl-3">
+                <p className="text-sm font-semibold">
+                  {r.name}
+                  <span className="font-normal text-on-surface-variant"> — {r.brand}</span>
+                  {r.family && (
+                    <span className="ml-2 text-[10px] uppercase tracking-widest text-outline">
+                      {r.family}
+                    </span>
+                  )}
+                </p>
+                {r.why && (
+                  <p className="text-sm text-on-surface-variant mt-0.5 leading-relaxed">
+                    {r.why}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {report.rejected_references && report.rejected_references.length > 0 && (
+        <Section title="À éviter de pitcher">
+          <ul className="flex flex-col gap-3">
+            {report.rejected_references.map((r, i) => (
+              <li key={i} className="border-l-2 border-error/60 pl-3">
+                <p className="text-sm font-semibold">
+                  {r.name}
+                  {r.brand && (
+                    <span className="font-normal text-on-surface-variant"> — {r.brand}</span>
+                  )}
+                  {r.family && (
+                    <span className="ml-2 text-[10px] uppercase tracking-widest text-outline">
+                      {r.family}
+                    </span>
+                  )}
+                </p>
+                {r.why && (
+                  <p className="text-sm text-on-surface-variant mt-0.5 leading-relaxed">
+                    {r.why}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {report.sales_advice && (
+        <Section title="Conseil vente">
+          <p className="text-sm leading-relaxed">{report.sales_advice}</p>
         </Section>
       )}
 

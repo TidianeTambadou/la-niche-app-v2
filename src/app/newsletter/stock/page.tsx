@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { useRequireAuth } from "@/lib/auth";
@@ -51,16 +52,25 @@ export default function PerfumeStockPage() {
 
   return (
     <div className="px-6 py-6 flex flex-col gap-5">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">Stock parfums</h1>
-        <button
-          type="button"
-          onClick={() => setEditing("new")}
-          className="flex items-center gap-1 px-3 py-2 bg-primary text-on-primary rounded-full text-xs font-bold uppercase tracking-widest"
-        >
-          <Icon name="add" size={16} />
-          Nouveau
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/newsletter/stock/import"
+            className="flex items-center gap-1 px-3 py-2 border border-outline-variant rounded-full text-xs font-bold uppercase tracking-widest"
+          >
+            <Icon name="upload_file" size={16} />
+            Import CSV
+          </Link>
+          <button
+            type="button"
+            onClick={() => setEditing("new")}
+            className="flex items-center gap-1 px-3 py-2 bg-primary text-on-primary rounded-full text-xs font-bold uppercase tracking-widest"
+          >
+            <Icon name="add" size={16} />
+            Nouveau
+          </button>
+        </div>
       </header>
 
       {error && (

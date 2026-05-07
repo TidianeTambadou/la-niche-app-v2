@@ -324,9 +324,7 @@ BEGIN
     END IF;
 
     INSERT INTO public.shop_questions (shop_id, position, label, kind, options, required) VALUES
-      (s.id, 1, 'Quel parfum portez-vous le plus souvent ?', 'text', NULL, false),
-
-      (s.id, 2, 'Quelles familles olfactives vous attirent ?', 'multi',
+      (s.id, 1, 'Quelles familles olfactives vous attirent ?', 'multi',
         jsonb_build_array(
           'Floral', 'Boisé', 'Oriental', 'Ambré', 'Hespéridé',
           'Fougère', 'Chypré', 'Cuir', 'Gourmand', 'Aromatique',
@@ -334,7 +332,7 @@ BEGIN
         ),
         true),
 
-      (s.id, 3, 'Quels accords précis vous parlent ?', 'multi',
+      (s.id, 2, 'Quels accords précis vous parlent ?', 'multi',
         jsonb_build_array(
           'Boisé ambré',
           'Floral poudré',
@@ -351,22 +349,35 @@ BEGIN
         ),
         false),
 
-      (s.id, 4, 'Quel sillage cherchez-vous ?', 'scale',
+      (s.id, 3, 'Quelles notes adorez-vous ?', 'multi',
+        jsonb_build_array(
+          'Vanille', 'Oud', 'Bergamote', 'Rose', 'Jasmin', 'Iris',
+          'Patchouli', 'Cèdre', 'Santal', 'Ambre', 'Musc', 'Cuir',
+          'Encens', 'Vétiver', 'Néroli', 'Tabac', 'Fève tonka', 'Cardamome'
+        ),
+        true),
+
+      (s.id, 4, 'Quelles notes vous rebutent ?', 'multi',
+        jsonb_build_array(
+          'Vanille', 'Oud', 'Bergamote', 'Rose', 'Jasmin', 'Iris',
+          'Patchouli', 'Cèdre', 'Santal', 'Ambre', 'Musc', 'Cuir',
+          'Encens', 'Vétiver', 'Néroli', 'Tabac', 'Fève tonka', 'Cardamome'
+        ),
+        false),
+
+      (s.id, 5, 'Quel sillage cherchez-vous ?', 'scale',
         jsonb_build_object('min', 1, 'max', 5,
           'minLabel', 'Discret', 'maxLabel', 'Enveloppant'),
         true),
 
-      (s.id, 5, 'Pour quel moment ?', 'single',
+      (s.id, 6, 'Pour quel moment ?', 'single',
         jsonb_build_array(
           'Tous les jours', 'Travail', 'Soir / sortie', 'Vacances', 'Occasion spéciale'
         ),
         true),
 
-      (s.id, 6, 'Quelles notes adorez-vous ?', 'text', NULL, false),
-      (s.id, 7, 'Quelles notes vous rebutent ?', 'text', NULL, false),
-
-      (s.id, 8, 'Email',     'email', NULL, false),
-      (s.id, 9, 'Téléphone', 'phone', NULL, false);
+      (s.id, 7, 'Email',     'email', NULL, false),
+      (s.id, 8, 'Téléphone', 'phone', NULL, false);
   END LOOP;
 END $$;
 

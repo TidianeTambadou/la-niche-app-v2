@@ -14,55 +14,59 @@ type Props = {
 };
 
 /**
- * Renders the right input control for a given question kind. Centralised
- * here so the wizard, the user-side form, and the questions preview all
- * stay visually consistent.
- *
- * On `single` and `multi` questions, every option carries a small (?)
- * button. Tapping it opens an explainer sheet that fetches a 1-2 sentence
- * plain-language explanation from /api/explain. Lets debutants understand
- * a "Chypré" or "Hespéridé" without leaving the form. Explanations are
- * cached server-side so subsequent taps are free.
+ * On `multi`/`single` questions whose label talks about families, accords or
+ * notes, tapping a chip first opens a small sheet that pulls a 1-2 sentence
+ * plain-language explanation from /api/explain. The sheet has a confirm
+ * button to actually select the option. Lets a beginner understand "Chypré"
+ * before committing. For non-technical questions (e.g. "Pour quel moment ?"
+ * with options like "Travail", "Soir / sortie") tapping selects directly.
  */
 export function QuestionInput({ q, value, onChange }: Props) {
-  const [explain, setExplain] = useState<{ term: string; text: string } | null>(null);
-  const [loadingTerm, setLoadingTerm] = useState<string | null>(null);
+  const [explain, setExplain] = useState<{ term: string; text: string; loading: boolean } | null>(null);
 
-  // Heuristic : on the "accords" question we tag the context as "accord"
-  // so the LLM knows it should describe a composite, not a single family.
-  const explainContext: "family" | "accord" =
-    q.label.toLowerCase().includes("accord") ? "accord" : "family";
+  const explainContext: "family" | "accord" | "note" = (() => {
+    const l = q.label.toLowerCase();
+    if (l.includes("accord")) return "accord";
+    if (l.includes("note")) return "note";
+    return "family";
+  })();
+  const isTechnical = /famille|accord|note/.test(q.label.toLowerCase());
 
-  async function openExplain(term: string) {
-    setLoadingTerm(term);
-    setExplain({ term, text: "" });
+  async function fetchExplain(term: string) {
+    setExplain({ term, text: "", loading: true });
     try {
       const url = new URL("/api/explain", window.location.origin);
       url.searchParams.set("term", term);
       url.searchParams.set("context", explainContext);
       const res = await fetch(url);
       const json = (await res.json()) as { explanation?: string; error?: string };
-      setExplain({ term, text: json.explanation ?? json.error ?? "Indisponible" });
+      setExplain({ term, text: json.explanation ?? json.error ?? "Indisponible", loading: false });
     } catch {
-      setExplain({ term, text: "Erreur réseau" });
-    } finally {
-      setLoadingTerm(null);
+      setExplain({ term, text: "Erreur réseau", loading: false });
     }
   }
 
-  function ExplainSheet() {
-    if (!explain) return null;
+  function ExplainSheet({
+    term,
+    isSelected,
+    onConfirm,
+  }: {
+    term: string;
+    isSelected: boolean;
+    onConfirm: () => void;
+  }) {
+    if (!explain || explain.term !== term) return null;
     return (
       <div
         className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center"
         onClick={() => setExplain(null)}
       >
         <div
-          className="w-full max-w-screen-md bg-surface rounded-t-3xl p-6"
+          className="w-full max-w-screen-md bg-surface rounded-t-3xl p-6 flex flex-col gap-4"
           onClick={(e) => e.stopPropagation()}
         >
-          <header className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-semibold">{explain.term}</h3>
+          <header className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">{term}</h3>
             <button
               onClick={() => setExplain(null)}
               aria-label="Fermer"
@@ -71,14 +75,31 @@ export function QuestionInput({ q, value, onChange }: Props) {
               <Icon name="close" />
             </button>
           </header>
-          {explain.text ? (
-            <p className="text-sm leading-relaxed">{explain.text}</p>
-          ) : (
+
+          {explain.loading ? (
             <p className="text-sm text-on-surface-variant flex items-center gap-2">
               <Icon name="progress_activity" size={16} className="animate-spin" />
-              L'IA cherche…
+              L'IA cherche une explication simple…
             </p>
+          ) : (
+            <p className="text-sm leading-relaxed">{explain.text}</p>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              onConfirm();
+              setExplain(null);
+            }}
+            className={clsx(
+              "w-full py-3 rounded-full text-sm font-bold uppercase tracking-widest mt-2",
+              isSelected
+                ? "border border-outline-variant"
+                : "bg-primary text-on-primary",
+            )}
+          >
+            {isSelected ? "Retirer ce choix" : "Sélectionner cette réponse"}
+          </button>
         </div>
       </div>
     );
@@ -126,36 +147,37 @@ export function QuestionInput({ q, value, onChange }: Props) {
 
     case "single": {
       const options = Array.isArray(q.options) ? (q.options as string[]) : [];
+      function tap(opt: string) {
+        if (isTechnical) fetchExplain(opt);
+        else onChange(opt);
+      }
       return (
-        <>
-          <ul className="flex flex-col gap-2">
-            {options.map((opt) => {
-              const selected = value === opt;
-              return (
-                <li key={opt} className="flex items-stretch gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onChange(opt)}
-                    className={clsx(
-                      "flex-1 text-left px-4 py-3 border rounded-2xl text-sm transition-all",
-                      selected
-                        ? "border-primary bg-primary-container/40 font-semibold"
-                        : "border-outline-variant hover:border-on-surface-variant",
-                    )}
-                  >
-                    {opt}
-                  </button>
-                  <ExplainButton
-                    term={opt}
-                    loading={loadingTerm === opt}
-                    onClick={() => openExplain(opt)}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-          <ExplainSheet />
-        </>
+        <ul className="flex flex-col gap-2">
+          {options.map((opt) => {
+            const selected = value === opt;
+            return (
+              <li key={opt}>
+                <button
+                  type="button"
+                  onClick={() => tap(opt)}
+                  className={clsx(
+                    "w-full text-left px-4 py-3 border rounded-2xl text-sm transition-all",
+                    selected
+                      ? "border-primary bg-primary-container/40 font-semibold"
+                      : "border-outline-variant hover:border-on-surface-variant",
+                  )}
+                >
+                  {opt}
+                </button>
+                <ExplainSheet
+                  term={opt}
+                  isSelected={selected}
+                  onConfirm={() => onChange(opt)}
+                />
+              </li>
+            );
+          })}
+        </ul>
       );
     }
 
@@ -168,37 +190,37 @@ export function QuestionInput({ q, value, onChange }: Props) {
           : [...current, opt];
         onChange(next);
       }
+      function tap(opt: string) {
+        if (isTechnical) fetchExplain(opt);
+        else toggle(opt);
+      }
       return (
-        <>
-          <ul className="flex flex-wrap gap-2">
-            {options.map((opt) => {
-              const selected = current.includes(opt);
-              return (
-                <li key={opt} className="flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => toggle(opt)}
-                    className={clsx(
-                      "pl-4 pr-2 py-2 border rounded-l-full text-sm transition-all flex items-center gap-2",
-                      selected
-                        ? "border-primary bg-primary-container/50 font-semibold"
-                        : "border-outline-variant hover:border-on-surface-variant",
-                    )}
-                  >
-                    {opt}
-                  </button>
-                  <ExplainButton
-                    term={opt}
-                    loading={loadingTerm === opt}
-                    onClick={() => openExplain(opt)}
-                    variant="chip"
-                  />
-                </li>
-              );
-            })}
-          </ul>
-          <ExplainSheet />
-        </>
+        <ul className="flex flex-wrap gap-2">
+          {options.map((opt) => {
+            const selected = current.includes(opt);
+            return (
+              <li key={opt}>
+                <button
+                  type="button"
+                  onClick={() => tap(opt)}
+                  className={clsx(
+                    "px-4 py-2 border rounded-full text-sm transition-all",
+                    selected
+                      ? "border-primary bg-primary-container/50 font-semibold"
+                      : "border-outline-variant hover:border-on-surface-variant",
+                  )}
+                >
+                  {opt}
+                </button>
+                <ExplainSheet
+                  term={opt}
+                  isSelected={selected}
+                  onConfirm={() => toggle(opt)}
+                />
+              </li>
+            );
+          })}
+        </ul>
       );
     }
 
@@ -245,31 +267,4 @@ export function QuestionInput({ q, value, onChange }: Props) {
       );
     }
   }
-}
-
-function ExplainButton({
-  loading,
-  onClick,
-  variant = "stack",
-}: {
-  term: string;
-  loading: boolean;
-  onClick: () => void;
-  variant?: "stack" | "chip";
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Que veut dire ce mot ?"
-      className={clsx(
-        "border border-l-0 border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary transition-colors flex items-center justify-center",
-        variant === "chip"
-          ? "px-2 py-2 rounded-r-full"
-          : "px-3 rounded-2xl",
-      )}
-    >
-      <Icon name={loading ? "progress_activity" : "help_outline"} size={16} className={loading ? "animate-spin" : ""} />
-    </button>
-  );
 }
