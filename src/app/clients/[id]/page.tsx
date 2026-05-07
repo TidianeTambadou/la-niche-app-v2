@@ -7,6 +7,7 @@ import { Icon } from "@/components/Icon";
 import { ClientReport } from "@/components/ClientReport";
 import { useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
+import { useGuardOutOfService } from "@/lib/service-mode";
 import { authedFetch } from "@/lib/api-client";
 import { timeAgo } from "@/lib/time";
 import type { BoutiqueClient, CommChannel } from "@/lib/types";
@@ -44,6 +45,7 @@ export default function ClientDetailPage({
 }) {
   const { id } = use(params);
   useRequireAuth();
+  useGuardOutOfService("/clients");
   const router = useRouter();
   const { isBoutique, loading: roleLoading } = useShopRole();
   const [client, setClient] = useState<BoutiqueClient | null>(null);

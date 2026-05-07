@@ -42,6 +42,11 @@ export async function GET(
 type PatchBody = {
   email?: string | null;
   phone?: string | null;
+  addressLine?: string | null;
+  postalCode?: string | null;
+  city?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   preferredChannel?: CommChannel;
   consentMarketing?: boolean;
   notes?: string | null;
@@ -65,6 +70,11 @@ export async function PATCH(
   const update: Record<string, unknown> = {};
   if (body.email !== undefined) update.email = body.email?.trim() || null;
   if (body.phone !== undefined) update.phone = body.phone?.trim() || null;
+  if (body.addressLine !== undefined) update.address_line = body.addressLine?.trim() || null;
+  if (body.postalCode !== undefined) update.postal_code = body.postalCode?.trim() || null;
+  if (body.city !== undefined) update.city = body.city?.trim() || null;
+  if (body.latitude !== undefined) update.latitude = body.latitude;
+  if (body.longitude !== undefined) update.longitude = body.longitude;
   if (body.preferredChannel !== undefined) {
     if (!CHANNELS.includes(body.preferredChannel)) return jsonError("invalid_channel", 400);
     update.preferred_channel = body.preferredChannel;

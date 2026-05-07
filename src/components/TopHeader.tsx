@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { useShopRole } from "@/lib/role";
+import { useShopMode } from "@/lib/service-mode";
 
 const ROOT_PATHS = new Set([
   "/",
@@ -18,7 +19,9 @@ export function TopHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { isBoutique } = useShopRole();
+  const mode = useShopMode();
   const isRoot = ROOT_PATHS.has(pathname);
+  const isKiosk = mode === "in_service";
 
   return (
     <header className="fixed top-0 left-0 w-full z-40 bg-background/70 backdrop-blur-xl border-b border-outline-variant/40">
@@ -45,13 +48,23 @@ export function TopHeader() {
           />
         </Link>
 
-        <Link
-          href="/settings"
-          className="text-on-background hover:opacity-70 active:scale-95 transition-all duration-200"
-          aria-label="Réglages"
-        >
-          <Icon name="settings" />
-        </Link>
+        {isKiosk ? (
+          <span
+            className="text-outline flex items-center gap-1 text-[10px] uppercase tracking-widest"
+            aria-label="Mode boutique actif"
+          >
+            <Icon name="lock" size={14} />
+            Boutique
+          </span>
+        ) : (
+          <Link
+            href="/settings"
+            className="text-on-background hover:opacity-70 active:scale-95 transition-all duration-200"
+            aria-label="Réglages"
+          >
+            <Icon name="settings" />
+          </Link>
+        )}
       </nav>
     </header>
   );

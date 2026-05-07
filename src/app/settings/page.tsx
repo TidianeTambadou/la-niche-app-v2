@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { useAuth, useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
+import { useGuardOutOfService } from "@/lib/service-mode";
 import { supabase } from "@/lib/supabase";
 
 export default function SettingsPage() {
   useRequireAuth();
+  useGuardOutOfService();
   const router = useRouter();
   const { user } = useAuth();
   const { shop, isBoutique, loading } = useShopRole();
@@ -34,6 +36,12 @@ export default function SettingsPage() {
           <h2 className="text-xs uppercase tracking-widest font-medium text-outline">
             Boutique
           </h2>
+          <SettingsLink
+            href="/settings/horaires"
+            icon="schedule"
+            title="Horaires d'ouverture"
+            description="L'app passe en mode boutique automatiquement pendant les heures d'ouverture (newsletter et réglages cachés)."
+          />
           <SettingsLink
             href="/settings/questions"
             icon="reorder"

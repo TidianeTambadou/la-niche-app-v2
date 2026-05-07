@@ -5,6 +5,10 @@ import { use } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { QuestionInput } from "@/components/QuestionInput";
+import {
+  AddressAutocomplete,
+  type ResolvedAddress,
+} from "@/components/AddressAutocomplete";
 import { useAuth, useRequireAuth } from "@/lib/auth";
 import { authedFetch } from "@/lib/api-client";
 import type { CommChannel, ShopQuestion } from "@/lib/types";
@@ -56,6 +60,8 @@ export default function UserFormPage({
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [timeBudget, setTimeBudget] = useState<TimeBudget>("classique");
   const [step, setStep] = useState<WizardStep>({ kind: "time-budget" });
+  const [addressInput, setAddressInput] = useState("");
+  const [resolvedAddress, setResolvedAddress] = useState<ResolvedAddress | null>(null);
 
   const wizardQuestions = useMemo(() => {
     const base = questions.filter((q) => q.kind !== "email" && q.kind !== "phone");
@@ -166,6 +172,11 @@ export default function UserFormPage({
           lastName,
           email: email || null,
           phone: phone || null,
+          addressLine: resolvedAddress?.addressLine ?? null,
+          postalCode: resolvedAddress?.postalCode ?? null,
+          city: resolvedAddress?.city ?? null,
+          latitude: resolvedAddress?.latitude ?? null,
+          longitude: resolvedAddress?.longitude ?? null,
           preferredChannel: channel,
           consentMarketing: consent,
           answers,
@@ -257,6 +268,19 @@ export default function UserFormPage({
           </Field>
           <Field label="Téléphone">
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="Adresse postale (facultatif)">
+            <AddressAutocomplete
+              value={addressInput}
+              onChange={(v) => {
+                setAddressInput(v);
+                if (resolvedAddress && v !== resolvedAddress.label) {
+                  setResolvedAddress(null);
+                }
+              }}
+              onSelect={setResolvedAddress}
+              className={inputCls}
+            />
           </Field>
           <Field label="Canal préféré">
             <div className="grid grid-cols-3 gap-2">

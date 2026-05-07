@@ -48,6 +48,11 @@ CREATE TABLE IF NOT EXISTS public.clients_v2 (
   last_name          text NOT NULL,
   email              text,
   phone              text,
+  address_line       text,
+  postal_code        text,
+  city               text,
+  latitude           double precision,
+  longitude          double precision,
   preferred_channel  text NOT NULL DEFAULT 'email'
                      CHECK (preferred_channel IN ('email', 'sms', 'both')),
   consent_marketing  boolean NOT NULL DEFAULT false,
@@ -61,6 +66,15 @@ CREATE TABLE IF NOT EXISTS public.clients_v2 (
 
   CONSTRAINT clients_v2_has_contact CHECK (email IS NOT NULL OR phone IS NOT NULL)
 );
+
+-- Colonnes adresse — ajoutées par ALTER pour les bases déjà migrées avant
+-- le 2026-05-08. Sur une base neuve, le CREATE TABLE plus haut les contient
+-- déjà ; les ALTER deviennent des no-ops grâce à IF NOT EXISTS.
+ALTER TABLE public.clients_v2 ADD COLUMN IF NOT EXISTS address_line  text;
+ALTER TABLE public.clients_v2 ADD COLUMN IF NOT EXISTS postal_code   text;
+ALTER TABLE public.clients_v2 ADD COLUMN IF NOT EXISTS city          text;
+ALTER TABLE public.clients_v2 ADD COLUMN IF NOT EXISTS latitude      double precision;
+ALTER TABLE public.clients_v2 ADD COLUMN IF NOT EXISTS longitude     double precision;
 
 CREATE INDEX IF NOT EXISTS idx_clients_v2_shop_created
   ON public.clients_v2 (shop_id, created_at DESC);

@@ -24,6 +24,9 @@ const nextConfig: NextConfig = {
                 "https://*.supabase.co",
                 "wss://*.supabase.co",
                 "https://fonts.googleapis.com",
+                // BAN — autocomplete adresse française gratuit, requêté
+                // côté client depuis le wizard de saisie de fiche client.
+                "https://api-adresse.data.gouv.fr",
               ].join(" "),
               "worker-src 'self' blob:",
               "media-src 'self' blob:",

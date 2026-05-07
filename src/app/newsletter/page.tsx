@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
+import { useGuardOutOfService } from "@/lib/service-mode";
 import { authedFetch } from "@/lib/api-client";
 import type { ShopPerfume } from "@/lib/types";
 
@@ -36,6 +37,7 @@ type Step =
 
 export default function NewsletterPage() {
   useRequireAuth();
+  useGuardOutOfService();
   const router = useRouter();
   const { isBoutique, loading: roleLoading } = useShopRole();
   const [perfumes, setPerfumes] = useState<ShopPerfume[]>([]);

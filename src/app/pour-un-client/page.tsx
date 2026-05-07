@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { QuestionInput } from "@/components/QuestionInput";
 import { ClientReport } from "@/components/ClientReport";
+import { ExistingClientSuggestions } from "@/components/ExistingClientSuggestions";
+import {
+  AddressAutocomplete,
+  type ResolvedAddress,
+} from "@/components/AddressAutocomplete";
 import { useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
 import { authedFetch } from "@/lib/api-client";
@@ -51,6 +56,8 @@ export default function PourUnClientPage() {
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [timeBudget, setTimeBudget] = useState<TimeBudget>("classique");
   const [step, setStep] = useState<WizardStep>({ kind: "time-budget" });
+  const [addressInput, setAddressInput] = useState("");
+  const [resolvedAddress, setResolvedAddress] = useState<ResolvedAddress | null>(null);
 
   // Email/phone live in the contact step regardless of where the boutique
   // placed them in the question order. The remaining olfactive questions are
@@ -169,6 +176,11 @@ export default function PourUnClientPage() {
           lastName,
           email: email || null,
           phone: phone || null,
+          addressLine: resolvedAddress?.addressLine ?? null,
+          postalCode: resolvedAddress?.postalCode ?? null,
+          city: resolvedAddress?.city ?? null,
+          latitude: resolvedAddress?.latitude ?? null,
+          longitude: resolvedAddress?.longitude ?? null,
           preferredChannel: channel,
           consentMarketing: consent,
           answers,
@@ -226,9 +238,11 @@ export default function PourUnClientPage() {
               setLastName("");
               setEmail("");
               setPhone("");
+              setAddressInput("");
+              setResolvedAddress(null);
               setConsent(false);
               setAnswers({});
-              setStep({ kind: "intro" });
+              setStep({ kind: "time-budget" });
             }}
             className="w-full py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest"
           >
@@ -272,6 +286,7 @@ export default function PourUnClientPage() {
               className="w-full px-4 py-3 bg-surface-container rounded-2xl border border-outline-variant text-sm"
             />
           </Field>
+          <ExistingClientSuggestions firstName={firstName} lastName={lastName} />
         </section>
       )}
 
@@ -310,6 +325,20 @@ export default function PourUnClientPage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="w-full px-4 py-3 bg-surface-container rounded-2xl border border-outline-variant text-sm"
+            />
+          </Field>
+          <Field label="Adresse postale (facultatif, aide à dédoublonner)">
+            <AddressAutocomplete
+              value={addressInput}
+              onChange={(v) => {
+                setAddressInput(v);
+                // Clear the resolved address as soon as the user edits the
+                // text so we don't persist a stale (label, gps) pair.
+                if (resolvedAddress && v !== resolvedAddress.label) {
+                  setResolvedAddress(null);
+                }
+              }}
+              onSelect={setResolvedAddress}
             />
           </Field>
           <Field label="Canal préféré">

@@ -8,6 +8,7 @@ import "react-day-picker/style.css";
 import { Icon } from "@/components/Icon";
 import { useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
+import { useShopMode } from "@/lib/service-mode";
 import { authedFetch } from "@/lib/api-client";
 import { timeAgo, isoDate } from "@/lib/time";
 import type { CommChannel, ClientSource } from "@/lib/types";
@@ -45,6 +46,8 @@ export default function ClientsPage() {
   useRequireAuth();
   const router = useRouter();
   const { isBoutique, loading: roleLoading } = useShopRole();
+  const mode = useShopMode();
+  const isKiosk = mode === "in_service";
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +112,54 @@ export default function ClientsPage() {
     const key = isoDate(selectedDate);
     return byDate.get(key) ?? [];
   }, [clients, byDate, selectedDate]);
+
+  // ─── Kiosk view (in_service) — minimal info, no contact / no profile.
+  // Active when the boutique is in open hours so a client manipulating the
+  // device only sees harmless rows : prénom + dernière visite, rien d'autre.
+  if (isKiosk) {
+    return (
+      <div className="px-6 py-6 flex flex-col gap-5">
+        <header className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold tracking-tight">Mes clients</h1>
+          <Link
+            href="/pour-un-client"
+            className="flex items-center gap-1 px-3 py-2 bg-primary text-on-primary rounded-full text-xs font-bold uppercase tracking-widest"
+          >
+            <Icon name="add" size={16} />
+            Ajouter
+          </Link>
+        </header>
+
+        <p className="text-xs text-outline leading-relaxed">
+          Mode boutique actif — détails complets cachés pendant les heures d'ouverture.
+        </p>
+
+        {loading ? (
+          <p className="text-sm text-on-surface-variant">Chargement…</p>
+        ) : clients.length === 0 ? (
+          <p className="text-sm text-on-surface-variant text-center py-8">
+            Aucun client pour l'instant.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {clients.map((c) => (
+              <li
+                key={c.id}
+                className="flex items-center justify-between gap-3 px-4 py-3 border border-outline-variant rounded-2xl"
+              >
+                <span className="font-medium truncate">
+                  {c.first_name} {c.last_name.charAt(0).toUpperCase()}.
+                </span>
+                <span className="text-xs text-on-surface-variant flex-shrink-0">
+                  {timeAgo(c.created_at)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="px-6 py-6 flex flex-col gap-5">

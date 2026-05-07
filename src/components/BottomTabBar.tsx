@@ -5,12 +5,16 @@ import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
 import { useShopRole } from "@/lib/role";
+import { useShopMode } from "@/lib/service-mode";
 
 type Tab = {
   href: string;
   label: string;
   icon: string;
   activeMatch: (pathname: string) => boolean;
+  /** When true, the tab is hidden during in_service (boutique open hours)
+   *  so a client handling the device can't reach confidential pages. */
+  adminOnly?: boolean;
 };
 
 const BOUTIQUE_TABS: Tab[] = [
@@ -31,12 +35,14 @@ const BOUTIQUE_TABS: Tab[] = [
     label: "Newsletter",
     icon: "send",
     activeMatch: (p) => p.startsWith("/newsletter"),
+    adminOnly: true,
   },
   {
     href: "/settings",
     label: "Réglages",
     icon: "tune",
     activeMatch: (p) => p.startsWith("/settings"),
+    adminOnly: true,
   },
 ];
 
@@ -58,10 +64,16 @@ const USER_TABS: Tab[] = [
 export function BottomTabBar() {
   const pathname = usePathname();
   const { isBoutique, loading } = useShopRole();
+  const mode = useShopMode();
 
   if (loading) return null;
 
-  const tabs = isBoutique ? BOUTIQUE_TABS : USER_TABS;
+  const allTabs = isBoutique ? BOUTIQUE_TABS : USER_TABS;
+  // Hide admin-only tabs (newsletter, settings) when the boutique is open.
+  const tabs =
+    mode === "in_service"
+      ? allTabs.filter((t) => !t.adminOnly)
+      : allTabs;
 
   return (
     <nav className="fixed bottom-0 left-0 w-full z-40 bg-background/85 backdrop-blur-xl border-t border-outline-variant/40">

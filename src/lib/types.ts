@@ -67,6 +67,13 @@ export type BoutiqueClient = {
   last_name: string;
   email: string | null;
   phone: string | null;
+  /** Postal address — captured via the BAN API (api-adresse.data.gouv.fr)
+   *  so it stays canonical and de-duplicates clients with similar names. */
+  address_line: string | null;
+  postal_code: string | null;
+  city: string | null;
+  latitude: number | null;
+  longitude: number | null;
   preferred_channel: CommChannel;
   consent_marketing: boolean;
   consent_at: string | null;

@@ -22,6 +22,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Icon } from "@/components/Icon";
 import { useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
+import { useGuardOutOfService } from "@/lib/service-mode";
 import { authedFetch } from "@/lib/api-client";
 import type { QuestionKind, ShopQuestion } from "@/lib/types";
 
@@ -36,6 +37,7 @@ const KIND_LABELS: Record<QuestionKind, string> = {
 
 export default function QuestionsSettingsPage() {
   useRequireAuth();
+  useGuardOutOfService();
   const router = useRouter();
   const { isBoutique, loading: roleLoading } = useShopRole();
   const [items, setItems] = useState<ShopQuestion[]>([]);

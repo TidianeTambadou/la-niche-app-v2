@@ -46,8 +46,8 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("clients_v2")
     .select(
-      "id, source, first_name, last_name, email, phone, preferred_channel, " +
-      "consent_marketing, olfactive_profile, report, notes, created_at, updated_at",
+      "id, source, first_name, last_name, email, phone, address_line, postal_code, city, " +
+      "preferred_channel, consent_marketing, olfactive_profile, report, notes, created_at, updated_at",
     )
     .eq("shop_id", shopId)
     .order("created_at", { ascending: false })
@@ -84,6 +84,12 @@ type CreateBody = {
   lastName: string;
   email?: string | null;
   phone?: string | null;
+  /** Captured via the BAN autocomplete (api-adresse.data.gouv.fr). */
+  addressLine?: string | null;
+  postalCode?: string | null;
+  city?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   preferredChannel: CommChannel;
   consentMarketing: boolean;
   /** key = question.id, value = string | string[] | number. */
@@ -171,6 +177,11 @@ export async function POST(req: NextRequest) {
       last_name: lastName,
       email,
       phone,
+      address_line: body.addressLine?.trim() || null,
+      postal_code: body.postalCode?.trim() || null,
+      city: body.city?.trim() || null,
+      latitude: typeof body.latitude === "number" ? body.latitude : null,
+      longitude: typeof body.longitude === "number" ? body.longitude : null,
       preferred_channel: body.preferredChannel,
       consent_marketing: !!body.consentMarketing,
       consent_at: body.consentMarketing ? new Date().toISOString() : null,

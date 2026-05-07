@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
+import { useGuardOutOfService } from "@/lib/service-mode";
 import { authedFetch } from "@/lib/api-client";
 
 type ImportResult = {
@@ -17,6 +18,7 @@ type ImportResult = {
 
 export default function PerfumeImportPage() {
   useRequireAuth();
+  useGuardOutOfService();
   const router = useRouter();
   const { isBoutique, loading: roleLoading } = useShopRole();
   const [csv, setCsv] = useState("");
