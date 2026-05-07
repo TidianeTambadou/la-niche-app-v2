@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { ClientReport } from "@/components/ClientReport";
 import { useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
 import { authedFetch } from "@/lib/api-client";
@@ -163,107 +164,7 @@ export default function ClientDetailPage({
         </p>
       )}
 
-      {/* Olfactive profile */}
-      {profile.dominant_families && (
-        <Section title="Profil olfactif">
-          {profile.personality && (
-            <p className="text-sm italic leading-relaxed">{profile.personality}</p>
-          )}
-          {profile.dominant_families.length > 0 && (
-            <ChipRow label="Familles" values={profile.dominant_families} />
-          )}
-          {profile.dominant_accords && profile.dominant_accords.length > 0 && (
-            <ChipRow label="Accords" values={profile.dominant_accords} />
-          )}
-          {profile.key_notes && profile.key_notes.length > 0 && (
-            <ChipRow label="Notes aimées" values={profile.key_notes} variant="positive" />
-          )}
-          {profile.avoid_notes && profile.avoid_notes.length > 0 && (
-            <ChipRow label="Notes à éviter" values={profile.avoid_notes} variant="negative" />
-          )}
-          {profile.intensity_label && (
-            <p className="text-xs text-on-surface-variant">
-              Sillage : <span className="font-medium">{profile.intensity_label}</span>
-              {profile.intensity_score && ` (${profile.intensity_score}/5)`}
-            </p>
-          )}
-          {profile.wear_context && profile.wear_context.length > 0 && (
-            <ChipRow label="Occasions" values={profile.wear_context} />
-          )}
-        </Section>
-      )}
-
-      {/* Sales report — format v1 FriendReport (summary / signature / loved /
-          rejected / advice). Affiché en sections distinctes pour qu'un vendeur
-          accède à l'info en 10 secondes. */}
-      {report.summary && (
-        <Section title="Pour le vendeur">
-          <p className="text-sm font-semibold leading-relaxed">{report.summary}</p>
-          {report.signature && (
-            <p className="text-sm leading-relaxed text-on-surface-variant border-l-2 border-outline-variant pl-3">
-              {report.signature}
-            </p>
-          )}
-        </Section>
-      )}
-
-      {report.loved_references && report.loved_references.length > 0 && (
-        <Section title="Références qui devraient lui parler">
-          <ul className="flex flex-col gap-3">
-            {report.loved_references.map((r, i) => (
-              <li key={i} className="border-l-2 border-primary/60 pl-3">
-                <p className="text-sm font-semibold">
-                  {r.name}
-                  <span className="font-normal text-on-surface-variant"> — {r.brand}</span>
-                  {r.family && (
-                    <span className="ml-2 text-[10px] uppercase tracking-widest text-outline">
-                      {r.family}
-                    </span>
-                  )}
-                </p>
-                {r.why && (
-                  <p className="text-sm text-on-surface-variant mt-0.5 leading-relaxed">
-                    {r.why}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {report.rejected_references && report.rejected_references.length > 0 && (
-        <Section title="À éviter de pitcher">
-          <ul className="flex flex-col gap-3">
-            {report.rejected_references.map((r, i) => (
-              <li key={i} className="border-l-2 border-error/60 pl-3">
-                <p className="text-sm font-semibold">
-                  {r.name}
-                  {r.brand && (
-                    <span className="font-normal text-on-surface-variant"> — {r.brand}</span>
-                  )}
-                  {r.family && (
-                    <span className="ml-2 text-[10px] uppercase tracking-widest text-outline">
-                      {r.family}
-                    </span>
-                  )}
-                </p>
-                {r.why && (
-                  <p className="text-sm text-on-surface-variant mt-0.5 leading-relaxed">
-                    {r.why}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {report.sales_advice && (
-        <Section title="Conseil vente">
-          <p className="text-sm leading-relaxed">{report.sales_advice}</p>
-        </Section>
-      )}
+      <ClientReport profile={profile} report={report} />
 
       {/* Contact + comm prefs */}
       <Section title="Contact" right={
@@ -408,34 +309,3 @@ function Section({
   );
 }
 
-function ChipRow({
-  label,
-  values,
-  variant = "neutral",
-}: {
-  label: string;
-  values: string[];
-  variant?: "neutral" | "positive" | "negative";
-}) {
-  const cls =
-    variant === "positive"
-      ? "border-primary/40 bg-primary-container/40"
-      : variant === "negative"
-        ? "border-error/40 bg-error-container/30"
-        : "border-outline-variant";
-  return (
-    <div>
-      <p className="text-xs uppercase tracking-widest text-outline mb-1.5">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {values.map((v) => (
-          <span
-            key={v}
-            className={`text-[11px] px-2 py-0.5 border rounded-full ${cls}`}
-          >
-            {v}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}

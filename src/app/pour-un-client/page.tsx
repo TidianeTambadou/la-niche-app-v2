@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { QuestionInput } from "@/components/QuestionInput";
+import { ClientReport } from "@/components/ClientReport";
 import { useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
 import { authedFetch } from "@/lib/api-client";
@@ -15,7 +16,12 @@ type WizardStep =
   | { kind: "question"; index: number }
   | { kind: "contact" }
   | { kind: "submitting" }
-  | { kind: "done"; clientId: string };
+  | {
+      kind: "done";
+      clientId: string;
+      olfactiveProfile: unknown;
+      report: unknown;
+    };
 
 export default function PourUnClientPage() {
   useRequireAuth();
@@ -132,7 +138,11 @@ export default function PourUnClientPage() {
 
     setStep({ kind: "submitting" });
     try {
-      const json = await authedFetch<{ id: string }>("/api/clients", {
+      const json = await authedFetch<{
+        id: string;
+        olfactive_profile: unknown;
+        report: unknown;
+      }>("/api/clients", {
         method: "POST",
         body: JSON.stringify({
           firstName,
@@ -144,7 +154,12 @@ export default function PourUnClientPage() {
           answers,
         }),
       });
-      setStep({ kind: "done", clientId: json.id });
+      setStep({
+        kind: "done",
+        clientId: json.id,
+        olfactiveProfile: json.olfactive_profile,
+        report: json.report,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");
       setStep({ kind: "contact" });
@@ -161,19 +176,28 @@ export default function PourUnClientPage() {
 
   if (step.kind === "done") {
     return (
-      <div className="px-6 py-10 flex flex-col items-center text-center gap-4">
-        <Icon name="check_circle" size={64} className="text-primary" />
-        <h1 className="text-2xl font-semibold">Fiche enregistrée</h1>
-        <p className="text-sm text-on-surface-variant max-w-sm">
-          Le rapport olfactif de {firstName} {lastName} a été généré et
-          ajouté à tes clients.
-        </p>
-        <div className="flex flex-col gap-2 w-full max-w-sm mt-4">
+      <div className="px-6 py-6 flex flex-col gap-6">
+        <header className="flex flex-col items-center text-center gap-2 pt-2">
+          <Icon name="check_circle" size={48} className="text-primary" />
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Rapport olfactif — {firstName} {lastName}
+          </h1>
+          <p className="text-xs uppercase tracking-widest text-outline">
+            Synthèse IA · fiche enregistrée
+          </p>
+        </header>
+
+        <ClientReport
+          profile={step.olfactiveProfile as never}
+          report={step.report as never}
+        />
+
+        <div className="flex flex-col gap-2 mt-2">
           <Link
             href={`/clients/${step.clientId}`}
-            className="w-full py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest text-center"
+            className="w-full py-3 border border-outline-variant rounded-full text-sm font-medium uppercase tracking-widest text-center"
           >
-            Voir le rapport
+            Ouvrir la fiche complète
           </Link>
           <button
             type="button"
@@ -186,7 +210,7 @@ export default function PourUnClientPage() {
               setAnswers({});
               setStep({ kind: "intro" });
             }}
-            className="w-full py-3 border border-outline-variant rounded-full text-sm font-medium uppercase tracking-widest"
+            className="w-full py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest"
           >
             Nouveau client
           </button>
