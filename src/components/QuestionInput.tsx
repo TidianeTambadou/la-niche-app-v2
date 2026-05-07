@@ -39,8 +39,15 @@ export function QuestionInput({ q, value, onChange }: Props) {
       url.searchParams.set("term", term);
       url.searchParams.set("context", explainContext);
       const res = await fetch(url);
-      const json = (await res.json()) as { explanation?: string; error?: string };
-      setExplain({ term, text: json.explanation ?? json.error ?? "Indisponible", loading: false });
+      const json = (await res.json()) as {
+        explanation?: string;
+        error?: string;
+        detail?: string;
+      };
+      const text =
+        json.explanation ??
+        (json.detail ? `${json.error ?? "Erreur"} — ${json.detail}` : json.error ?? "Indisponible");
+      setExplain({ term, text, loading: false });
     } catch {
       setExplain({ term, text: "Erreur réseau", loading: false });
     }

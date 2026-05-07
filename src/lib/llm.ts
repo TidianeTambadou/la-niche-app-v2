@@ -19,18 +19,35 @@ export type LLMOptions = {
   maxTokens?: number;
 };
 
-const DEFAULT_MODEL = "anthropic/claude-haiku-4-5";
+/**
+ * Same fallback chain that powered v1's /api/agent — when the primary is
+ * rate-limited or down, OpenRouter tries the next one. Gemini 2.0 Flash
+ * is the cheapest fast model with reliable JSON mode.
+ */
+const DEFAULT_MODELS = [
+  "google/gemini-2.0-flash-001",
+  "google/gemini-flash-1.5",
+  "openai/gpt-4o-mini",
+];
 
 export async function chat(messages: LLMMessage[], opts: LLMOptions = {}): Promise<string> {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("OPENROUTER_API_KEY missing");
 
+  // OpenRouter supports `models: string[]` + `route: "fallback"` for
+  // auto-failover. When the caller pins a single model via opts.model
+  // we honour that and skip the fallback machinery.
   const body: Record<string, unknown> = {
-    model: opts.model ?? DEFAULT_MODEL,
     messages,
     temperature: opts.temperature ?? 0.4,
     max_tokens: opts.maxTokens ?? 1500,
   };
+  if (opts.model) {
+    body.model = opts.model;
+  } else {
+    body.models = DEFAULT_MODELS;
+    body.route = "fallback";
+  }
   if (opts.json) body.response_format = { type: "json_object" };
 
   const res = await fetch(OPENROUTER_URL, {
@@ -46,7 +63,7 @@ export async function chat(messages: LLMMessage[], opts: LLMOptions = {}): Promi
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`OpenRouter ${res.status}: ${text.slice(0, 300)}`);
+    throw new Error(`OpenRouter ${res.status}: ${text.slice(0, 400)}`);
   }
 
   const json = (await res.json()) as {
