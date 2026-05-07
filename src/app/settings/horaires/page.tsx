@@ -31,7 +31,7 @@ const DEFAULT_HOURS: OpeningHours = {
 
 export default function OpeningHoursPage() {
   useRequireAuth();
-  useGuardOutOfService();
+  useGuardOutOfService("/pour-un-client", { bypassable: true });
   const router = useRouter();
   const { isBoutique, loading: roleLoading } = useShopRole();
   const [hours, setHours] = useState<OpeningHours>(DEFAULT_HOURS);

@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function SettingsPage() {
   useRequireAuth();
-  useGuardOutOfService();
+  useGuardOutOfService("/pour-un-client", { bypassable: true });
   const router = useRouter();
   const { user } = useAuth();
   const { shop, isBoutique, loading } = useShopRole();

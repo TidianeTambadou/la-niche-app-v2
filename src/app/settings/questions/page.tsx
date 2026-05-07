@@ -37,7 +37,7 @@ const KIND_LABELS: Record<QuestionKind, string> = {
 
 export default function QuestionsSettingsPage() {
   useRequireAuth();
-  useGuardOutOfService();
+  useGuardOutOfService("/pour-un-client", { bypassable: true });
   const router = useRouter();
   const { isBoutique, loading: roleLoading } = useShopRole();
   const [items, setItems] = useState<ShopQuestion[]>([]);
