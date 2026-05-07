@@ -324,23 +324,49 @@ BEGIN
     END IF;
 
     INSERT INTO public.shop_questions (shop_id, position, label, kind, options, required) VALUES
-      (s.id, 1, 'Quel parfum portez-vous habituellement ?', 'text', NULL, false),
+      (s.id, 1, 'Quel parfum portez-vous le plus souvent ?', 'text', NULL, false),
+
       (s.id, 2, 'Quelles familles olfactives vous attirent ?', 'multi',
         jsonb_build_array(
-          'Floral', 'Boisé', 'Oriental', 'Fruité', 'Gourmand',
-          'Hespéridé', 'Fougère', 'Chypré', 'Aromatique', 'Cuir'
+          'Floral', 'Boisé', 'Oriental', 'Ambré', 'Hespéridé',
+          'Fougère', 'Chypré', 'Cuir', 'Gourmand', 'Aromatique',
+          'Aquatique', 'Poudré'
         ),
         true),
-      (s.id, 3, 'Préférez-vous un sillage discret ou enveloppant ?', 'scale',
-        jsonb_build_object('min', 1, 'max', 5, 'minLabel', 'Discret', 'maxLabel', 'Enveloppant'),
+
+      (s.id, 3, 'Quels accords précis vous parlent ?', 'multi',
+        jsonb_build_array(
+          'Boisé ambré',
+          'Floral poudré',
+          'Iris poudré',
+          'Oud oriental',
+          'Vanille gourmande',
+          'Cuir fumé',
+          'Cuir suédé',
+          'Musc blanc',
+          'Encens résineux',
+          'Vétiver vert',
+          'Patchouli sombre',
+          'Néroli solaire'
+        ),
+        false),
+
+      (s.id, 4, 'Quel sillage cherchez-vous ?', 'scale',
+        jsonb_build_object('min', 1, 'max', 5,
+          'minLabel', 'Discret', 'maxLabel', 'Enveloppant'),
         true),
-      (s.id, 4, 'Pour quelle occasion ?', 'single',
-        jsonb_build_array('Jour', 'Travail', 'Soir / sortie', 'Vacances', 'Tous les jours'),
+
+      (s.id, 5, 'Pour quel moment ?', 'single',
+        jsonb_build_array(
+          'Tous les jours', 'Travail', 'Soir / sortie', 'Vacances', 'Occasion spéciale'
+        ),
         true),
-      (s.id, 5, 'Quelles notes adorez-vous ?', 'text', NULL, false),
-      (s.id, 6, 'Quelles notes détestez-vous ?', 'text', NULL, false),
-      (s.id, 7, 'Email', 'email', NULL, false),
-      (s.id, 8, 'Téléphone', 'phone', NULL, false);
+
+      (s.id, 6, 'Quelles notes adorez-vous ?', 'text', NULL, false),
+      (s.id, 7, 'Quelles notes vous rebutent ?', 'text', NULL, false),
+
+      (s.id, 8, 'Email',     'email', NULL, false),
+      (s.id, 9, 'Téléphone', 'phone', NULL, false);
   END LOOP;
 END $$;
 
