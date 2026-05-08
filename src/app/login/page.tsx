@@ -312,7 +312,7 @@ function LoginContent() {
             <img
               src="/logo-laniche.png"
               alt="Gallery La Niche"
-              className="h-10 w-auto object-contain dark:invert"
+              className="h-20 w-auto object-contain dark:invert"
             />
           </Link>
           <DataLabel>BUILD://v2.0</DataLabel>

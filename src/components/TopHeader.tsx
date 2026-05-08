@@ -23,7 +23,7 @@ export function TopHeader() {
 
   return (
     <header className="fixed top-0 left-0 w-full z-40 bg-background border-b-2 border-on-background">
-      <nav className="flex justify-between items-center px-6 py-3 w-full max-w-screen-md mx-auto safe-top">
+      <nav className="flex justify-between items-center px-6 py-4 w-full max-w-screen-md mx-auto safe-top">
         {isRoot ? (
           <span className="w-6" aria-hidden />
         ) : (
@@ -46,7 +46,7 @@ export function TopHeader() {
           <img
             src="/logo-laniche.png"
             alt="Gallery La Niche"
-            className="h-10 w-auto object-contain dark:invert"
+            className="h-16 w-auto object-contain dark:invert"
           />
         </Link>
 

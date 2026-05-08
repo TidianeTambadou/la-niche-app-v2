@@ -21,7 +21,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <TopHeader />
-      <main className="flex-1 pt-24 pb-24 w-full max-w-screen-md mx-auto">
+      <main className="flex-1 pt-32 pb-24 w-full max-w-screen-md mx-auto">
         {children}
       </main>
       <BottomTabBar />
