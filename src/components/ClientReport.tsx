@@ -60,9 +60,8 @@ export function ClientReport({ profile, report }: Props) {
 
   if (!hasAnything) {
     return (
-      <p className="text-sm text-on-surface-variant text-center py-6">
-        Le rapport n'a pas pu être généré. Réessaie plus tard depuis la
-        fiche du client.
+      <p className="font-mono text-xs uppercase tracking-widest opacity-60 text-center py-6">
+        REPORT_UNAVAILABLE · RETRY_LATER
       </p>
     );
   }
@@ -71,11 +70,11 @@ export function ClientReport({ profile, report }: Props) {
     <div className="flex flex-col gap-5">
       {/* 1. Headline */}
       {r.summary && (
-        <Section title="Pour le vendeur" delayMs={80}>
-          <p className="text-sm font-semibold leading-relaxed">{r.summary}</p>
+        <Section title="POUR LE VENDEUR" delayMs={80}>
+          <p className="font-sans font-bold uppercase tracking-tight text-base leading-relaxed">{r.summary}</p>
           {r.signature && (
-            <p className="text-sm leading-relaxed text-on-surface-variant border-l-2 border-outline-variant pl-3">
-              {r.signature}
+            <p className="font-cormorant italic text-base leading-relaxed border-l-2 border-on-background pl-3 opacity-80">
+              « {r.signature} »
             </p>
           )}
         </Section>
@@ -83,57 +82,53 @@ export function ClientReport({ profile, report }: Props) {
 
       {/* 2. ADN olfactif synthétisé */}
       {(p.dominant_families?.length || p.key_notes?.length) && (
-        <Section title="ADN olfactif" delayMs={160}>
+        <Section title="ADN OLFACTIF" delayMs={160}>
           {p.personality && (
-            <p className="text-sm italic leading-relaxed">{p.personality}</p>
+            <p className="font-cormorant italic text-base leading-relaxed">« {p.personality} »</p>
           )}
           {p.dominant_families && p.dominant_families.length > 0 && (
-            <ChipRow label="Familles" values={p.dominant_families} />
+            <ChipRow label="FAMILLES" values={p.dominant_families} />
           )}
           {p.dominant_accords && p.dominant_accords.length > 0 && (
-            <ChipRow label="Accords dominants" values={p.dominant_accords} />
+            <ChipRow label="ACCORDS DOMINANTS" values={p.dominant_accords} />
           )}
           {p.key_notes && p.key_notes.length > 0 && (
-            <ChipRow label="Notes phares" values={p.key_notes} variant="positive" />
+            <ChipRow label="NOTES PHARES" values={p.key_notes} variant="positive" />
           )}
           {p.avoid_notes && p.avoid_notes.length > 0 && (
-            <ChipRow label="Notes à éviter" values={p.avoid_notes} variant="negative" />
+            <ChipRow label="NOTES À ÉVITER" values={p.avoid_notes} variant="negative" />
           )}
           {p.intensity_label && (
-            <p className="text-xs text-on-surface-variant">
-              Sillage : <span className="font-medium">{p.intensity_label}</span>
-              {typeof p.intensity_score === "number" && ` (${p.intensity_score}/5)`}
+            <p className="font-mono text-xs uppercase tracking-wider opacity-70">
+              SILLAGE : <span className="font-bold opacity-100">{p.intensity_label}</span>
+              {typeof p.intensity_score === "number" && ` · ${p.intensity_score}/5`}
             </p>
           )}
           {p.wear_context && p.wear_context.length > 0 && (
-            <ChipRow label="Occasions" values={p.wear_context} />
+            <ChipRow label="OCCASIONS" values={p.wear_context} />
           )}
         </Section>
       )}
 
       {/* 3. Références à proposer */}
       {r.loved_references && r.loved_references.length > 0 && (
-        <Section title="Références qui devraient lui parler" delayMs={240}>
+        <Section title="RÉFÉRENCES QUI DEVRAIENT LUI PARLER" delayMs={240}>
           <ul className="flex flex-col gap-3">
             {r.loved_references.map((ref, i) => (
-              <li key={i} className="border-l-2 border-primary/60 pl-3">
-                <p className="text-sm font-semibold">
+              <li key={i} className="border-l-2 border-on-background pl-3">
+                <p className="font-sans font-bold uppercase tracking-tight text-sm">
                   {ref.name}
                   {ref.brand && (
-                    <span className="font-normal text-on-surface-variant">
-                      {" "}— {ref.brand}
-                    </span>
+                    <span className="font-normal opacity-60"> — {ref.brand}</span>
                   )}
                   {ref.family && (
-                    <span className="ml-2 text-[10px] uppercase tracking-widest text-outline">
+                    <span className="ml-2 font-mono text-[10px] uppercase tracking-widest opacity-60">
                       {ref.family}
                     </span>
                   )}
                 </p>
                 {ref.why && (
-                  <p className="text-sm text-on-surface-variant mt-0.5 leading-relaxed">
-                    {ref.why}
-                  </p>
+                  <p className="text-sm opacity-80 mt-0.5 leading-relaxed">{ref.why}</p>
                 )}
               </li>
             ))}
@@ -143,25 +138,26 @@ export function ClientReport({ profile, report }: Props) {
 
       {/* 4. Références à éviter */}
       {r.rejected_references && r.rejected_references.length > 0 && (
-        <Section title="À éviter de pitcher" delayMs={320}>
+        <Section title="À ÉVITER DE PITCHER" delayMs={320}>
           <ul className="flex flex-col gap-3">
             {r.rejected_references.map((ref, i) => (
-              <li key={i} className="border-l-2 border-error/60 pl-3">
-                <p className="text-sm font-semibold">
+              <li
+                key={i}
+                className="border-l-2 border-on-background pl-3 line-through decoration-[1px]"
+              >
+                <p className="font-sans font-bold uppercase tracking-tight text-sm no-underline">
                   {ref.name}
                   {ref.brand && (
-                    <span className="font-normal text-on-surface-variant">
-                      {" "}— {ref.brand}
-                    </span>
+                    <span className="font-normal opacity-60"> — {ref.brand}</span>
                   )}
                   {ref.family && (
-                    <span className="ml-2 text-[10px] uppercase tracking-widest text-outline">
+                    <span className="ml-2 font-mono text-[10px] uppercase tracking-widest opacity-60">
                       {ref.family}
                     </span>
                   )}
                 </p>
                 {ref.why && (
-                  <p className="text-sm text-on-surface-variant mt-0.5 leading-relaxed">
+                  <p className="text-sm opacity-80 mt-0.5 leading-relaxed no-underline">
                     {ref.why}
                   </p>
                 )}
@@ -173,7 +169,7 @@ export function ClientReport({ profile, report }: Props) {
 
       {/* 5. Conseil vente */}
       {r.sales_advice && (
-        <Section title="Conseil vente" delayMs={400}>
+        <Section title="CONSEIL VENTE" delayMs={400}>
           <p className="text-sm leading-relaxed">{r.sales_advice}</p>
         </Section>
       )}
@@ -192,10 +188,12 @@ function Section({
 }) {
   return (
     <section
-      className="report-section flex flex-col gap-3 border border-outline-variant rounded-3xl px-5 py-4"
+      className="report-section flex flex-col gap-3 border-2 border-on-background bg-background px-5 py-4 shadow-[4px_4px_0px_0px_currentColor]"
       style={{ animationDelay: `${delayMs}ms` }}
     >
-      <h2 className="text-xs uppercase tracking-widest text-outline">{title}</h2>
+      <h2 className="font-mono text-xs uppercase tracking-widest font-bold opacity-100">
+        {title}
+      </h2>
       {children}
     </section>
   );
@@ -210,22 +208,23 @@ function ChipRow({
   values: string[];
   variant?: "neutral" | "positive" | "negative";
 }) {
+  // Variants restent monochromes : positive = inversé (bg noir), negative = barré.
   const cls =
     variant === "positive"
-      ? "border-primary/40 bg-primary-container/40"
+      ? "border-on-background bg-on-background text-background font-bold"
       : variant === "negative"
-        ? "border-error/40 bg-error-container/30"
-        : "border-outline-variant";
+        ? "border-on-background line-through opacity-60"
+        : "border-on-background";
   return (
     <div>
-      <p className="text-xs uppercase tracking-widest text-outline mb-1.5">
+      <p className="font-mono text-[10px] uppercase tracking-widest opacity-60 mb-1.5">
         {label}
       </p>
       <div className="flex flex-wrap gap-1.5">
         {values.map((v) => (
           <span
             key={v}
-            className={`text-[11px] px-2 py-0.5 border rounded-full ${cls}`}
+            className={`font-mono text-[11px] uppercase tracking-wider px-2 py-0.5 border-2 ${cls}`}
           >
             {v}
           </span>

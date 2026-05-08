@@ -8,6 +8,8 @@ import { useShopRole } from "@/lib/role";
 import { useGuardOutOfService } from "@/lib/service-mode";
 import { authedFetch } from "@/lib/api-client";
 import type { DayHours, OpeningHours, Shop } from "@/lib/types";
+import { DataLabel } from "@/components/brutalist/DataLabel";
+import { BrutalistButton } from "@/components/brutalist/BrutalistButton";
 
 const DAYS: { key: keyof OpeningHours; label: string }[] = [
   { key: "lundi", label: "Lundi" },
@@ -81,24 +83,32 @@ export default function OpeningHoursPage() {
   }
 
   if (loading || roleLoading) {
-    return <div className="p-6 text-sm text-on-surface-variant">Chargement…</div>;
+    return (
+      <div className="p-6">
+        <DataLabel>LOADING…</DataLabel>
+      </div>
+    );
   }
 
   return (
     <div className="px-6 py-6 flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Horaires d'ouverture</h1>
-        <p className="text-sm text-on-surface-variant mt-1 leading-relaxed">
-          L'app bascule automatiquement en <span className="font-semibold">mode boutique</span> pendant tes heures d'ouverture
-          (newsletter, stock et réglages cachés pour qu'aucun client ne tombe dessus). Hors créneau,
-          tout redevient visible.
+      <header className="relative pl-6">
+        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+        <DataLabel>SCHEDULE · OPENING_HOURS</DataLabel>
+        <h1 className="font-sans font-black text-3xl tracking-tighter uppercase leading-none mt-2">
+          HORAIRES
+        </h1>
+        <p className="font-cormorant italic text-base opacity-70 mt-3 max-w-md">
+          « L'app bascule automatiquement en mode boutique pendant les heures
+          d'ouverture — newsletter, stock et réglages cachés. Hors créneau,
+          tout redevient visible. »
         </p>
       </header>
 
       {error && (
-        <p className="text-sm text-error border border-error/30 bg-error-container/30 px-4 py-3 rounded-xl">
-          {error}
-        </p>
+        <div className="border-2 border-on-background bg-on-background text-background px-4 py-3">
+          <p className="font-mono text-xs uppercase tracking-wider">{error}</p>
+        </div>
       )}
 
       <ul className="flex flex-col gap-2">
@@ -107,30 +117,33 @@ export default function OpeningHoursPage() {
           return (
             <li
               key={key}
-              className="flex items-center gap-3 px-4 py-3 border border-outline-variant rounded-2xl"
+              className="flex items-center gap-3 px-4 py-3 border-2 border-on-background bg-background"
             >
               <label className="flex items-center gap-2 flex-1 min-w-0">
                 <input
                   type="checkbox"
                   checked={day.ouvert}
                   onChange={(e) => updateDay(key, { ouvert: e.target.checked })}
+                  className="w-4 h-4 accent-on-background"
                 />
-                <span className="text-sm font-medium">{label}</span>
+                <span className="font-sans font-bold uppercase tracking-tight text-sm">
+                  {label}
+                </span>
               </label>
               <input
                 type="time"
                 value={day.debut}
                 onChange={(e) => updateDay(key, { debut: e.target.value })}
                 disabled={!day.ouvert}
-                className="px-2 py-1 bg-surface-container rounded-lg border border-outline-variant text-sm disabled:opacity-40"
+                className="px-2 py-1.5 bg-background border-2 border-on-background font-mono text-sm disabled:opacity-40 focus:outline-none focus:shadow-[2px_2px_0px_0px_currentColor] transition-shadow"
               />
-              <span className="text-xs text-outline">→</span>
+              <span className="font-mono text-xs opacity-60">→</span>
               <input
                 type="time"
                 value={day.fin}
                 onChange={(e) => updateDay(key, { fin: e.target.value })}
                 disabled={!day.ouvert}
-                className="px-2 py-1 bg-surface-container rounded-lg border border-outline-variant text-sm disabled:opacity-40"
+                className="px-2 py-1.5 bg-background border-2 border-on-background font-mono text-sm disabled:opacity-40 focus:outline-none focus:shadow-[2px_2px_0px_0px_currentColor] transition-shadow"
               />
             </li>
           );
@@ -138,20 +151,15 @@ export default function OpeningHoursPage() {
       </ul>
 
       {saved && (
-        <p className="text-sm text-primary flex items-center gap-1.5">
+        <p className="font-mono text-xs uppercase tracking-widest font-bold flex items-center gap-1.5">
           <Icon name="check_circle" size={16} />
-          Horaires enregistrés.
+          ENREGISTRÉ ✓
         </p>
       )}
 
-      <button
-        type="button"
-        disabled={busy}
-        onClick={save}
-        className="w-full py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest disabled:opacity-50"
-      >
+      <BrutalistButton onClick={save} disabled={busy} size="lg" className="w-full">
         {busy ? "Enregistrement…" : "Enregistrer"}
-      </button>
+      </BrutalistButton>
     </div>
   );
 }

@@ -98,6 +98,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Persist : split successful enrichments into upsertable rows.
+  // We can't use Postgres `ON CONFLICT` here because the unique index is on
+  // an expression `(shop_id, lower(brand), lower(name))` and PostgREST/
+  // supabase-js `upsert({...}, { onConflict })` only accepts plain column
+  // lists. So we do a manual case-insensitive lookup, then insert or update.
   const admin = createAdminClient();
   const errors: { name: string; brand: string; reason: string }[] = [];
   let imported = 0;
@@ -110,31 +114,43 @@ export async function POST(req: NextRequest) {
     }
     const original = inputs[i];
     const priceEur = parseFloat((original.price ?? "").replace(",", ".")) || null;
+    const nameTrim = e.name.trim();
+    const brandTrim = e.brand.trim();
 
-    const { error } = await admin
+    const row = {
+      shop_id: shopId,
+      name: nameTrim,
+      brand: brandTrim,
+      family: e.family ?? null,
+      top_notes: e.top_notes ?? [],
+      heart_notes: e.heart_notes ?? [],
+      base_notes: e.base_notes ?? [],
+      accords: e.accords ?? [],
+      description: e.description ?? original.description ?? null,
+      price_eur: priceEur,
+      in_stock: true,
+    };
+
+    const { data: existing, error: lookupError } = await admin
       .from("shop_perfumes")
-      .upsert(
-        {
-          shop_id: shopId,
-          name: e.name.trim(),
-          brand: e.brand.trim(),
-          family: e.family ?? null,
-          top_notes: e.top_notes ?? [],
-          heart_notes: e.heart_notes ?? [],
-          base_notes: e.base_notes ?? [],
-          accords: e.accords ?? [],
-          description: e.description ?? original.description ?? null,
-          price_eur: priceEur,
-          in_stock: true,
-        },
-        // The unique index is on (shop_id, lower(brand), lower(name)).
-        // Supabase upsert needs a target ; we use the same shape since
-        // Postgres normalises via the index expression.
-        { onConflict: "shop_id,brand,name" },
-      );
+      .select("id")
+      .eq("shop_id", shopId)
+      .ilike("brand", brandTrim)
+      .ilike("name", nameTrim)
+      .maybeSingle();
 
-    if (error) {
-      errors.push({ name: e.name, brand: e.brand, reason: error.message });
+    if (lookupError) {
+      errors.push({ name: e.name, brand: e.brand, reason: lookupError.message });
+      continue;
+    }
+
+    const writeError = existing
+      ? (await admin.from("shop_perfumes").update(row).eq("id", existing.id))
+          .error
+      : (await admin.from("shop_perfumes").insert(row)).error;
+
+    if (writeError) {
+      errors.push({ name: e.name, brand: e.brand, reason: writeError.message });
     } else {
       imported += 1;
     }
@@ -191,7 +207,10 @@ async function enrichBatch(rows: Row[]): Promise<Enriched[]> {
 /* ─── Tiny CSV parser ────────────────────────────────────────────── */
 
 function parseCSV(text: string): Record<string, string>[] {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  // Strip UTF-8 BOM that Excel inserts when "Save As CSV UTF-8" is used —
+  // otherwise the first header becomes "﻿name" and never matches.
+  const cleaned = text.replace(/^﻿/, "");
+  const lines = cleaned.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
 
   const headers = parseLine(lines[0]).map((h) => normaliseHeader(h));

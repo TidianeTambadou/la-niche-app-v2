@@ -26,7 +26,7 @@ const BOUTIQUE_TABS: Tab[] = [
   },
   {
     href: "/clients",
-    label: "Mes clients",
+    label: "Clients",
     icon: "groups",
     activeMatch: (p) => p.startsWith("/clients"),
   },
@@ -69,15 +69,14 @@ export function BottomTabBar() {
   if (loading) return null;
 
   const allTabs = isBoutique ? BOUTIQUE_TABS : USER_TABS;
-  // Hide admin-only tabs (newsletter, settings) when the boutique is open.
   const tabs =
     mode === "in_service"
       ? allTabs.filter((t) => !t.adminOnly)
       : allTabs;
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full z-40 bg-background/85 backdrop-blur-xl border-t border-outline-variant/40">
-      <ul className="flex justify-around items-center w-full max-w-screen-md mx-auto px-2 pt-3 safe-bottom">
+    <nav className="fixed bottom-0 left-0 w-full z-40 bg-background border-t-2 border-on-background">
+      <ul className="flex justify-around items-stretch w-full max-w-screen-md mx-auto safe-bottom divide-x-2 divide-on-background">
         {tabs.map((tab) => {
           const active = tab.activeMatch(pathname);
           return (
@@ -85,15 +84,15 @@ export function BottomTabBar() {
               <Link
                 href={tab.href}
                 className={clsx(
-                  "flex flex-col items-center gap-1 py-1 active:opacity-50 transition-all",
+                  "flex flex-col items-center gap-1 py-3 px-2 transition-colors duration-150",
                   active
-                    ? "text-on-background scale-105"
-                    : "text-outline hover:text-on-background",
+                    ? "bg-on-background text-background"
+                    : "text-on-background/60 hover:text-on-background",
                 )}
                 aria-current={active ? "page" : undefined}
               >
-                <Icon name={tab.icon} filled={active} size={22} />
-                <span className="text-[9px] uppercase tracking-[0.15em] font-medium">
+                <Icon name={tab.icon} filled={active} size={20} />
+                <span className="font-mono text-[9px] uppercase tracking-[0.2em] font-medium">
                   {tab.label}
                 </span>
               </Link>

@@ -7,6 +7,7 @@ import { useAuth, useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
 import { useGuardOutOfService } from "@/lib/service-mode";
 import { supabase } from "@/lib/supabase";
+import { DataLabel } from "@/components/brutalist/DataLabel";
 
 export default function SettingsPage() {
   useRequireAuth();
@@ -22,31 +23,37 @@ export default function SettingsPage() {
 
   return (
     <div className="px-6 py-6 flex flex-col gap-8">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Réglages</h1>
-        <p className="text-sm text-on-surface-variant mt-1">
+      <header className="relative pl-6">
+        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+        <DataLabel>
+          {isBoutique ? "BOUTIQUE_ADMIN" : "USER_ACCOUNT"}
+        </DataLabel>
+        <h1 className="font-sans font-black text-3xl tracking-tighter uppercase leading-none mt-2">
+          RÉGLAGES
+        </h1>
+        <p className="font-cormorant italic text-base opacity-70 mt-3">
+          «{" "}
           {isBoutique && shop
-            ? `Compte boutique — ${shop.name}`
+            ? shop.name
             : user?.email ?? "Compte utilisateur"}
+          {" "}»
         </p>
       </header>
 
       {isBoutique && !loading && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-xs uppercase tracking-widest font-medium text-outline">
-            Boutique
-          </h2>
+          <DataLabel emphasis="high">SECTION:BOUTIQUE</DataLabel>
           <SettingsLink
             href="/settings/horaires"
             icon="schedule"
             title="Horaires d'ouverture"
-            description="L'app passe en mode boutique automatiquement pendant les heures d'ouverture (newsletter et réglages cachés)."
+            description="L'app passe en mode boutique automatiquement pendant les heures d'ouverture."
           />
           <SettingsLink
             href="/settings/questions"
             icon="reorder"
             title="Questionnaire client"
-            description="Réordonner, ajouter ou retirer des questions du formulaire « Pour un client »."
+            description="Réordonner, ajouter ou retirer des questions du formulaire."
           />
           <SettingsLink
             href="/newsletter/stock"
@@ -58,19 +65,19 @@ export default function SettingsPage() {
       )}
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs uppercase tracking-widest font-medium text-outline">
-          Compte
-        </h2>
+        <DataLabel emphasis="high">SECTION:COMPTE</DataLabel>
         <button
           type="button"
           onClick={signOut}
-          className="flex items-center justify-between gap-4 w-full px-4 py-4 border border-outline-variant rounded-2xl active:scale-[0.99] transition-transform"
+          className="flex items-center justify-between gap-4 w-full px-4 py-4 border-2 border-on-background bg-background hover:bg-on-background hover:text-background transition-colors duration-150"
         >
           <span className="flex items-center gap-3">
             <Icon name="logout" />
-            <span className="text-sm font-medium">Se déconnecter</span>
+            <span className="font-sans font-bold uppercase tracking-tight text-sm">
+              Se déconnecter
+            </span>
           </span>
-          <Icon name="chevron_right" className="text-outline" />
+          <Icon name="chevron_right" className="opacity-60" />
         </button>
       </section>
     </div>
@@ -91,18 +98,20 @@ function SettingsLink({
   return (
     <Link
       href={href}
-      className="flex items-start justify-between gap-4 w-full px-4 py-4 border border-outline-variant rounded-2xl active:scale-[0.99] transition-transform"
+      className="flex items-start justify-between gap-4 w-full px-4 py-4 border-2 border-on-background bg-background hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_currentColor] transition-all duration-150"
     >
-      <span className="flex items-start gap-3">
-        <Icon name={icon} className="mt-0.5" />
-        <span className="flex flex-col">
-          <span className="text-sm font-semibold">{title}</span>
-          <span className="text-xs text-on-surface-variant mt-0.5">
+      <span className="flex items-start gap-3 min-w-0">
+        <Icon name={icon} className="mt-0.5 flex-shrink-0" />
+        <span className="flex flex-col min-w-0">
+          <span className="font-sans font-bold uppercase tracking-tight text-sm">
+            {title}
+          </span>
+          <span className="text-xs opacity-70 mt-0.5">
             {description}
           </span>
         </span>
       </span>
-      <Icon name="chevron_right" className="text-outline mt-0.5" />
+      <Icon name="chevron_right" className="opacity-40 mt-0.5 flex-shrink-0" />
     </Link>
   );
 }

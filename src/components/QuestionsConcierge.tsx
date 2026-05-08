@@ -5,6 +5,8 @@ import { Icon } from "@/components/Icon";
 import { authedFetch } from "@/lib/api-client";
 import { useSpeechRecognition } from "@/lib/speech";
 import type { QuestionKind, ShopQuestion } from "@/lib/types";
+import { DataLabel } from "@/components/brutalist/DataLabel";
+import { BrutalistButton } from "@/components/brutalist/BrutalistButton";
 
 /**
  * Conciergerie La Niche — assistant intégré sur /settings/questions.
@@ -149,39 +151,45 @@ export function QuestionsConcierge({ questions, onChange }: Props) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Ouvrir la conciergerie"
-        className="fixed bottom-24 right-4 z-30 flex items-center gap-2 px-4 py-3 bg-primary text-on-primary rounded-full shadow-lg active:scale-95 transition-transform"
+        className="fixed bottom-24 right-4 z-30 flex items-center gap-2 px-4 py-3 bg-on-background text-background border-2 border-on-background shadow-[4px_4px_0px_0px_currentColor] hover:shadow-[2px_2px_0px_0px_currentColor] hover:translate-x-[2px] hover:translate-y-[2px] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all duration-150"
       >
         <Icon name="auto_awesome" size={18} />
-        <span className="text-xs uppercase tracking-widest font-bold">
+        <span className="font-mono text-xs uppercase tracking-widest font-bold">
           Conciergerie
         </span>
       </button>
 
       {!open ? null : (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center"
+          className="fixed inset-0 z-50 bg-on-background/40 flex items-end justify-center"
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-screen-md bg-surface rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto flex flex-col gap-4"
+            className="w-full max-w-screen-md bg-background border-t-2 border-on-background p-6 max-h-[90vh] overflow-y-auto flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <header className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Conciergerie La Niche</h2>
+            <header className="flex items-center justify-between pl-4 relative">
+              <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+              <div>
+                <DataLabel>AI · CONCIERGERIE</DataLabel>
+                <h2 className="font-sans font-black text-2xl tracking-tighter uppercase mt-1">
+                  La Niche
+                </h2>
+              </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Fermer"
-                className="text-outline"
+                className="opacity-60 hover:opacity-100"
               >
                 <Icon name="close" />
               </button>
             </header>
 
-            <p className="text-xs text-on-surface-variant leading-relaxed">
-              Dis-moi ce que tu veux : reformuler une question, en ajouter,
-              en supprimer, simplifier les options. Tu peux taper ou{" "}
-              {supported ? "dicter à la voix" : "(la dictée n'est pas dispo dans ce navigateur)"}.
+            <p className="font-cormorant italic text-base opacity-70 leading-relaxed">
+              « Dis-moi ce que tu veux : reformuler une question, en ajouter,
+              en supprimer, simplifier les options.{" "}
+              {supported ? "Tape ou dicte à la voix." : "(dictée non dispo dans ce navigateur)"} »
             </p>
 
             <div className="flex items-stretch gap-2">
@@ -189,18 +197,18 @@ export function QuestionsConcierge({ questions, onChange }: Props) {
                 value={transcript}
                 onChange={(e) => setTranscript(e.target.value)}
                 rows={3}
-                placeholder="Ex : reformule la question 4 pour qu'elle soit plus simple, ou ajoute une question sur la peau"
-                className="flex-1 px-3 py-2 bg-surface-container rounded-2xl border border-outline-variant text-sm leading-relaxed"
+                placeholder="Ex : reformule la question 4, ou ajoute une question sur la peau"
+                className="flex-1 px-3 py-2.5 bg-background border-2 border-on-background text-sm leading-relaxed focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
               />
               {supported && (
                 <button
                   type="button"
                   onClick={() => (listening ? stop() : start())}
                   aria-label={listening ? "Arrêter la dictée" : "Dicter"}
-                  className={`px-3 rounded-2xl border flex items-center justify-center transition-colors ${
+                  className={`px-4 border-2 flex items-center justify-center transition-colors duration-150 ${
                     listening
-                      ? "border-error bg-error-container/40 text-error animate-pulse"
-                      : "border-outline-variant hover:border-primary"
+                      ? "border-on-background bg-on-background text-background animate-pulse"
+                      : "border-on-background bg-background hover:bg-on-background/5"
                   }`}
                 >
                   <Icon name={listening ? "stop" : "mic"} />
@@ -212,15 +220,15 @@ export function QuestionsConcierge({ questions, onChange }: Props) {
               <button
                 type="button"
                 onClick={reset}
-                className="flex-1 py-2 border border-outline-variant rounded-full text-xs uppercase tracking-widest"
+                className="flex-1 py-2.5 border-2 border-on-background bg-background hover:bg-on-background hover:text-background font-mono text-xs font-bold uppercase tracking-widest transition-colors duration-150"
               >
                 Effacer
               </button>
-              <button
-                type="button"
+              <BrutalistButton
                 onClick={send}
                 disabled={busy || !transcript.trim()}
-                className="flex-1 py-2 bg-primary text-on-primary rounded-full text-xs font-bold uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-1"
+                size="md"
+                className="flex-1"
               >
                 {busy ? (
                   <>
@@ -230,28 +238,28 @@ export function QuestionsConcierge({ questions, onChange }: Props) {
                 ) : (
                   "Demander"
                 )}
-              </button>
+              </BrutalistButton>
             </div>
 
             {error && (
-              <p className="text-sm text-error border border-error/30 bg-error-container/30 px-4 py-3 rounded-xl">
-                {error}
-              </p>
+              <div className="border-2 border-on-background bg-on-background text-background px-4 py-3">
+                <p className="font-mono text-xs uppercase tracking-wider">{error}</p>
+              </div>
             )}
 
             {operations.length > 0 && (
               <section className="flex flex-col gap-2">
                 <header className="flex items-center justify-between">
-                  <h3 className="text-xs uppercase tracking-widest text-outline">
-                    {operations.length} action{operations.length > 1 ? "s" : ""} suggérée{operations.length > 1 ? "s" : ""}
-                  </h3>
+                  <DataLabel emphasis="high">
+                    {operations.length} ACTION{operations.length > 1 ? "S" : ""} SUGGÉRÉE{operations.length > 1 ? "S" : ""}
+                  </DataLabel>
                   <button
                     type="button"
                     onClick={applyAll}
                     disabled={appliedIdx.size === operations.length}
-                    className="text-xs uppercase tracking-widest font-bold text-primary border-b border-primary disabled:opacity-50"
+                    className="font-mono text-xs uppercase tracking-widest font-bold border-b-2 border-on-background disabled:opacity-50"
                   >
-                    Tout appliquer
+                    TOUT APPLIQUER
                   </button>
                 </header>
                 <ul className="flex flex-col gap-2">
@@ -292,7 +300,7 @@ function OpCard({
       : undefined;
 
   return (
-    <div className="border border-outline-variant rounded-2xl px-4 py-3 flex flex-col gap-2">
+    <div className="border-2 border-on-background bg-background px-4 py-3 flex flex-col gap-2">
       <div className="flex items-start gap-2">
         <Icon
           name={
@@ -303,38 +311,38 @@ function OpCard({
                 : "delete"
           }
           size={18}
-          className="mt-0.5 text-primary"
+          className="mt-0.5"
         />
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] uppercase tracking-widest text-outline">
+          <DataLabel>
             {op.type === "update"
-              ? "Modifier"
+              ? "UPDATE"
               : op.type === "create"
-                ? "Créer"
-                : "Supprimer"}
-          </p>
+                ? "CREATE"
+                : "DELETE"}
+          </DataLabel>
           {op.type === "update" && target && (
             <>
-              <p className="text-xs text-outline mt-0.5">Avant</p>
+              <p className="font-mono text-xs opacity-60 uppercase tracking-wider mt-1">AVANT</p>
               <p className="text-sm">{target.label}</p>
               {op.patch.label && (
                 <>
-                  <p className="text-xs text-outline mt-1">Après</p>
-                  <p className="text-sm font-semibold">{op.patch.label}</p>
+                  <p className="font-mono text-xs opacity-60 uppercase tracking-wider mt-1">APRÈS</p>
+                  <p className="text-sm font-bold">{op.patch.label}</p>
                 </>
               )}
               {op.patch.kind && (
-                <p className="text-[11px] text-on-surface-variant mt-1">
+                <p className="font-mono text-[11px] opacity-70 mt-1">
                   Type → {KIND_LABEL[op.patch.kind]}
                 </p>
               )}
               {Array.isArray(op.patch.options) && (
-                <p className="text-[11px] text-on-surface-variant mt-1">
+                <p className="font-mono text-[11px] opacity-70 mt-1">
                   Choix → {(op.patch.options as string[]).join(", ")}
                 </p>
               )}
               {typeof op.patch.required === "boolean" && (
-                <p className="text-[11px] text-on-surface-variant mt-1">
+                <p className="font-mono text-[11px] opacity-70 mt-1">
                   Obligatoire → {op.patch.required ? "oui" : "non"}
                 </p>
               )}
@@ -342,8 +350,8 @@ function OpCard({
           )}
           {op.type === "create" && (
             <>
-              <p className="text-sm font-semibold">{op.question.label}</p>
-              <p className="text-[11px] text-on-surface-variant mt-0.5">
+              <p className="font-sans font-bold uppercase tracking-tight text-sm mt-1">{op.question.label}</p>
+              <p className="font-mono text-[11px] opacity-70 mt-0.5">
                 {KIND_LABEL[op.question.kind]}
                 {op.question.required ? " · obligatoire" : " · optionnelle"}
                 {Array.isArray(op.question.options) &&
@@ -352,10 +360,10 @@ function OpCard({
             </>
           )}
           {op.type === "delete" && target && (
-            <p className="text-sm">{target.label}</p>
+            <p className="text-sm mt-1">{target.label}</p>
           )}
-          <p className="text-xs text-on-surface-variant italic mt-2 leading-relaxed">
-            {op.rationale}
+          <p className="font-cormorant italic text-sm opacity-70 mt-2 leading-relaxed">
+            « {op.rationale} »
           </p>
         </div>
       </div>
@@ -363,10 +371,10 @@ function OpCard({
         type="button"
         onClick={onApply}
         disabled={applied}
-        className={`self-end px-3 py-1.5 rounded-full text-[10px] uppercase tracking-widest font-bold ${
+        className={`self-end px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest font-bold border-2 transition-colors duration-150 ${
           applied
-            ? "bg-primary-container/40 text-on-primary-container"
-            : "bg-primary text-on-primary"
+            ? "border-on-background bg-on-background/10 text-on-background opacity-60"
+            : "border-on-background bg-on-background text-background hover:bg-background hover:text-on-background"
         }`}
       >
         {applied ? "Appliqué" : "Appliquer"}

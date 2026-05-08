@@ -9,6 +9,8 @@ import { useShopRole } from "@/lib/role";
 import { useGuardOutOfService } from "@/lib/service-mode";
 import { authedFetch } from "@/lib/api-client";
 import type { ShopPerfume } from "@/lib/types";
+import { DataLabel } from "@/components/brutalist/DataLabel";
+import { BrutalistButton } from "@/components/brutalist/BrutalistButton";
 
 export default function PerfumeStockPage() {
   useRequireAuth();
@@ -54,64 +56,75 @@ export default function PerfumeStockPage() {
 
   return (
     <div className="px-6 py-6 flex flex-col gap-5">
-      <header className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Stock parfums</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/newsletter/stock/import"
-            className="flex items-center gap-1 px-3 py-2 border border-outline-variant rounded-full text-xs font-bold uppercase tracking-widest"
-          >
-            <Icon name="upload_file" size={16} />
-            Import CSV
-          </Link>
-          <button
-            type="button"
-            onClick={() => setEditing("new")}
-            className="flex items-center gap-1 px-3 py-2 bg-primary text-on-primary rounded-full text-xs font-bold uppercase tracking-widest"
-          >
-            <Icon name="add" size={16} />
-            Nouveau
-          </button>
+      <header className="relative pl-6">
+        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+        <DataLabel>STOCK · {perfumes.length} ITEMS</DataLabel>
+        <div className="flex items-end justify-between gap-3 mt-2 flex-wrap">
+          <h1 className="font-sans font-black text-3xl tracking-tighter uppercase leading-none">
+            STOCK
+            <br />
+            <span className="ml-4">PARFUMS</span>
+          </h1>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/newsletter/stock/import"
+              className="flex items-center gap-1 px-3 py-2 border-2 border-on-background bg-background hover:bg-on-background hover:text-background font-mono text-[11px] font-bold uppercase tracking-widest transition-colors duration-150"
+            >
+              <Icon name="upload_file" size={14} />
+              Import CSV
+            </Link>
+            <button
+              type="button"
+              onClick={() => setEditing("new")}
+              className="flex items-center gap-1 px-4 py-2 bg-on-background text-background border-2 border-on-background shadow-[4px_4px_0px_0px_currentColor] hover:shadow-[2px_2px_0px_0px_currentColor] hover:translate-x-[2px] hover:translate-y-[2px] font-mono text-[11px] font-bold uppercase tracking-widest transition-all duration-150"
+            >
+              <Icon name="add" size={14} />
+              Nouveau
+            </button>
+          </div>
         </div>
       </header>
 
       {error && (
-        <p className="text-sm text-error border border-error/30 bg-error-container/30 px-4 py-3 rounded-xl">
-          {error}
-        </p>
+        <div className="border-2 border-on-background bg-on-background text-background px-4 py-3">
+          <p className="font-mono text-xs uppercase tracking-wider">{error}</p>
+        </div>
       )}
 
       {loading ? (
-        <p className="text-sm text-on-surface-variant">Chargement…</p>
+        <DataLabel>LOADING…</DataLabel>
       ) : perfumes.length === 0 ? (
-        <p className="text-sm text-on-surface-variant text-center py-8">
-          Aucun parfum en stock. Ajoute le premier pour démarrer une newsletter.
-        </p>
+        <div className="text-center py-8 flex flex-col items-center gap-2">
+          <DataLabel emphasis="high">EMPTY_STOCK</DataLabel>
+          <p className="font-cormorant italic text-base opacity-70 max-w-sm">
+            « Aucun parfum en stock. Ajoute le premier pour démarrer une newsletter. »
+          </p>
+        </div>
       ) : (
         <ul className="flex flex-col gap-2">
           {perfumes.map((p) => (
             <li
               key={p.id}
-              className="flex items-start gap-3 px-4 py-3 border border-outline-variant rounded-2xl"
+              className="flex items-start gap-3 px-4 py-3 border-2 border-on-background bg-background"
             >
               <div className="flex-1 min-w-0">
-                <p className="font-semibold truncate">
-                  {p.name}{" "}
-                  <span className="font-normal text-on-surface-variant">— {p.brand}</span>
+                <p className="font-sans font-bold uppercase tracking-tight truncate">
+                  {p.name}
+                  <span className="font-normal opacity-60 ml-2">— {p.brand}</span>
                 </p>
-                <div className="flex flex-wrap gap-1 mt-1">
+                <div className="flex flex-wrap gap-1 mt-1.5">
                   {p.family && (
-                    <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 border border-outline-variant rounded-full">
+                    <span className="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 border-2 border-on-background">
                       {p.family}
                     </span>
                   )}
                   {!p.in_stock && (
-                    <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 bg-error-container/40 text-error rounded-full">
+                    <span className="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 bg-on-background text-background">
                       Rupture
                     </span>
                   )}
                   {p.price_eur && (
-                    <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 border border-outline-variant rounded-full">
+                    <span className="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 border-2 border-on-background">
                       {p.price_eur} €
                     </span>
                   )}
@@ -121,7 +134,7 @@ export default function PerfumeStockPage() {
                 type="button"
                 onClick={() => setEditing(p)}
                 aria-label="Modifier"
-                className="text-on-surface-variant hover:text-primary p-1"
+                className="opacity-60 hover:opacity-100 p-1 transition-opacity"
               >
                 <Icon name="edit" size={20} />
               </button>
@@ -129,7 +142,7 @@ export default function PerfumeStockPage() {
                 type="button"
                 onClick={() => remove(p.id)}
                 aria-label="Supprimer"
-                className="text-on-surface-variant hover:text-error p-1"
+                className="opacity-60 hover:opacity-100 p-1 transition-opacity"
               >
                 <Icon name="delete" size={20} />
               </button>
@@ -211,28 +224,34 @@ function PerfumeEditor({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center"
+      className="fixed inset-0 z-50 bg-on-background/40 flex items-end justify-center"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-screen-md bg-surface rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-screen-md bg-background border-t-2 border-on-background p-6 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">{initial ? "Modifier" : "Nouveau parfum"}</h2>
-          <button onClick={onClose} aria-label="Fermer" className="text-outline">
+        <header className="flex items-center justify-between mb-4 pl-4 relative">
+          <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+          <div>
+            <DataLabel>{initial ? "EDIT_MODE" : "NEW_PERFUME"}</DataLabel>
+            <h2 className="font-sans font-black text-2xl tracking-tighter uppercase mt-1">
+              {initial ? "Modifier" : "Nouveau"}
+            </h2>
+          </div>
+          <button onClick={onClose} aria-label="Fermer" className="opacity-60 hover:opacity-100">
             <Icon name="close" />
           </button>
         </header>
 
         <div className="flex flex-col gap-3">
-          <Field label="Nom">
+          <Field label="NOM">
             <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Marque">
+          <Field label="MARQUE">
             <input value={brand} onChange={(e) => setBrand(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Famille olfactive">
+          <Field label="FAMILLE OLFACTIVE">
             <input
               value={family}
               onChange={(e) => setFamily(e.target.value)}
@@ -240,19 +259,19 @@ function PerfumeEditor({
               className={inputCls}
             />
           </Field>
-          <Field label="Notes de tête (virgules)">
+          <Field label="NOTES DE TÊTE (VIRGULES)">
             <input value={topNotes} onChange={(e) => setTopNotes(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Notes de cœur (virgules)">
+          <Field label="NOTES DE CŒUR (VIRGULES)">
             <input value={heartNotes} onChange={(e) => setHeartNotes(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Notes de fond (virgules)">
+          <Field label="NOTES DE FOND (VIRGULES)">
             <input value={baseNotes} onChange={(e) => setBaseNotes(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Accords (virgules)">
+          <Field label="ACCORDS (VIRGULES)">
             <input value={accords} onChange={(e) => setAccords(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Description">
+          <Field label="DESCRIPTION">
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -260,10 +279,10 @@ function PerfumeEditor({
               className={inputCls}
             />
           </Field>
-          <Field label="Image URL">
+          <Field label="IMAGE URL">
             <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Prix (€)">
+          <Field label="PRIX (€)">
             <input
               type="number"
               inputMode="decimal"
@@ -277,20 +296,20 @@ function PerfumeEditor({
               type="checkbox"
               checked={inStock}
               onChange={(e) => setInStock(e.target.checked)}
+              className="w-4 h-4 accent-on-background"
             />
-            En stock
+            <span className="font-mono text-xs uppercase tracking-widest">EN STOCK</span>
           </label>
 
-          {error && <p className="text-sm text-error">{error}</p>}
+          {error && (
+            <div className="border-2 border-on-background bg-on-background text-background px-3 py-2">
+              <p className="font-mono text-xs uppercase tracking-wider">{error}</p>
+            </div>
+          )}
 
-          <button
-            type="button"
-            disabled={busy}
-            onClick={save}
-            className="w-full py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest disabled:opacity-50"
-          >
+          <BrutalistButton onClick={save} disabled={busy} size="lg" className="w-full">
             {busy ? "Enregistrement…" : "Enregistrer"}
-          </button>
+          </BrutalistButton>
         </div>
       </div>
     </div>
@@ -305,12 +324,12 @@ function splitList(s: string): string[] {
 }
 
 const inputCls =
-  "w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm";
+  "w-full px-3 py-2.5 bg-background border-2 border-on-background font-mono text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-xs uppercase tracking-widest text-outline">{label}</span>
+      <DataLabel emphasis="high">{label}</DataLabel>
       {children}
     </label>
   );

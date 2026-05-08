@@ -15,6 +15,9 @@ import {
 import { useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
 import { authedFetch } from "@/lib/api-client";
+import { DataLabel } from "@/components/brutalist/DataLabel";
+import { BrutalistButton } from "@/components/brutalist/BrutalistButton";
+import { BrutalistCard } from "@/components/brutalist/BrutalistCard";
 import type { BoutiqueClient, CommChannel, ShopQuestion } from "@/lib/types";
 
 type TimeBudget = "express" | "classique" | "complet";
@@ -295,45 +298,40 @@ export default function PourUnClientPage() {
   if (step.kind === "done") {
     return (
       <div className="px-6 py-6 flex flex-col gap-6">
-        <header className="flex flex-col items-center text-center gap-2 pt-2 report-section">
-          <Icon
-            name={step.fromExisting ? "person" : "check_circle"}
-            size={48}
-            className="text-primary"
-          />
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Rapport olfactif — {firstName} {lastName}
+        <header className="flex flex-col items-start gap-3 pt-2 report-section relative pl-6">
+          <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+          <DataLabel>
+            {step.fromExisting ? "EXISTING_CLIENT" : "NEW_CLIENT"} ·
+            ID:{step.clientId.slice(0, 8)}
+          </DataLabel>
+          <h1 className="font-sans font-black text-3xl tracking-tighter uppercase leading-none">
+            <span className="block">RAPPORT</span>
+            <span className="block ml-4">OLFACTIF</span>
           </h1>
-          <p className="text-xs uppercase tracking-widest text-outline">
-            {step.fromExisting
-              ? "Fiche existante · dernière session"
-              : "Synthèse IA · fiche enregistrée"}
+          <p className="font-cormorant italic text-lg opacity-70">
+            « pour {firstName} {lastName} »
           </p>
         </header>
 
         {step.llmError && (
-          <div className="border border-error/40 bg-error-container/30 rounded-2xl px-4 py-3 flex flex-col gap-1">
-            <p className="text-xs uppercase tracking-widest font-bold text-error">
-              Rapport IA échoué
-            </p>
-            <p className="text-xs text-on-surface-variant break-words">
-              {step.llmError}
-            </p>
+          <BrutalistCard className="px-4 py-3 flex flex-col gap-1">
+            <DataLabel emphasis="high">LLM_ERROR</DataLabel>
+            <p className="text-xs break-words mt-1">{step.llmError}</p>
             {step.llmError.includes("402") && (
               <a
                 href="https://openrouter.ai/settings/credits"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs uppercase tracking-widest font-bold text-primary border-b border-primary self-start mt-2"
+                className="font-mono text-xs uppercase tracking-widest font-bold border-b-2 border-on-background self-start mt-2"
               >
-                Recharger OpenRouter ↗
+                RECHARGER OPENROUTER ↗
               </a>
             )}
-            <p className="text-[11px] text-outline mt-1">
+            <p className="text-[11px] opacity-60 mt-1">
               La fiche est bien enregistrée. Tu peux relancer l'analyse depuis
-              la fiche client (à venir) ou réessayer un nouveau client.
+              la fiche client ou réessayer un nouveau client.
             </p>
-          </div>
+          </BrutalistCard>
         )}
 
         <ClientReport
@@ -343,19 +341,18 @@ export default function PourUnClientPage() {
 
         <div className="flex flex-col gap-2 mt-2 report-section">
           {step.fromExisting && (
-            <button
-              type="button"
-              onClick={() =>
-                setStep({ kind: "question", index: 0 })
-              }
-              className="w-full py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest"
+            <BrutalistButton
+              onClick={() => setStep({ kind: "question", index: 0 })}
+              variant="primary"
+              size="lg"
+              className="w-full"
             >
               Refaire le questionnaire
-            </button>
+            </BrutalistButton>
           )}
           <Link
             href={`/clients/${step.clientId}`}
-            className="w-full py-3 border border-outline-variant rounded-full text-sm font-medium uppercase tracking-widest text-center"
+            className="w-full py-3.5 px-6 border-2 border-on-background bg-background hover:bg-on-background hover:text-background text-sm font-bold uppercase tracking-widest text-center transition-colors duration-150"
           >
             Ouvrir la fiche complète
           </Link>
@@ -372,7 +369,7 @@ export default function PourUnClientPage() {
               setAnswers({});
               setStep({ kind: "time-budget" });
             }}
-            className="w-full py-3 border border-outline-variant rounded-full text-sm font-medium uppercase tracking-widest"
+            className="w-full py-3.5 px-6 border-2 border-on-background bg-background hover:bg-on-background hover:text-background text-sm font-bold uppercase tracking-widest transition-colors duration-150"
           >
             Nouveau client
           </button>
@@ -402,37 +399,44 @@ export default function PourUnClientPage() {
 
       {step.kind === "intro" && (
         <section className="flex flex-col gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight">Pour un client</h1>
-          <p className="text-sm text-on-surface-variant">
-            Renseigne le prénom et le nom du client. Tu pourras retrouver sa
-            fiche dans « Mes clients ».
-          </p>
-          <Field label="Prénom">
+          <header className="relative pl-6">
+            <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+            <DataLabel>STEP:01 · IDENTITY</DataLabel>
+            <h1 className="font-sans font-black text-3xl tracking-tighter uppercase mt-2 leading-none">
+              POUR
+              <br />
+              <span className="ml-4">UN CLIENT</span>
+            </h1>
+            <p className="font-cormorant italic text-base opacity-70 mt-3">
+              « Renseigne prénom et nom — la fiche restera dans Mes Clients. »
+            </p>
+          </header>
+          <Field label="PRÉNOM">
             <input
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               autoFocus
-              className="w-full px-4 py-3 bg-surface-container rounded-2xl border border-outline-variant text-sm"
+              className={brutalInput}
             />
           </Field>
-          <Field label="Nom">
+          <Field label="NOM">
             <input
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              className="w-full px-4 py-3 bg-surface-container rounded-2xl border border-outline-variant text-sm"
+              className={brutalInput}
             />
           </Field>
           {anonymous ? (
-            <div className="border border-outline-variant rounded-2xl px-4 py-3 flex items-center justify-between gap-3 bg-surface-container/40">
-              <p className="text-xs text-on-surface-variant leading-snug">
+            <div className="border-2 border-on-background bg-on-background/5 px-4 py-3 flex items-center justify-between gap-3">
+              <p className="text-xs leading-snug">
                 Mode anonyme — la recherche de doublons est désactivée.
               </p>
               <button
                 type="button"
                 onClick={() => setAnonymous(false)}
-                className="text-[10px] uppercase tracking-widest font-bold text-primary border-b border-primary"
+                className="font-mono text-[10px] uppercase tracking-widest font-bold border-b-2 border-on-background"
               >
-                Réactiver
+                RÉACTIVER
               </button>
             </div>
           ) : (
@@ -445,9 +449,9 @@ export default function PourUnClientPage() {
               <button
                 type="button"
                 onClick={() => setAnonymous(true)}
-                className="self-start text-[11px] uppercase tracking-widest text-outline hover:text-primary"
+                className="self-start font-mono text-[10px] uppercase tracking-widest opacity-60 hover:opacity-100 transition-opacity"
               >
-                ⚡ Sauter la recherche (mode anonyme)
+                ⚡ MODE ANONYME — SAUTER LA RECHERCHE
               </button>
             </>
           )}
@@ -457,12 +461,19 @@ export default function PourUnClientPage() {
       {step.kind === "question" && (
         <section className="flex flex-col gap-4">
           <PerfumeGlossary />
-          <h2 className="text-xl font-semibold tracking-tight leading-tight">
-            {wizardQuestions[step.index].label}
-            {wizardQuestions[step.index].required && (
-              <span className="text-error ml-1">*</span>
-            )}
-          </h2>
+          <header className="relative pl-6">
+            <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+            <DataLabel>
+              QUESTION:{String(step.index + 1).padStart(2, "0")}/
+              {String(wizardQuestions.length).padStart(2, "0")}
+            </DataLabel>
+            <h2 className="font-sans font-black text-2xl tracking-tighter leading-tight uppercase mt-2">
+              {wizardQuestions[step.index].label}
+              {wizardQuestions[step.index].required && (
+                <span className="ml-1">*</span>
+              )}
+            </h2>
+          </header>
           <QuestionInput
             q={wizardQuestions[step.index]}
             value={answerOf(wizardQuestions[step.index].id)}
@@ -473,32 +484,36 @@ export default function PourUnClientPage() {
 
       {step.kind === "contact" && (
         <section className="flex flex-col gap-4">
-          <h2 className="text-xl font-semibold tracking-tight">
-            Comment recevoir la newsletter ?
-          </h2>
-          <Field label="Email">
+          <header className="relative pl-6">
+            <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+            <DataLabel>STEP:FINAL · CONTACT</DataLabel>
+            <h2 className="font-sans font-black text-3xl tracking-tighter uppercase leading-none mt-2">
+              CANAL
+              <br />
+              <span className="ml-4">NEWSLETTER</span>
+            </h2>
+          </header>
+          <Field label="EMAIL">
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-surface-container rounded-2xl border border-outline-variant text-sm"
+              className={brutalInput}
             />
           </Field>
-          <Field label="Téléphone">
+          <Field label="TÉLÉPHONE">
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-4 py-3 bg-surface-container rounded-2xl border border-outline-variant text-sm"
+              className={brutalInput}
             />
           </Field>
-          <Field label="Adresse postale (facultatif, aide à dédoublonner)">
+          <Field label="ADRESSE POSTALE (FACULTATIF — AIDE À DÉDOUBLONNER)">
             <AddressAutocomplete
               value={addressInput}
               onChange={(v) => {
                 setAddressInput(v);
-                // Clear the resolved address as soon as the user edits the
-                // text so we don't persist a stale (label, gps) pair.
                 if (resolvedAddress && v !== resolvedAddress.label) {
                   setResolvedAddress(null);
                 }
@@ -506,17 +521,17 @@ export default function PourUnClientPage() {
               onSelect={setResolvedAddress}
             />
           </Field>
-          <Field label="Canal préféré">
+          <Field label="CANAL PRÉFÉRÉ">
             <div className="grid grid-cols-3 gap-2">
               {(["email", "sms", "both"] as CommChannel[]).map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setChannel(c)}
-                  className={`px-3 py-2 border rounded-full text-xs uppercase tracking-widest ${
+                  className={`px-3 py-2.5 border-2 font-mono text-[11px] uppercase tracking-widest transition-colors duration-150 ${
                     channel === c
-                      ? "border-primary bg-primary-container/50 font-semibold"
-                      : "border-outline-variant"
+                      ? "border-on-background bg-on-background text-background font-bold"
+                      : "border-on-background bg-background hover:bg-on-background/5"
                   }`}
                 >
                   {c === "both" ? "Les deux" : c.toUpperCase()}
@@ -529,7 +544,7 @@ export default function PourUnClientPage() {
               type="checkbox"
               checked={consent}
               onChange={(e) => setConsent(e.target.checked)}
-              className="mt-0.5"
+              className="mt-1 w-4 h-4 accent-on-background"
             />
             <span>
               Le client accepte de recevoir la newsletter par le canal choisi et
@@ -541,15 +556,15 @@ export default function PourUnClientPage() {
 
       {step.kind === "submitting" && (
         <div className="min-h-[40vh] flex flex-col items-center justify-center gap-3">
-          <Icon name="progress_activity" size={48} className="text-primary animate-spin" />
-          <p className="text-sm text-on-surface-variant">Génération du profil olfactif…</p>
+          <Icon name="progress_activity" size={48} className="animate-spin" />
+          <DataLabel emphasis="high">GENERATING_PROFILE…</DataLabel>
         </div>
       )}
 
       {error && (
-        <p className="text-sm text-error border border-error/30 bg-error-container/30 px-4 py-3 rounded-xl">
-          {error}
-        </p>
+        <div className="border-2 border-on-background bg-on-background text-background px-4 py-3">
+          <p className="font-mono text-xs uppercase tracking-wider">{error}</p>
+        </div>
       )}
 
       {step.kind !== "submitting" && step.kind !== "welcome-back" && (
@@ -558,33 +573,28 @@ export default function PourUnClientPage() {
             <button
               type="button"
               onClick={back}
-              className="flex-1 py-3 border border-outline-variant rounded-full text-sm font-medium uppercase tracking-widest"
+              className="flex-1 py-3.5 border-2 border-on-background bg-background hover:bg-on-background hover:text-background text-sm font-bold uppercase tracking-widest transition-colors duration-150"
             >
               Retour
             </button>
           )}
           {step.kind === "contact" ? (
-            <button
-              type="button"
-              onClick={submit}
-              className="flex-1 py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest"
-            >
+            <BrutalistButton onClick={submit} size="lg" className="flex-1">
               Enregistrer
-            </button>
+            </BrutalistButton>
           ) : (
-            <button
-              type="button"
-              onClick={next}
-              className="flex-1 py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest"
-            >
+            <BrutalistButton onClick={next} size="lg" className="flex-1">
               {step.kind === "time-budget" ? "C'est parti" : "Suivant"}
-            </button>
+            </BrutalistButton>
           )}
         </footer>
       )}
     </div>
   );
 }
+
+const brutalInput =
+  "w-full px-4 py-3 bg-background border-2 border-on-background font-mono text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow";
 
 function Progress({ step, total }: { step: WizardStep; total: number }) {
   if (
@@ -604,11 +614,14 @@ function Progress({ step, total }: { step: WizardStep; total: number }) {
           : total + 2;
   const pct = total > 0 ? Math.min(100, (done / (total + 2)) * 100) : 0;
   return (
-    <div className="h-1 bg-outline-variant/30 rounded-full overflow-hidden">
-      <div
-        className="h-full bg-primary transition-all duration-300"
-        style={{ width: `${pct}%` }}
-      />
+    <div className="flex items-center gap-3">
+      <DataLabel emphasis="high">{Math.round(pct).toString().padStart(2, "0")}%</DataLabel>
+      <div className="h-[2px] flex-1 bg-on-background/10 relative">
+        <div
+          className="absolute inset-y-0 left-0 bg-on-background transition-all duration-300"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }
@@ -628,43 +641,28 @@ function WelcomeBackStep({
   onGift: () => void;
 }) {
   return (
-    <section className="flex flex-col items-center text-center gap-5 py-6">
-      <div className="relative">
-        <div className="welcome-pop w-20 h-20 rounded-full bg-primary-container/40 flex items-center justify-center">
-          <Icon name="favorite" size={36} className="text-primary" filled />
-        </div>
-        <span className="sparkle-1 absolute -top-2 -right-3 text-primary">
-          <Icon name="auto_awesome" size={16} />
-        </span>
-        <span className="sparkle-2 absolute -bottom-1 -left-3 text-primary">
-          <Icon name="auto_awesome" size={12} />
-        </span>
-        <span className="sparkle-3 absolute -top-3 left-1/2 -translate-x-1/2 text-primary">
-          <Icon name="auto_awesome" size={10} />
-        </span>
-      </div>
-
-      <div className="welcome-text flex flex-col gap-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Coucou, heureux de revoir {client.first_name} !
+    <section className="flex flex-col gap-6 py-4">
+      <div className="welcome-pop relative pl-6">
+        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+        <DataLabel emphasis="high">RETURNING_CLIENT · MATCHED</DataLabel>
+        <h1 className="font-sans font-black text-3xl tracking-tighter uppercase leading-none mt-2">
+          <span className="block">COUCOU</span>
+          <span className="block ml-4 uppercase">{client.first_name.toUpperCase()}</span>
         </h1>
-        <p className="text-sm text-on-surface-variant max-w-sm">
-          Cette session, c'est encore pour {client.first_name} — ou c'est un cadeau pour quelqu'un d'autre&nbsp;?
+        <p className="font-cormorant italic text-base opacity-70 mt-3 max-w-sm">
+          « Encore pour {client.first_name} — ou c'est un cadeau pour
+          quelqu'un d'autre ? »
         </p>
       </div>
 
-      <div className="welcome-cta flex flex-col gap-2 w-full max-w-sm">
-        <button
-          type="button"
-          onClick={onReuse}
-          className="w-full py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest active:scale-95 transition-transform"
-        >
+      <div className="welcome-cta flex flex-col gap-2">
+        <BrutalistButton onClick={onReuse} size="lg" className="w-full">
           Encore pour {client.first_name}
-        </button>
+        </BrutalistButton>
         <button
           type="button"
           onClick={onGift}
-          className="w-full py-3 border border-outline-variant rounded-full text-sm font-medium uppercase tracking-widest active:scale-95 transition-transform"
+          className="w-full py-3.5 px-6 border-2 border-on-background bg-background hover:bg-on-background hover:text-background text-sm font-bold uppercase tracking-widest transition-colors duration-150"
         >
           C'est un cadeau, on repart à zéro
         </button>
@@ -716,17 +714,21 @@ function TimeBudgetStep({
 
   return (
     <section className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Combien de temps avez-vous ?
+      <header className="relative pl-6">
+        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+        <DataLabel>STEP:00 · TIME_BUDGET</DataLabel>
+        <h1 className="font-sans font-black text-3xl tracking-tighter uppercase leading-none mt-2">
+          COMBIEN
+          <br />
+          <span className="ml-4">DE TEMPS ?</span>
         </h1>
-        <p className="text-sm text-on-surface-variant mt-1 leading-relaxed">
-          Plus vous prenez de temps, mieux le vendeur cerne votre profil olfactif —
-          et moins vous risquez de repartir avec un parfum qui ne vous correspond pas.
+        <p className="font-cormorant italic text-base opacity-70 mt-3">
+          « Plus on prend de temps, plus on cerne le profil — moins on
+          repart avec un parfum qui ne correspond pas. »
         </p>
       </header>
 
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-3">
         {choices.map((c) => {
           const active = selected === c.key;
           return (
@@ -734,23 +736,21 @@ function TimeBudgetStep({
               <button
                 type="button"
                 onClick={() => onSelect(c.key)}
-                className={`w-full text-left px-4 py-4 border rounded-2xl transition-all ${
+                className={`w-full text-left px-4 py-4 border-2 transition-all duration-150 ${
                   active
-                    ? "border-primary bg-primary-container/40"
-                    : "border-outline-variant hover:border-on-surface-variant"
+                    ? "border-on-background bg-on-background text-background shadow-[4px_4px_0px_0px_currentColor]"
+                    : "border-on-background bg-background hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_currentColor]"
                 }`}
               >
                 <div className="flex items-baseline justify-between gap-2 mb-1">
-                  <span className="text-base font-semibold tracking-tight">
+                  <span className="font-sans font-black text-base tracking-tight uppercase">
                     {c.title}
                   </span>
-                  <span className="text-xs uppercase tracking-widest text-outline">
+                  <span className="font-mono text-xs uppercase tracking-widest opacity-70">
                     {c.minutes}
                   </span>
                 </div>
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  {c.desc}
-                </p>
+                <p className="text-xs leading-relaxed opacity-80">{c.desc}</p>
               </button>
             </li>
           );
@@ -763,7 +763,7 @@ function TimeBudgetStep({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-xs uppercase tracking-widest text-outline">{label}</span>
+      <DataLabel emphasis="high">{label}</DataLabel>
       {children}
     </label>
   );

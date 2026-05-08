@@ -22,14 +22,14 @@ export function TopHeader() {
   const isRoot = ROOT_PATHS.has(pathname);
 
   return (
-    <header className="fixed top-0 left-0 w-full z-40 bg-background/70 backdrop-blur-xl border-b border-outline-variant/40">
-      <nav className="flex justify-between items-center px-6 py-4 w-full max-w-screen-md mx-auto safe-top">
+    <header className="fixed top-0 left-0 w-full z-40 bg-background border-b-2 border-on-background">
+      <nav className="flex justify-between items-center px-6 py-3 w-full max-w-screen-md mx-auto safe-top">
         {isRoot ? (
           <span className="w-6" aria-hidden />
         ) : (
           <button
             type="button"
-            className="text-on-background hover:opacity-70 active:scale-95 transition-all duration-200"
+            className="text-on-background hover:opacity-60 active:scale-95 transition-all duration-150"
             aria-label="Retour"
             onClick={() => router.back()}
           >
@@ -37,12 +37,16 @@ export function TopHeader() {
           </button>
         )}
 
-        <Link href={isBoutique ? "/pour-un-client" : "/choix-boutique"} aria-label="Accueil">
+        <Link
+          href={isBoutique ? "/pour-un-client" : "/choix-boutique"}
+          aria-label="Accueil"
+          className="flex items-center"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-laniche.png"
             alt="La Niche"
-            className="h-12 w-auto object-contain dark:invert"
+            className="h-10 w-auto object-contain dark:invert"
           />
         </Link>
 

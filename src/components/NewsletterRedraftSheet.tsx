@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import { Icon } from "@/components/Icon";
 import { authedFetch } from "@/lib/api-client";
 import { useSpeechRecognition } from "@/lib/speech";
+import { DataLabel } from "@/components/brutalist/DataLabel";
+import { BrutalistButton } from "@/components/brutalist/BrutalistButton";
 
 /**
  * Conciergerie newsletter — bottom sheet ouverte depuis le step preview
@@ -65,29 +67,34 @@ export function NewsletterRedraftSheet({
   if (typeof document === "undefined") return null;
   return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center"
+      className="fixed inset-0 z-50 bg-on-background/40 flex items-end justify-center"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-screen-md bg-surface rounded-t-3xl p-6 flex flex-col gap-4 max-h-[85vh] overflow-y-auto"
+        className="w-full max-w-screen-md bg-background border-t-2 border-on-background p-6 flex flex-col gap-4 max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Reformuler avec l'IA</h2>
+        <header className="flex items-center justify-between pl-4 relative">
+          <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+          <div>
+            <DataLabel>AI · REDRAFT</DataLabel>
+            <h2 className="font-sans font-black text-2xl tracking-tighter uppercase mt-1">
+              Reformuler
+            </h2>
+          </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Fermer"
-            className="text-outline"
+            className="opacity-60 hover:opacity-100"
           >
             <Icon name="close" />
           </button>
         </header>
 
-        <p className="text-xs text-on-surface-variant leading-relaxed">
-          Dis-moi ce que tu veux changer : ton plus chaleureux, plus
-          court, accent saison, registre VIP… Tu peux taper ou{" "}
-          {supported ? "dicter à la voix" : "(dictée non dispo dans ce navigateur)"}.
+        <p className="font-cormorant italic text-base opacity-70 leading-relaxed">
+          « Dis-moi ce que tu veux changer : ton plus chaleureux, plus court,
+          accent saison, registre VIP… {supported ? "Tape ou dicte à la voix." : "(dictée non dispo dans ce navigateur)"} »
         </p>
 
         <div className="flex items-stretch gap-2">
@@ -95,18 +102,18 @@ export function NewsletterRedraftSheet({
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
             rows={3}
-            placeholder="Ex : rends ça plus chaleureux et personnel, façon ami qui partage une découverte"
-            className="flex-1 px-3 py-2 bg-surface-container rounded-2xl border border-outline-variant text-sm leading-relaxed"
+            placeholder="Ex : rends ça plus chaleureux et personnel"
+            className="flex-1 px-3 py-2.5 bg-background border-2 border-on-background text-sm leading-relaxed focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
           />
           {supported && (
             <button
               type="button"
               onClick={() => (listening ? stop() : start())}
               aria-label={listening ? "Arrêter" : "Dicter"}
-              className={`px-3 rounded-2xl border flex items-center justify-center transition-colors ${
+              className={`px-4 border-2 flex items-center justify-center transition-colors duration-150 ${
                 listening
-                  ? "border-error bg-error-container/40 text-error animate-pulse"
-                  : "border-outline-variant hover:border-primary"
+                  ? "border-on-background bg-on-background text-background animate-pulse"
+                  : "border-on-background bg-background hover:bg-on-background/5"
               }`}
             >
               <Icon name={listening ? "stop" : "mic"} />
@@ -115,16 +122,16 @@ export function NewsletterRedraftSheet({
         </div>
 
         {error && (
-          <p className="text-sm text-error border border-error/30 bg-error-container/30 px-4 py-3 rounded-xl">
-            {error}
-          </p>
+          <div className="border-2 border-on-background bg-on-background text-background px-4 py-3">
+            <p className="font-mono text-xs uppercase tracking-wider">{error}</p>
+          </div>
         )}
 
-        <button
-          type="button"
+        <BrutalistButton
           onClick={submit}
           disabled={busy || !instruction.trim()}
-          className="w-full py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
+          size="lg"
+          className="w-full"
         >
           {busy ? (
             <>
@@ -134,10 +141,10 @@ export function NewsletterRedraftSheet({
           ) : (
             <>
               <Icon name="auto_awesome" size={16} />
-              Appliquer la reformulation
+              Appliquer
             </>
           )}
-        </button>
+        </BrutalistButton>
       </div>
     </div>,
     document.body,

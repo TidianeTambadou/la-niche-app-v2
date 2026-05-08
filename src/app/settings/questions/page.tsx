@@ -26,6 +26,8 @@ import { useShopRole } from "@/lib/role";
 import { useGuardOutOfService } from "@/lib/service-mode";
 import { authedFetch } from "@/lib/api-client";
 import type { QuestionKind, ShopQuestion } from "@/lib/types";
+import { DataLabel } from "@/components/brutalist/DataLabel";
+import { BrutalistButton } from "@/components/brutalist/BrutalistButton";
 
 const KIND_LABELS: Record<QuestionKind, string> = {
   text: "Texte libre",
@@ -110,22 +112,28 @@ export default function QuestionsSettingsPage() {
 
   return (
     <div className="px-6 py-6 flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Questionnaire</h1>
-        <p className="text-sm text-on-surface-variant mt-1">
-          Glisse les questions pour les réorganiser. Ce questionnaire est utilisé
-          dans « Pour un client » et côté utilisateur quand il choisit ta boutique.
+      <header className="relative pl-6">
+        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+        <DataLabel>QUESTIONNAIRE · {items.length} ITEMS</DataLabel>
+        <h1 className="font-sans font-black text-3xl tracking-tighter uppercase leading-none mt-2">
+          QUESTION-
+          <br />
+          <span className="ml-4">NAIRE</span>
+        </h1>
+        <p className="font-cormorant italic text-base opacity-70 mt-3">
+          « Glisse les questions pour les réorganiser — utilisé dans Pour un
+          client et côté utilisateur. »
         </p>
       </header>
 
       {error && (
-        <p className="text-sm text-error border border-error/30 bg-error-container/30 px-4 py-3 rounded-xl">
-          {error}
-        </p>
+        <div className="border-2 border-on-background bg-on-background text-background px-4 py-3">
+          <p className="font-mono text-xs uppercase tracking-wider">{error}</p>
+        </div>
       )}
 
       {loading ? (
-        <p className="text-sm text-on-surface-variant">Chargement…</p>
+        <DataLabel>LOADING…</DataLabel>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
@@ -141,7 +149,7 @@ export default function QuestionsSettingsPage() {
       <button
         type="button"
         onClick={() => setEditing("new")}
-        className="flex items-center justify-center gap-2 py-3 border border-dashed border-outline-variant rounded-2xl text-sm font-medium hover:border-primary transition-colors"
+        className="flex items-center justify-center gap-2 py-3 border-2 border-dashed border-on-background bg-background hover:bg-on-background hover:text-background font-mono text-xs font-bold uppercase tracking-widest transition-colors duration-150"
       >
         <Icon name="add" size={18} />
         Ajouter une question
@@ -187,11 +195,11 @@ function SortableRow({
     <li
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-3 px-3 py-3 border border-outline-variant rounded-2xl bg-surface"
+      className="flex items-center gap-3 px-3 py-3 border-2 border-on-background bg-background"
     >
       <button
         type="button"
-        className="text-outline cursor-grab active:cursor-grabbing touch-none"
+        className="opacity-60 hover:opacity-100 cursor-grab active:cursor-grabbing touch-none"
         aria-label="Glisser"
         {...attributes}
         {...listeners}
@@ -199,15 +207,15 @@ function SortableRow({
         <Icon name="drag_indicator" />
       </button>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{q.label}</p>
-        <p className="text-[10px] uppercase tracking-widest text-outline mt-0.5">
-          {KIND_LABELS[q.kind]} {q.required ? "· requis" : "· optionnel"}
-        </p>
+        <p className="font-sans font-bold uppercase tracking-tight text-sm truncate">{q.label}</p>
+        <DataLabel className="block mt-0.5">
+          {KIND_LABELS[q.kind].toUpperCase()} · {q.required ? "REQUIS" : "OPTIONNEL"}
+        </DataLabel>
       </div>
       <button
         type="button"
         onClick={onEdit}
-        className="text-on-surface-variant hover:text-primary p-1"
+        className="opacity-60 hover:opacity-100 p-1 transition-opacity"
         aria-label="Modifier"
       >
         <Icon name="edit" size={20} />
@@ -215,7 +223,7 @@ function SortableRow({
       <button
         type="button"
         onClick={onDelete}
-        className="text-on-surface-variant hover:text-error p-1"
+        className="opacity-60 hover:opacity-100 p-1 transition-opacity"
         aria-label="Supprimer"
       >
         <Icon name="delete" size={20} />
@@ -292,35 +300,41 @@ function QuestionEditor({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center"
+      className="fixed inset-0 z-50 bg-on-background/40 flex items-end justify-center"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-screen-md bg-surface rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto"
+        className="w-full max-w-screen-md bg-background border-t-2 border-on-background p-6 max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">{initial ? "Modifier" : "Nouvelle question"}</h2>
-          <button onClick={onClose} aria-label="Fermer" className="text-outline">
+        <header className="flex items-center justify-between mb-4 pl-4 relative">
+          <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+          <div>
+            <DataLabel>{initial ? "EDIT_MODE" : "NEW_QUESTION"}</DataLabel>
+            <h2 className="font-sans font-black text-2xl tracking-tighter uppercase mt-1">
+              {initial ? "Modifier" : "Nouvelle"}
+            </h2>
+          </div>
+          <button onClick={onClose} aria-label="Fermer" className="opacity-60 hover:opacity-100">
             <Icon name="close" />
           </button>
         </header>
 
         <div className="flex flex-col gap-4">
-          <Field label="Libellé">
+          <Field label="LIBELLÉ">
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm"
+              className="w-full px-3 py-2.5 bg-background border-2 border-on-background text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
               placeholder="Ex : Quelles familles olfactives vous attirent ?"
             />
           </Field>
 
-          <Field label="Type">
+          <Field label="TYPE">
             <select
               value={kind}
               onChange={(e) => setKind(e.target.value as QuestionKind)}
-              className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm"
+              className="w-full px-3 py-2.5 bg-background border-2 border-on-background font-mono text-sm uppercase focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] transition-shadow"
             >
               {Object.entries(KIND_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>
@@ -331,12 +345,12 @@ function QuestionEditor({
           </Field>
 
           {needsList && (
-            <Field label="Choix (un par ligne)">
+            <Field label="CHOIX (UN PAR LIGNE)">
               <textarea
                 value={optionsText}
                 onChange={(e) => setOptionsText(e.target.value)}
                 rows={6}
-                className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm font-mono"
+                className="w-full px-3 py-2.5 bg-background border-2 border-on-background text-sm font-mono focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
                 placeholder={"Floral\nBoisé\nOriental"}
               />
             </Field>
@@ -347,20 +361,20 @@ function QuestionEditor({
               type="checkbox"
               checked={required}
               onChange={(e) => setRequired(e.target.checked)}
+              className="w-4 h-4 accent-on-background"
             />
-            Réponse obligatoire
+            <span className="font-mono text-xs uppercase tracking-widest">RÉPONSE OBLIGATOIRE</span>
           </label>
 
-          {error && <p className="text-sm text-error">{error}</p>}
+          {error && (
+            <div className="border-2 border-on-background bg-on-background text-background px-3 py-2">
+              <p className="font-mono text-xs uppercase tracking-wider">{error}</p>
+            </div>
+          )}
 
-          <button
-            type="button"
-            disabled={busy}
-            onClick={save}
-            className="w-full py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest disabled:opacity-50"
-          >
+          <BrutalistButton onClick={save} disabled={busy} size="lg" className="w-full">
             {busy ? "Enregistrement…" : "Enregistrer"}
-          </button>
+          </BrutalistButton>
         </div>
       </div>
     </div>
@@ -370,7 +384,7 @@ function QuestionEditor({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-xs uppercase tracking-widest text-outline">{label}</span>
+      <DataLabel emphasis="high">{label}</DataLabel>
       {children}
     </label>
   );

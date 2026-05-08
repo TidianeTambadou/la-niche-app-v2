@@ -12,6 +12,7 @@ import { useShopMode } from "@/lib/service-mode";
 import { authedFetch } from "@/lib/api-client";
 import { timeAgo, isoDate } from "@/lib/time";
 import type { CommChannel, ClientSource } from "@/lib/types";
+import { DataLabel } from "@/components/brutalist/DataLabel";
 
 type ClientRow = {
   id: string;
@@ -119,40 +120,44 @@ export default function ClientsPage() {
   if (isKiosk) {
     return (
       <div className="px-6 py-6 flex flex-col gap-5">
-        <header className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">Mes clients</h1>
-          <Link
-            href="/pour-un-client"
-            className="flex items-center gap-1 px-3 py-2 bg-primary text-on-primary rounded-full text-xs font-bold uppercase tracking-widest"
-          >
-            <Icon name="add" size={16} />
-            Ajouter
-          </Link>
+        <header className="relative pl-6">
+          <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+          <DataLabel>KIOSK_MODE · IN_SERVICE</DataLabel>
+          <h1 className="font-sans font-black text-3xl tracking-tighter uppercase leading-none mt-2">
+            MES CLIENTS
+          </h1>
+          <p className="font-cormorant italic text-base opacity-70 mt-3">
+            « Mode boutique actif — détails masqués pendant les heures d'ouverture. »
+          </p>
         </header>
 
-        <p className="text-xs text-outline leading-relaxed">
-          Mode boutique actif — détails complets cachés pendant les heures d'ouverture.
-        </p>
+        <Link
+          href="/pour-un-client"
+          className="self-start inline-flex items-center gap-2 px-5 py-2.5 bg-on-background text-background border-2 border-on-background shadow-[4px_4px_0px_0px_currentColor] hover:shadow-[2px_2px_0px_0px_currentColor] hover:translate-x-[2px] hover:translate-y-[2px] text-xs font-bold uppercase tracking-widest transition-all duration-150"
+        >
+          <Icon name="add" size={16} />
+          Ajouter
+        </Link>
 
         {loading ? (
-          <p className="text-sm text-on-surface-variant">Chargement…</p>
+          <DataLabel>LOADING…</DataLabel>
         ) : clients.length === 0 ? (
-          <p className="text-sm text-on-surface-variant text-center py-8">
-            Aucun client pour l'instant.
-          </p>
+          <DataLabel className="text-center py-8 block">
+            EMPTY · NO_CLIENT_YET
+          </DataLabel>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {clients.map((c) => (
+          <ul className="flex flex-col">
+            {clients.map((c, i) => (
               <li
                 key={c.id}
-                className="flex items-center justify-between gap-3 px-4 py-3 border border-outline-variant rounded-2xl"
+                className={`flex items-center justify-between gap-3 px-4 py-3 border-2 border-on-background ${
+                  i > 0 ? "border-t-0" : ""
+                }`}
               >
                 <span className="font-medium truncate">
                   {c.first_name} {c.last_name.charAt(0).toUpperCase()}.
                 </span>
-                <span className="text-xs text-on-surface-variant flex-shrink-0">
-                  {timeAgo(c.created_at)}
-                </span>
+                <DataLabel>{timeAgo(c.created_at)}</DataLabel>
               </li>
             ))}
           </ul>
@@ -163,15 +168,23 @@ export default function ClientsPage() {
 
   return (
     <div className="px-6 py-6 flex flex-col gap-5">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Mes clients</h1>
-        <Link
-          href="/pour-un-client"
-          className="flex items-center gap-1 px-3 py-2 bg-primary text-on-primary rounded-full text-xs font-bold uppercase tracking-widest"
-        >
-          <Icon name="add" size={16} />
-          Ajouter
-        </Link>
+      <header className="relative pl-6">
+        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+        <DataLabel>CRM · CLIENT_INDEX</DataLabel>
+        <div className="flex items-end justify-between gap-3 mt-2">
+          <h1 className="font-sans font-black text-3xl tracking-tighter uppercase leading-none">
+            MES
+            <br />
+            <span className="ml-4">CLIENTS</span>
+          </h1>
+          <Link
+            href="/pour-un-client"
+            className="inline-flex items-center gap-1 px-4 py-2 bg-on-background text-background border-2 border-on-background shadow-[4px_4px_0px_0px_currentColor] hover:shadow-[2px_2px_0px_0px_currentColor] hover:translate-x-[2px] hover:translate-y-[2px] text-[11px] font-bold uppercase tracking-widest transition-all duration-150"
+          >
+            <Icon name="add" size={14} />
+            Ajouter
+          </Link>
+        </div>
       </header>
 
       <CalendarBlock
@@ -186,14 +199,14 @@ export default function ClientsPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher (nom, prénom, email)…"
-          className="w-full px-4 py-2.5 bg-surface-container rounded-full border border-outline-variant text-sm"
+          placeholder="RECHERCHER (NOM, PRÉNOM, EMAIL)…"
+          className="w-full px-4 py-3 bg-background border-2 border-on-background font-mono text-xs uppercase tracking-wider focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
         />
         <div className="flex gap-2">
           <select
             value={source}
             onChange={(e) => setSource(e.target.value as "" | ClientSource)}
-            className="flex-1 px-3 py-2 bg-surface-container rounded-full border border-outline-variant text-xs"
+            className="flex-1 px-3 py-2.5 bg-background border-2 border-on-background font-mono text-xs uppercase tracking-wider focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] transition-shadow"
           >
             {SOURCE_OPTS.map((o) => (
               <option key={o.v} value={o.v}>
@@ -204,7 +217,7 @@ export default function ClientsPage() {
           <select
             value={channel}
             onChange={(e) => setChannel(e.target.value as "" | CommChannel)}
-            className="flex-1 px-3 py-2 bg-surface-container rounded-full border border-outline-variant text-xs"
+            className="flex-1 px-3 py-2.5 bg-background border-2 border-on-background font-mono text-xs uppercase tracking-wider focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] transition-shadow"
           >
             {CHANNEL_OPTS.map((o) => (
               <option key={o.v} value={o.v}>
@@ -216,7 +229,7 @@ export default function ClientsPage() {
             <button
               type="button"
               onClick={() => setSelectedDate(undefined)}
-              className="px-3 py-2 border border-outline-variant rounded-full text-xs flex items-center gap-1"
+              className="px-3 py-2.5 border-2 border-on-background hover:bg-on-background hover:text-background font-mono text-xs uppercase tracking-widest flex items-center gap-1 transition-colors duration-150"
             >
               <Icon name="close" size={14} />
               Date
@@ -226,23 +239,21 @@ export default function ClientsPage() {
       </div>
 
       {error && (
-        <p className="text-sm text-error border border-error/30 bg-error-container/30 px-4 py-3 rounded-xl">
-          {error}
-        </p>
+        <div className="border-2 border-on-background bg-on-background text-background px-4 py-3">
+          <p className="font-mono text-xs uppercase tracking-wider">{error}</p>
+        </div>
       )}
 
       {/* List */}
       <section className="flex flex-col gap-2">
-        <p className="text-xs uppercase tracking-widest text-outline">
-          {visible.length} client{visible.length > 1 ? "s" : ""}
+        <DataLabel emphasis="high">
+          {visible.length} CLIENT{visible.length > 1 ? "S" : ""}
           {selectedDate && ` · ${selectedDate.toLocaleDateString("fr")}`}
-        </p>
+        </DataLabel>
         {loading ? (
-          <p className="text-sm text-on-surface-variant">Chargement…</p>
+          <DataLabel>LOADING…</DataLabel>
         ) : visible.length === 0 ? (
-          <p className="text-sm text-on-surface-variant text-center py-8">
-            Aucun client à afficher.
-          </p>
+          <DataLabel className="text-center py-8 block">EMPTY</DataLabel>
         ) : (
           <ul className="flex flex-col gap-2">
             {visible.map((c) => (
@@ -268,7 +279,7 @@ function CalendarBlock({
   countByDate: (d: Date) => number;
 }) {
   return (
-    <div className="border border-outline-variant rounded-3xl px-2 py-3">
+    <div className="border-2 border-on-background bg-background px-2 py-3 shadow-[4px_4px_0px_0px_currentColor]">
       <DayPicker
         mode="single"
         selected={selectedDate}
@@ -289,28 +300,28 @@ function ClientCard({ client }: { client: ClientRow }) {
   return (
     <Link
       href={`/clients/${client.id}`}
-      className="flex items-start gap-3 px-4 py-3 border border-outline-variant rounded-2xl active:scale-[0.99] transition-transform"
+      className="flex items-start gap-3 px-4 py-3 border-2 border-on-background bg-background hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_currentColor] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150"
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className="font-semibold truncate">
+          <p className="font-sans font-bold uppercase tracking-tight truncate">
             {client.first_name} {client.last_name}
           </p>
           <SourceBadge source={client.source} />
         </div>
-        <div className="flex items-center gap-2 text-xs text-on-surface-variant mt-0.5">
-          <span>{timeAgo(client.created_at)}</span>
-          <span>·</span>
-          <span className="uppercase tracking-widest">
-            {client.preferred_channel === "both" ? "Email+SMS" : client.preferred_channel}
-          </span>
+        <div className="flex items-center gap-2 mt-1">
+          <DataLabel>{timeAgo(client.created_at)}</DataLabel>
+          <span className="opacity-40">·</span>
+          <DataLabel>
+            {client.preferred_channel === "both" ? "EMAIL+SMS" : client.preferred_channel.toUpperCase()}
+          </DataLabel>
         </div>
         {families.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {families.map((f) => (
               <span
                 key={f}
-                className="text-[10px] uppercase tracking-widest px-2 py-0.5 border border-outline-variant rounded-full"
+                className="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 border-2 border-on-background"
               >
                 {f}
               </span>
@@ -318,7 +329,7 @@ function ClientCard({ client }: { client: ClientRow }) {
           </div>
         )}
       </div>
-      <Icon name="chevron_right" className="text-outline mt-1" />
+      <Icon name="chevron_right" className="opacity-40 mt-1" />
     </Link>
   );
 }
@@ -327,14 +338,14 @@ function SourceBadge({ source }: { source: ClientSource }) {
   const isInShop = source === "in_shop";
   return (
     <span
-      className={`text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full font-medium ${
+      className={`font-mono text-[9px] uppercase tracking-widest px-1.5 py-0.5 border ${
         isInShop
-          ? "bg-primary-container/50 text-on-primary-container"
-          : "bg-tertiary-container/50 text-on-tertiary-container"
+          ? "bg-on-background text-background border-on-background"
+          : "bg-background text-on-background border-on-background"
       }`}
       title={isInShop ? "Rempli en boutique" : "Rempli depuis le compte user"}
     >
-      {isInShop ? "Boutique" : "Compte"}
+      {isInShop ? "BOUTIQUE" : "COMPTE"}
     </span>
   );
 }

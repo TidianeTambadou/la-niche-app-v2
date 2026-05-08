@@ -30,6 +30,16 @@ export function useSpeechRecognition({
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<SR | null>(null);
+  // Stash the callback in a ref so the effect below doesn't re-run (and
+  // recreate the SpeechRecognition object) on every render. Without this,
+  // the very first interim result triggers a state update in the caller,
+  // which gives a fresh `onTranscript` identity, which tears down the
+  // running recognition mid-listen and the user only ever hears their
+  // first word transcribed.
+  const onTranscriptRef = useRef(onTranscript);
+  useEffect(() => {
+    onTranscriptRef.current = onTranscript;
+  }, [onTranscript]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -50,16 +60,20 @@ export function useSpeechRecognition({
       for (let i = 0; i < results.length; i++) {
         text += results[i][0].transcript;
       }
-      onTranscript(text);
+      onTranscriptRef.current(text);
     };
     r.onend = () => setListening(false);
     r.onerror = () => setListening(false);
     recognitionRef.current = r;
     return () => {
-      r.stop();
+      try {
+        r.stop();
+      } catch {
+        // already stopped — the browser throws InvalidStateError sometimes.
+      }
       recognitionRef.current = null;
     };
-  }, [onTranscript]);
+  }, []);
 
   function start() {
     const r = recognitionRef.current;

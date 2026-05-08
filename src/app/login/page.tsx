@@ -7,6 +7,9 @@ import { clsx } from "clsx";
 import { Icon } from "@/components/Icon";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import { GridBackground } from "@/components/brutalist/GridBackground";
+import { DataLabel } from "@/components/brutalist/DataLabel";
+import { BrutalistButton } from "@/components/brutalist/BrutalistButton";
 
 type Mode = "signin" | "signup" | "magic";
 
@@ -84,10 +87,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-[100dvh] flex items-center justify-center">
-          <p className="text-[10px] uppercase tracking-widest text-outline">
-            Chargement…
-          </p>
+        <main className="min-h-[100dvh] flex items-center justify-center bg-background">
+          <DataLabel>LOADING…</DataLabel>
         </main>
       }
     >
@@ -302,47 +303,45 @@ function LoginContent() {
   }
 
   return (
-    <main className="min-h-[100dvh] flex flex-col justify-between max-w-screen-md mx-auto px-6 pt-12 pb-10 safe-top safe-bottom">
-      <header className="mb-10">
+    <main className="min-h-[100dvh] relative bg-background flex flex-col justify-between max-w-screen-md mx-auto px-6 pt-10 pb-8 safe-top safe-bottom">
+      <GridBackground />
+      <header className="relative z-10 mb-8">
         <div className="flex items-center justify-between mb-10">
-          <Link
-            href="/"
-            className="text-xl font-semibold tracking-[0.2em] uppercase"
-          >
-            LA NICHE
+          <Link href="/" aria-label="Accueil" className="block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo-laniche.png"
+              alt="La Niche"
+              className="h-10 w-auto object-contain dark:invert"
+            />
           </Link>
-          <span className="text-[10px] font-mono text-outline uppercase">
-            v1.0
-          </span>
+          <DataLabel>BUILD://v2.0</DataLabel>
         </div>
-        <div className="flex items-center gap-6 mb-12">
-          <span className="text-[10px] uppercase tracking-[0.3em] font-semibold">
-            Étape 00
-          </span>
-          <div className="h-px flex-1 bg-outline-variant">
-            <div className="h-px w-1/4 bg-primary" />
+        <div className="flex items-center gap-4">
+          <DataLabel emphasis="high">STEP:00</DataLabel>
+          <div className="h-[2px] flex-1 bg-on-background/10 relative">
+            <div className="absolute inset-y-0 left-0 w-1/4 bg-on-background" />
           </div>
-          <span className="text-[10px] uppercase tracking-[0.3em] text-on-surface-variant">
-            Identification
-          </span>
+          <DataLabel>IDENTIFICATION</DataLabel>
         </div>
       </header>
 
-      <section className="flex-1 flex flex-col justify-center">
-        <h1 className="text-5xl md:text-6xl font-extralight tracking-tighter leading-[0.9] mb-4">
-          {mode === "signup" ? "Crée ton" : "Entre dans le"}
-          <br />
-          <span className="italic font-serif">
-            {mode === "signup" ? "compte." : "vestiaire."}
+      <section className="relative z-10 flex-1 flex flex-col justify-center pl-6">
+        <div className="absolute left-0 top-4 bottom-4 w-[2px] bg-on-background" />
+        <h1 className="font-sans font-black text-5xl md:text-6xl tracking-tighter leading-none uppercase mb-6">
+          <span className="block">{mode === "signup" ? "CRÉE" : "ENTRE"}</span>
+          <span className="block ml-6">{mode === "signup" ? "TON" : "DANS"}</span>
+          <span className="block ml-12">
+            {mode === "signup" ? "COMPTE" : "LE VESTIAIRE"}
           </span>
         </h1>
-        <p className="text-sm text-on-surface-variant max-w-md leading-relaxed mb-10">
+        <p className="font-cormorant italic text-lg opacity-60 max-w-md mb-10">
           {mode === "magic"
-            ? "On t'envoie un lien de connexion à usage unique par email."
-            : "Ta mémoire olfactive : wishlist, balades, placements corps. Synchronisés sur tous tes écrans."}
+            ? "« On t'envoie un lien de connexion à usage unique par email. »"
+            : "« Ta mémoire olfactive, synchronisée. »"}
         </p>
 
-        <div className="flex gap-6 mb-8 border-b border-outline-variant/40 pb-3">
+        <div className="flex gap-6 mb-8 border-b-2 border-on-background pb-3">
           <ModeTab
             active={mode === "signin"}
             onClick={() => {
@@ -374,11 +373,8 @@ function LoginContent() {
 
         <form onSubmit={onSubmit} className="flex flex-col gap-6">
           <div>
-            <label
-              htmlFor="email"
-              className="text-[10px] uppercase tracking-[0.2em] font-bold text-outline block mb-2"
-            >
-              Email
+            <label htmlFor="email" className="block mb-2">
+              <DataLabel emphasis="high">EMAIL</DataLabel>
             </label>
             <input
               id="email"
@@ -388,27 +384,24 @@ function LoginContent() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="prenom@domaine.com"
-              className="w-full bg-transparent border-b border-outline-variant py-2 text-base focus:outline-none focus:border-primary placeholder:text-outline/50 transition-colors"
+              className="w-full bg-background border-2 border-on-background py-3 px-4 font-mono text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
             />
           </div>
 
           {mode !== "magic" && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label
-                  htmlFor="password"
-                  className="text-[10px] uppercase tracking-[0.2em] font-bold text-outline"
-                >
-                  Mot de passe
+                <label htmlFor="password">
+                  <DataLabel emphasis="high">PASSWORD</DataLabel>
                 </label>
                 {mode === "signin" && (
                   <button
                     type="button"
                     onClick={sendPasswordReset}
                     disabled={resetting}
-                    className="text-[10px] uppercase tracking-widest text-outline hover:text-on-background transition-colors disabled:opacity-40"
+                    className="font-mono text-[10px] uppercase tracking-widest opacity-60 hover:opacity-100 transition-opacity disabled:opacity-30"
                   >
-                    {resetting ? "Envoi…" : "Mot de passe oublié ?"}
+                    {resetting ? "ENVOI…" : "OUBLIÉ ?"}
                   </button>
                 )}
               </div>
@@ -424,7 +417,7 @@ function LoginContent() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="•••••••••"
-                  className="w-full bg-transparent border-b border-outline-variant py-2 pr-10 text-base focus:outline-none focus:border-primary placeholder:text-outline/50 transition-colors"
+                  className="w-full bg-background border-2 border-on-background py-3 px-4 pr-12 font-mono text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
                 />
                 <button
                   type="button"
@@ -432,7 +425,7 @@ function LoginContent() {
                   aria-label={
                     showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"
                   }
-                  className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-outline hover:text-on-background transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 opacity-60 hover:opacity-100 transition-opacity"
                 >
                   <Icon
                     name={showPassword ? "visibility_off" : "visibility"}
@@ -441,31 +434,34 @@ function LoginContent() {
                 </button>
               </div>
               {mode === "signup" && (
-                <p className="text-[10px] uppercase tracking-widest text-outline mt-2">
-                  8 caractères minimum
+                <p className="font-mono text-[10px] uppercase tracking-widest opacity-60 mt-2">
+                  MIN:08
                 </p>
               )}
             </div>
           )}
 
           {error && (
-            <div className="border border-error/50 bg-error-container/20 px-4 py-3">
-              <p className="text-xs text-error">{error}</p>
+            <div className="border-2 border-on-background bg-on-background text-background px-4 py-3">
+              <p className="font-mono text-xs uppercase tracking-wider">{error}</p>
             </div>
           )}
           {info && (
-            <div className="border border-outline-variant bg-surface-container-low px-4 py-3">
-              <p className="text-xs text-on-surface-variant">{info}</p>
+            <div className="border-2 border-on-background bg-on-background/5 px-4 py-3">
+              <p className="font-mono text-xs uppercase tracking-wider opacity-80">
+                {info}
+              </p>
             </div>
           )}
 
-          <button
+          <BrutalistButton
             type="submit"
             disabled={submitting}
-            className="w-full py-4 bg-primary text-on-primary rounded-full text-xs uppercase tracking-[0.3em] font-bold active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+            size="lg"
+            className="w-full"
           >
             {submitting ? (
-              <Icon name="progress_activity" size={16} />
+              <Icon name="progress_activity" size={16} className="animate-spin" />
             ) : (
               <Icon name="arrow_forward" size={16} />
             )}
@@ -476,19 +472,19 @@ function LoginContent() {
                 : mode === "signup"
                   ? "Créer mon compte"
                   : "Envoyer le lien"}
-          </button>
+          </BrutalistButton>
         </form>
       </section>
 
-      <footer className="mt-10 pt-6 border-t border-outline-variant/40 flex items-center justify-between gap-4">
+      <footer className="relative z-10 mt-8 pt-6 border-t-2 border-on-background flex items-center justify-between gap-4">
         <Link
           href="/"
-          className="text-[10px] uppercase tracking-widest text-outline hover:text-on-background transition-colors"
+          className="font-mono text-[10px] uppercase tracking-widest opacity-60 hover:opacity-100 transition-opacity"
         >
-          ← Retour à l&apos;accueil
+          ← ACCUEIL
         </Link>
-        <span className="text-[10px] uppercase tracking-widest text-outline text-right max-w-[180px]">
-          Synthesis is the convergence of data and intuition.
+        <span className="font-cormorant italic text-sm opacity-60 text-right max-w-[200px]">
+          « Synthesis is the convergence of data and intuition. »
         </span>
       </footer>
     </main>
@@ -513,12 +509,12 @@ function ModeTab({
         active ? "opacity-100" : "opacity-40 hover:opacity-100",
       )}
     >
-      <span className="text-xs font-bold tracking-[0.2em] uppercase">
+      <span className="font-sans font-bold text-xs tracking-[0.2em] uppercase">
         {label}
       </span>
       <div
         className={clsx(
-          "h-0.5 mt-2 bg-primary transition-all",
+          "h-[2px] mt-2 bg-on-background transition-all",
           active ? "w-full" : "w-0",
         )}
       />

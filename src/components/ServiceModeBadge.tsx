@@ -36,7 +36,7 @@ export function ServiceModeBadge() {
     return (
       <Link
         href="/settings"
-        className="text-on-background hover:opacity-70 active:scale-95 transition-all duration-200"
+        className="text-on-background hover:opacity-60 active:scale-95 transition-all duration-150"
         aria-label="Réglages"
       >
         <Icon name="settings" />
@@ -54,7 +54,7 @@ export function ServiceModeBadge() {
           router.replace("/pour-un-client");
         }}
         aria-label="Reverrouiller le mode boutique"
-        className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-primary border border-primary/40 rounded-full px-2 py-0.5"
+        className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest font-bold border-2 border-on-background bg-on-background text-background px-2 py-0.5"
       >
         <Icon name="lock_open" size={14} />
         Admin
@@ -68,7 +68,7 @@ export function ServiceModeBadge() {
         type="button"
         onClick={() => setUnlockOpen(true)}
         aria-label="Déverrouiller les réglages"
-        className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-outline hover:text-on-background"
+        className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest border-2 border-on-background px-2 py-0.5 hover:bg-on-background hover:text-background transition-colors duration-150"
       >
         <Icon name="lock" size={14} />
         Boutique
@@ -149,29 +149,34 @@ function UnlockModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center"
+      className="fixed inset-0 z-50 bg-on-background/40 flex items-end justify-center"
       onClick={onClose}
     >
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={submit}
-        className="w-full max-w-screen-md bg-surface rounded-t-3xl p-6 flex flex-col gap-4"
+        className="w-full max-w-screen-md bg-background border-t-2 border-on-background p-6 flex flex-col gap-4"
       >
-        <header className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Déverrouiller les réglages</h3>
+        <header className="flex items-center justify-between pl-4 relative">
+          <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+          <div>
+            <span className="font-mono text-xs tracking-widest uppercase opacity-60">UNLOCK · ADMIN</span>
+            <h3 className="font-sans font-black text-2xl tracking-tighter uppercase mt-1">
+              Déverrouiller
+            </h3>
+          </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Fermer"
-            className="text-outline"
+            className="opacity-60 hover:opacity-100"
           >
             <Icon name="close" />
           </button>
         </header>
-        <p className="text-xs text-on-surface-variant leading-relaxed">
-          Pendant les heures d'ouverture, l'app cache les réglages pour qu'aucun
-          client ne tombe dessus. Saisis ton mot de passe boutique pour les
-          rouvrir le temps de la session.
+        <p className="font-cormorant italic text-base opacity-70 leading-relaxed">
+          « Pendant les heures d'ouverture, l'app cache les réglages.
+          Saisis ton mot de passe boutique pour les rouvrir. »
         </p>
         <input
           type="password"
@@ -180,13 +185,17 @@ function UnlockModal({
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Mot de passe"
-          className="w-full px-4 py-3 bg-surface-container rounded-2xl border border-outline-variant text-sm"
+          className="w-full px-4 py-3 bg-background border-2 border-on-background font-mono text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
         />
-        {error && <p className="text-sm text-error">{error}</p>}
+        {error && (
+          <div className="border-2 border-on-background bg-on-background text-background px-3 py-2">
+            <p className="font-mono text-xs uppercase tracking-wider">{error}</p>
+          </div>
+        )}
         <button
           type="submit"
           disabled={busy}
-          className="w-full py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest disabled:opacity-50"
+          className="w-full py-3.5 px-6 bg-on-background text-background border-2 border-on-background shadow-[4px_4px_0px_0px_currentColor] hover:shadow-[2px_2px_0px_0px_currentColor] hover:translate-x-[2px] hover:translate-y-[2px] text-sm font-bold uppercase tracking-widest disabled:opacity-50 transition-all duration-150"
         >
           {busy ? "Vérification…" : "Déverrouiller"}
         </button>

@@ -10,6 +10,8 @@ import { useShopRole } from "@/lib/role";
 import { useGuardOutOfService } from "@/lib/service-mode";
 import { authedFetch } from "@/lib/api-client";
 import type { ShopPerfume } from "@/lib/types";
+import { DataLabel } from "@/components/brutalist/DataLabel";
+import { BrutalistButton } from "@/components/brutalist/BrutalistButton";
 
 type Mode = "perfume" | "freeform";
 type Channel = "email" | "sms" | "both";
@@ -125,25 +127,37 @@ export default function NewsletterPage() {
   }
 
   if (loading || roleLoading) {
-    return <div className="p-6 text-sm text-on-surface-variant">Chargement…</div>;
+    return (
+      <div className="p-6">
+        <DataLabel>LOADING…</DataLabel>
+      </div>
+    );
   }
 
   return (
     <div className="px-6 py-6 flex flex-col gap-5">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Newsletter</h1>
-        <Link
-          href="/newsletter/stock"
-          className="text-xs uppercase tracking-widest font-medium text-primary border-b border-primary"
-        >
-          Stock
-        </Link>
+      <header className="relative pl-6">
+        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+        <DataLabel>CAMPAIGN_BUILDER</DataLabel>
+        <div className="flex items-end justify-between gap-3 mt-2">
+          <h1 className="font-sans font-black text-3xl tracking-tighter uppercase leading-none">
+            NEWS-
+            <br />
+            <span className="ml-4">LETTER</span>
+          </h1>
+          <Link
+            href="/newsletter/stock"
+            className="font-mono text-xs uppercase tracking-widest font-bold border-b-2 border-on-background hover:opacity-60 transition-opacity"
+          >
+            STOCK →
+          </Link>
+        </div>
       </header>
 
       {error && (
-        <p className="text-sm text-error border border-error/30 bg-error-container/30 px-4 py-3 rounded-xl">
-          {error}
-        </p>
+        <div className="border-2 border-on-background bg-on-background text-background px-4 py-3">
+          <p className="font-mono text-xs uppercase tracking-wider">{error}</p>
+        </div>
       )}
 
       {step.kind === "mode" && (
@@ -181,12 +195,12 @@ export default function NewsletterPage() {
 
       {step.kind === "scoring" && (
         <div className="min-h-[40vh] flex flex-col items-center justify-center gap-3">
-          <Icon name="progress_activity" size={48} className="text-primary animate-spin" />
-          <p className="text-sm text-on-surface-variant text-center">
+          <Icon name="progress_activity" size={48} className="animate-spin" />
+          <DataLabel emphasis="high" className="text-center">
             {step.perfume
-              ? `L'IA sélectionne ${step.count === "all" ? "toute ta base" : `les ${step.count} clients`} les plus alignés…`
-              : `Récupération de ${step.count === "all" ? "toute la base" : `${step.count} clients`}…`}
-          </p>
+              ? `IA · SCORING ${step.count === "all" ? "ALL_CLIENTS" : `${step.count}_CLIENTS`}…`
+              : `FETCH ${step.count === "all" ? "ALL_CLIENTS" : `${step.count}_CLIENTS`}…`}
+          </DataLabel>
         </div>
       )}
 
@@ -202,10 +216,10 @@ export default function NewsletterPage() {
 
       {step.kind === "sending" && (
         <div className="min-h-[40vh] flex flex-col items-center justify-center gap-3">
-          <Icon name="send" size={48} className="text-primary animate-pulse" />
-          <p className="text-sm text-on-surface-variant">
-            Envoi en cours à {step.preview.audience.length} destinataires…
-          </p>
+          <Icon name="send" size={48} className="animate-pulse" />
+          <DataLabel emphasis="high">
+            SENDING · {step.preview.audience.length}_RECIPIENTS…
+          </DataLabel>
         </div>
       )}
 
@@ -227,40 +241,42 @@ function ModeStep({
 }) {
   return (
     <section className="flex flex-col gap-3">
-      <p className="text-sm text-on-surface-variant">
-        Choisis le type de campagne :
-      </p>
+      <DataLabel emphasis="high">SELECT_MODE</DataLabel>
       <button
         type="button"
         onClick={onPickPerfume}
-        className="w-full text-left px-4 py-4 border border-outline-variant rounded-2xl hover:border-primary transition-colors flex items-start gap-3"
+        className="w-full text-left px-4 py-4 border-2 border-on-background bg-background hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_currentColor] transition-all duration-150 flex items-start gap-3"
       >
-        <Icon name="auto_awesome" className="mt-0.5 text-primary" />
+        <Icon name="auto_awesome" className="mt-0.5" />
         <div className="flex-1">
-          <p className="text-base font-semibold">Par parfum</p>
-          <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
+          <p className="font-sans font-black text-base uppercase tracking-tight">
+            Par parfum
+          </p>
+          <p className="text-xs opacity-70 mt-1 leading-relaxed">
             Tu choisis un parfum dans ton stock. L'IA cible automatiquement
-            les clients qui ont le profil olfactif compatible et écrit un
-            message taillé pour chacun.
+            les clients au profil olfactif compatible et écrit un message
+            taillé pour chacun.
           </p>
         </div>
-        <Icon name="chevron_right" className="text-outline mt-1" />
+        <Icon name="chevron_right" className="opacity-40 mt-1" />
       </button>
       <button
         type="button"
         onClick={onPickFreeform}
-        className="w-full text-left px-4 py-4 border border-outline-variant rounded-2xl hover:border-primary transition-colors flex items-start gap-3"
+        className="w-full text-left px-4 py-4 border-2 border-on-background bg-background hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_currentColor] transition-all duration-150 flex items-start gap-3"
       >
-        <Icon name="edit_note" className="mt-0.5 text-primary" />
+        <Icon name="edit_note" className="mt-0.5" />
         <div className="flex-1">
-          <p className="text-base font-semibold">Message libre</p>
-          <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
-            Annonce horaires d'été, soldes, événement… tu rédiges ce que
-            tu veux et tu choisis l'audience (toute ta base ou un nombre
+          <p className="font-sans font-black text-base uppercase tracking-tight">
+            Message libre
+          </p>
+          <p className="text-xs opacity-70 mt-1 leading-relaxed">
+            Annonce horaires d'été, soldes, événement… tu rédiges ce que tu
+            veux et tu choisis l'audience (toute ta base ou un nombre
             précis).
           </p>
         </div>
-        <Icon name="chevron_right" className="text-outline mt-1" />
+        <Icon name="chevron_right" className="opacity-40 mt-1" />
       </button>
     </section>
   );
@@ -280,46 +296,43 @@ function PickPerfume({
   if (perfumes.length === 0) {
     return (
       <div className="flex flex-col items-center text-center gap-3 py-8">
-        <p className="text-sm text-on-surface-variant">
+        <DataLabel emphasis="high">EMPTY_STOCK</DataLabel>
+        <p className="text-sm opacity-70">
           Aucun parfum en stock. Ajoute des parfums avant d'envoyer une newsletter.
         </p>
-        <Link
-          href="/newsletter/stock"
-          className="px-4 py-2 bg-primary text-on-primary rounded-full text-xs font-bold uppercase tracking-widest"
-        >
-          Gérer le stock
-        </Link>
+        <BrutalistButton onClick={() => null} className="!px-5 !py-2">
+          <Link href="/newsletter/stock">Gérer le stock</Link>
+        </BrutalistButton>
         <button
           type="button"
           onClick={onBack}
-          className="text-xs uppercase tracking-widest text-outline mt-2"
+          className="font-mono text-[10px] uppercase tracking-widest opacity-60 hover:opacity-100 mt-2"
         >
-          Retour
+          ← RETOUR
         </button>
       </div>
     );
   }
   return (
     <section className="flex flex-col gap-3">
-      <p className="text-sm text-on-surface-variant">
-        Choisis un parfum à mettre en avant. L'IA sélectionnera les clients les
-        plus susceptibles de l'aimer.
-      </p>
+      <DataLabel emphasis="high">SELECT_PERFUME · {perfumes.length} ITEMS</DataLabel>
       <ul className="flex flex-col gap-2">
         {perfumes.map((p) => (
           <li key={p.id}>
             <button
               type="button"
               onClick={() => onPick(p)}
-              className="w-full flex items-start justify-between gap-3 px-4 py-3 border border-outline-variant rounded-2xl hover:border-primary text-left transition-colors"
+              className="w-full flex items-start justify-between gap-3 px-4 py-3 border-2 border-on-background bg-background hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_currentColor] text-left transition-all duration-150"
             >
               <div className="flex-1 min-w-0">
-                <p className="font-semibold truncate">{p.name}</p>
-                <p className="text-xs text-on-surface-variant truncate">
+                <p className="font-sans font-bold uppercase tracking-tight truncate">
+                  {p.name}
+                </p>
+                <p className="font-mono text-xs opacity-60 uppercase tracking-wider truncate mt-0.5">
                   {p.brand} {p.family && `· ${p.family}`}
                 </p>
               </div>
-              <Icon name="chevron_right" className="text-outline mt-1" />
+              <Icon name="chevron_right" className="opacity-40 mt-1" />
             </button>
           </li>
         ))}
@@ -327,9 +340,9 @@ function PickPerfume({
       <button
         type="button"
         onClick={onBack}
-        className="self-start text-xs uppercase tracking-widest text-outline mt-2"
+        className="self-start font-mono text-[10px] uppercase tracking-widest opacity-60 hover:opacity-100 mt-2"
       >
-        ← Retour
+        ← RETOUR
       </button>
     </section>
   );
@@ -360,32 +373,31 @@ function ConfigStep({
   return (
     <section className="flex flex-col gap-4">
       {perfume ? (
-        <div className="border border-outline-variant rounded-2xl p-4">
-          <p className="font-semibold">{perfume.name}</p>
-          <p className="text-xs text-on-surface-variant">{perfume.brand}</p>
+        <div className="border-2 border-on-background bg-background p-4">
+          <DataLabel>SELECTED_PERFUME</DataLabel>
+          <p className="font-sans font-black uppercase tracking-tight mt-1">{perfume.name}</p>
+          <p className="font-mono text-xs opacity-60 uppercase tracking-wider">{perfume.brand}</p>
         </div>
       ) : (
-        <div className="border border-outline-variant rounded-2xl p-4 flex items-center gap-2">
-          <Icon name="edit_note" className="text-primary" />
-          <p className="text-sm font-semibold">Message libre</p>
+        <div className="border-2 border-on-background bg-background p-4 flex items-center gap-2">
+          <Icon name="edit_note" />
+          <p className="font-sans font-black uppercase tracking-tight">Message libre</p>
         </div>
       )}
 
       {/* Audience size */}
       <div>
-        <p className="text-xs uppercase tracking-widest text-outline mb-2">
-          Audience
-        </p>
+        <DataLabel emphasis="high" className="mb-2 block">AUDIENCE</DataLabel>
         <div className="flex flex-wrap gap-2 mb-3">
           {presets.map((n) => (
             <button
               key={n}
               type="button"
               onClick={() => setCount(n)}
-              className={`px-4 py-2 border rounded-full text-sm ${
+              className={`px-4 py-2 border-2 font-mono text-xs uppercase tracking-widest transition-colors duration-150 ${
                 count === n
-                  ? "border-primary bg-primary-container/50 font-semibold"
-                  : "border-outline-variant"
+                  ? "border-on-background bg-on-background text-background font-bold"
+                  : "border-on-background bg-background hover:bg-on-background/5"
               }`}
             >
               {n}
@@ -394,10 +406,10 @@ function ConfigStep({
           <button
             type="button"
             onClick={() => setCount("all")}
-            className={`px-4 py-2 border rounded-full text-sm flex items-center gap-1 ${
+            className={`px-4 py-2 border-2 font-mono text-xs uppercase tracking-widest flex items-center gap-1 transition-colors duration-150 ${
               isAll
-                ? "border-primary bg-primary-container/50 font-semibold"
-                : "border-outline-variant"
+                ? "border-on-background bg-on-background text-background font-bold"
+                : "border-on-background bg-background hover:bg-on-background/5"
             }`}
           >
             <Icon name="groups" size={14} />
@@ -413,30 +425,28 @@ function ConfigStep({
             onChange={(e) =>
               setCount(Math.max(1, Math.min(500, Number(e.target.value) || 1)))
             }
-            className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm"
+            className="w-full px-3 py-2 bg-background border-2 border-on-background font-mono text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] transition-shadow"
           />
         )}
       </div>
 
       {/* Channel */}
       <div>
-        <p className="text-xs uppercase tracking-widest text-outline mb-2">
-          Canal d'envoi
-        </p>
+        <DataLabel emphasis="high" className="mb-2 block">CHANNEL</DataLabel>
         <div className="grid grid-cols-3 gap-2">
           {([
             { v: "email", label: "Email", icon: "mail" },
             { v: "sms", label: "SMS", icon: "sms" },
-            { v: "both", label: "Préférence du client", icon: "diversity_3" },
+            { v: "both", label: "Préf. client", icon: "diversity_3" },
           ] as { v: Channel; label: string; icon: string }[]).map((opt) => (
             <button
               key={opt.v}
               type="button"
               onClick={() => setChannel(opt.v)}
-              className={`px-3 py-2 border rounded-xl text-xs flex flex-col items-center gap-1 ${
+              className={`px-3 py-3 border-2 font-mono text-[11px] uppercase tracking-widest flex flex-col items-center gap-1 transition-colors duration-150 ${
                 channel === opt.v
-                  ? "border-primary bg-primary-container/50 font-semibold"
-                  : "border-outline-variant"
+                  ? "border-on-background bg-on-background text-background font-bold"
+                  : "border-on-background bg-background hover:bg-on-background/5"
               }`}
             >
               <Icon name={opt.icon} size={18} />
@@ -444,13 +454,13 @@ function ConfigStep({
             </button>
           ))}
         </div>
-        <p className="text-[11px] text-outline mt-1.5 leading-snug">
+        <p className="font-mono text-[10px] opacity-60 uppercase tracking-wider mt-2 leading-snug">
           {channel === "email" &&
-            "Email uniquement — les clients sans email seront ignorés."}
+            "EMAIL ONLY — CLIENTS SANS EMAIL IGNORÉS."}
           {channel === "sms" &&
-            "SMS uniquement — les clients sans téléphone seront ignorés."}
+            "SMS ONLY — CLIENTS SANS TÉLÉPHONE IGNORÉS."}
           {channel === "both" &&
-            "Chaque client reçoit selon son canal préféré (email ou SMS)."}
+            "CHAQUE CLIENT REÇOIT SELON SON CANAL PRÉFÉRÉ."}
         </p>
       </div>
 
@@ -458,17 +468,13 @@ function ConfigStep({
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 py-3 border border-outline-variant rounded-full text-sm font-medium uppercase tracking-widest"
+          className="flex-1 py-3.5 border-2 border-on-background bg-background hover:bg-on-background hover:text-background text-sm font-bold uppercase tracking-widest transition-colors duration-150"
         >
           Retour
         </button>
-        <button
-          type="button"
-          onClick={onConfirm}
-          className="flex-1 py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest"
-        >
+        <BrutalistButton onClick={onConfirm} size="lg" className="flex-1">
           {perfume ? "Calculer le panel" : "Voir l'audience"}
-        </button>
+        </BrutalistButton>
       </div>
     </section>
   );
@@ -495,40 +501,41 @@ function PreviewStep({
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="border border-outline-variant rounded-2xl p-4 flex flex-col gap-1">
-        <p className="font-semibold">
+      <div className="border-2 border-on-background bg-background p-4 flex flex-col gap-1 shadow-[4px_4px_0px_0px_currentColor]">
+        <DataLabel>PREVIEW</DataLabel>
+        <p className="font-sans font-black uppercase tracking-tight mt-1">
           {preview.perfume ? preview.perfume.name : "Message libre"}
         </p>
-        <p className="text-xs text-on-surface-variant">
-          {preview.audience.length} destinataires retenus sur {preview.totalClients} clients
+        <p className="font-mono text-xs uppercase tracking-wider opacity-60 mt-1">
+          {preview.audience.length}/{preview.totalClients} CLIENTS
           {(emailCount > 0 || smsCount > 0) && (
-            <>
-              {" "}({emailCount} email · {smsCount} sms)
-            </>
+            <> · {emailCount}_EMAIL · {smsCount}_SMS</>
           )}
         </p>
       </div>
 
-      <details className="border border-outline-variant rounded-2xl px-4 py-3" open>
-        <summary className="cursor-pointer text-xs uppercase tracking-widest text-outline">
-          Panel sélectionné
+      <details className="border-2 border-on-background bg-background px-4 py-3" open>
+        <summary className="cursor-pointer">
+          <DataLabel emphasis="high">PANEL_SELECTED</DataLabel>
         </summary>
         <ul className="mt-3 flex flex-col gap-2 max-h-72 overflow-y-auto">
           {preview.audience.map((a) => (
             <li
               key={a.client_id}
-              className="flex items-start gap-2 px-3 py-2 border border-outline-variant rounded-xl"
+              className="flex items-start gap-2 px-3 py-2 border-2 border-on-background"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">
+                <p className="text-sm font-bold uppercase tracking-tight">
                   {a.first_name} {a.last_name}
-                  <span className="ml-2 text-[9px] uppercase tracking-widest text-outline">
+                  <span className="ml-2 font-mono text-[9px] uppercase tracking-widest opacity-60">
                     {a.channel}
                     {preview.perfume && ` · ${a.score}`}
                   </span>
                 </p>
                 {a.reason && (
-                  <p className="text-xs text-on-surface-variant italic mt-0.5">{a.reason}</p>
+                  <p className="font-cormorant italic text-sm opacity-70 mt-0.5">
+                    « {a.reason} »
+                  </p>
                 )}
               </div>
             </li>
@@ -539,49 +546,50 @@ function PreviewStep({
       <button
         type="button"
         onClick={() => setRedraftOpen(true)}
-        className="self-start flex items-center gap-2 px-3 py-1.5 border border-primary/40 rounded-full text-xs font-bold uppercase tracking-widest text-primary hover:bg-primary-container/30"
+        className="self-start flex items-center gap-2 px-4 py-2 border-2 border-on-background bg-background hover:bg-on-background hover:text-background font-mono text-xs font-bold uppercase tracking-widest transition-colors duration-150"
       >
         <Icon name="auto_awesome" size={14} />
-        Reformule avec l'IA
+        Reformule IA
       </button>
 
       {(preview.channel === "email" || preview.channel === "both") && (
-        <details className="border border-outline-variant rounded-2xl px-4 py-3" open>
-          <summary className="cursor-pointer text-xs uppercase tracking-widest text-outline">
-            Email
+        <details className="border-2 border-on-background bg-background px-4 py-3" open>
+          <summary className="cursor-pointer">
+            <DataLabel emphasis="high">EMAIL</DataLabel>
           </summary>
           <div className="mt-3 flex flex-col gap-2">
             <input
               value={draft.subject}
               onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
               placeholder="Objet"
-              className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm"
+              className="w-full px-3 py-2.5 bg-background border-2 border-on-background font-mono text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
             />
             <textarea
               value={draft.body}
               onChange={(e) => setDraft({ ...draft, body: e.target.value })}
               rows={6}
               placeholder="Corps (utilise {{firstName}} pour personnaliser)"
-              className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm"
+              className="w-full px-3 py-2.5 bg-background border-2 border-on-background text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
             />
           </div>
         </details>
       )}
 
       {(preview.channel === "sms" || preview.channel === "both") && (
-        <details className="border border-outline-variant rounded-2xl px-4 py-3">
-          <summary className="cursor-pointer text-xs uppercase tracking-widest text-outline">
-            SMS
+        <details className="border-2 border-on-background bg-background px-4 py-3">
+          <summary className="cursor-pointer">
+            <DataLabel emphasis="high">SMS</DataLabel>
           </summary>
           <textarea
             value={draft.sms}
             onChange={(e) => setDraft({ ...draft, sms: e.target.value })}
             rows={3}
             placeholder="SMS court"
-            className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm mt-3"
+            className="w-full px-3 py-2.5 bg-background border-2 border-on-background text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow mt-3"
           />
-          <p className="text-[10px] text-outline mt-1">
-            {draft.sms.length} caractères {draft.sms.length > 160 && "(deux SMS facturés)"}
+          <p className="font-mono text-[10px] uppercase tracking-widest opacity-60 mt-1">
+            {draft.sms.length} CHARS
+            {draft.sms.length > 160 && " · TWO SMS BILLED"}
           </p>
         </details>
       )}
@@ -590,18 +598,18 @@ function PreviewStep({
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 py-3 border border-outline-variant rounded-full text-sm font-medium uppercase tracking-widest"
+          className="flex-1 py-3.5 border-2 border-on-background bg-background hover:bg-on-background hover:text-background text-sm font-bold uppercase tracking-widest transition-colors duration-150"
         >
           Annuler
         </button>
-        <button
-          type="button"
+        <BrutalistButton
           onClick={onSend}
           disabled={preview.audience.length === 0}
-          className="flex-1 py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest disabled:opacity-50"
+          size="lg"
+          className="flex-1"
         >
           Envoyer à {preview.audience.length}
-        </button>
+        </BrutalistButton>
       </div>
 
       {redraftOpen && (
@@ -624,27 +632,29 @@ function DoneStep({
   onRestart: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center text-center gap-4 py-8">
-      <Icon
-        name={result.failed === 0 ? "check_circle" : "error"}
-        size={64}
-        className={result.failed === 0 ? "text-primary" : "text-error"}
-      />
-      <h2 className="text-2xl font-semibold">
-        {result.sent} message{result.sent > 1 ? "s" : ""} envoyé{result.sent > 1 ? "s" : ""}
+    <div className="flex flex-col items-start gap-4 py-8 relative pl-6">
+      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-on-background" />
+      <DataLabel emphasis="high">
+        {result.failed === 0 ? "SUCCESS" : "PARTIAL_SUCCESS"} ·
+        {String(result.sent).padStart(3, "0")}/{String(result.total).padStart(3, "0")}
+      </DataLabel>
+      <h2 className="font-sans font-black text-4xl tracking-tighter uppercase leading-none">
+        {result.sent}
+        <br />
+        <span className="ml-4">
+          MESSAGE{result.sent > 1 ? "S" : ""}
+        </span>
+        <br />
+        <span className="ml-8">ENVOYÉ{result.sent > 1 ? "S" : ""}</span>
       </h2>
       {result.failed > 0 && (
-        <p className="text-sm text-error">
-          {result.failed} échec{result.failed > 1 ? "s" : ""} sur {result.total}
+        <p className="font-mono text-xs uppercase tracking-wider border-2 border-on-background bg-on-background text-background px-3 py-2">
+          {result.failed} ÉCHEC{result.failed > 1 ? "S" : ""}
         </p>
       )}
-      <button
-        type="button"
-        onClick={onRestart}
-        className="px-5 py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest"
-      >
+      <BrutalistButton onClick={onRestart} size="lg">
         Nouvelle campagne
-      </button>
+      </BrutalistButton>
     </div>
   );
 }
