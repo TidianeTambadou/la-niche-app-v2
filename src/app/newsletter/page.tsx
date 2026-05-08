@@ -11,6 +11,10 @@ import { useGuardOutOfService } from "@/lib/service-mode";
 import { authedFetch } from "@/lib/api-client";
 import type { ShopPerfume } from "@/lib/types";
 
+type Mode = "perfume" | "freeform";
+type Channel = "email" | "sms" | "both";
+type Count = number | "all";
+
 type Recipient = {
   client_id: string;
   first_name: string;
@@ -21,17 +25,19 @@ type Recipient = {
 };
 
 type Preview = {
-  perfume: ShopPerfume;
+  perfume: ShopPerfume | null;
   audience: Recipient[];
   eligibleCount: number;
   totalClients: number;
   draft: { subject: string; body: string; sms: string };
+  channel: Channel;
 };
 
 type Step =
-  | { kind: "pick" }
-  | { kind: "size"; perfume: ShopPerfume }
-  | { kind: "scoring"; perfume: ShopPerfume; count: number }
+  | { kind: "mode" }
+  | { kind: "perfume" }
+  | { kind: "config"; perfume: ShopPerfume | null }
+  | { kind: "scoring"; perfume: ShopPerfume | null; count: Count }
   | { kind: "preview"; preview: Preview }
   | { kind: "sending"; preview: Preview }
   | { kind: "done"; sent: number; failed: number; total: number };
@@ -44,8 +50,9 @@ export default function NewsletterPage() {
   const [perfumes, setPerfumes] = useState<ShopPerfume[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<Step>({ kind: "pick" });
-  const [count, setCount] = useState(20);
+  const [step, setStep] = useState<Step>({ kind: "mode" });
+  const [count, setCount] = useState<Count>(20);
+  const [channel, setChannel] = useState<Channel>("both");
   const [draft, setDraft] = useState({ subject: "", body: "", sms: "" });
 
   useEffect(() => {
@@ -66,19 +73,23 @@ export default function NewsletterPage() {
     })();
   }, [isBoutique]);
 
-  async function startScoring(perfume: ShopPerfume, n: number) {
+  async function startScoring(perfume: ShopPerfume | null, n: Count, ch: Channel) {
     setError(null);
     setStep({ kind: "scoring", perfume, count: n });
     try {
       const json = await authedFetch<Preview>("/api/newsletter/preview", {
         method: "POST",
-        body: JSON.stringify({ perfumeId: perfume.id, count: n }),
+        body: JSON.stringify({
+          perfumeId: perfume?.id ?? null,
+          count: n,
+          channel: ch,
+        }),
       });
       setDraft(json.draft);
       setStep({ kind: "preview", preview: json });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");
-      setStep({ kind: "size", perfume });
+      setStep({ kind: "config", perfume });
     }
   }
 
@@ -91,7 +102,7 @@ export default function NewsletterPage() {
         {
           method: "POST",
           body: JSON.stringify({
-            perfumeId: preview.perfume.id,
+            perfumeId: preview.perfume?.id ?? null,
             recipients: preview.audience,
             subject: draft.subject,
             body: draft.body,
@@ -104,6 +115,13 @@ export default function NewsletterPage() {
       setError(e instanceof Error ? e.message : "Erreur");
       setStep({ kind: "preview", preview });
     }
+  }
+
+  function reset() {
+    setStep({ kind: "mode" });
+    setCount(20);
+    setChannel("both");
+    setDraft({ subject: "", body: "", sms: "" });
   }
 
   if (loading || roleLoading) {
@@ -128,28 +146,46 @@ export default function NewsletterPage() {
         </p>
       )}
 
-      {step.kind === "pick" && (
-        <PickPerfume
-          perfumes={perfumes}
-          onPick={(p) => setStep({ kind: "size", perfume: p })}
+      {step.kind === "mode" && (
+        <ModeStep
+          onPickPerfume={() => setStep({ kind: "perfume" })}
+          onPickFreeform={() =>
+            setStep({ kind: "config", perfume: null })
+          }
         />
       )}
 
-      {step.kind === "size" && (
-        <SizeStep
+      {step.kind === "perfume" && (
+        <PickPerfume
+          perfumes={perfumes}
+          onPick={(p) => setStep({ kind: "config", perfume: p })}
+          onBack={() => setStep({ kind: "mode" })}
+        />
+      )}
+
+      {step.kind === "config" && (
+        <ConfigStep
           perfume={step.perfume}
           count={count}
           setCount={setCount}
-          onCancel={() => setStep({ kind: "pick" })}
-          onConfirm={() => startScoring(step.perfume, count)}
+          channel={channel}
+          setChannel={setChannel}
+          onCancel={() =>
+            setStep(
+              step.perfume ? { kind: "perfume" } : { kind: "mode" },
+            )
+          }
+          onConfirm={() => startScoring(step.perfume, count, channel)}
         />
       )}
 
       {step.kind === "scoring" && (
         <div className="min-h-[40vh] flex flex-col items-center justify-center gap-3">
           <Icon name="progress_activity" size={48} className="text-primary animate-spin" />
-          <p className="text-sm text-on-surface-variant">
-            L'IA sélectionne les {step.count} clients les plus alignés…
+          <p className="text-sm text-on-surface-variant text-center">
+            {step.perfume
+              ? `L'IA sélectionne ${step.count === "all" ? "toute ta base" : `les ${step.count} clients`} les plus alignés…`
+              : `Récupération de ${step.count === "all" ? "toute la base" : `${step.count} clients`}…`}
           </p>
         </div>
       )}
@@ -159,7 +195,7 @@ export default function NewsletterPage() {
           preview={step.preview}
           draft={draft}
           setDraft={setDraft}
-          onCancel={() => setStep({ kind: "pick" })}
+          onCancel={reset}
           onSend={() => send(step.preview)}
         />
       )}
@@ -174,20 +210,72 @@ export default function NewsletterPage() {
       )}
 
       {step.kind === "done" && (
-        <DoneStep result={step} onRestart={() => setStep({ kind: "pick" })} />
+        <DoneStep result={step} onRestart={reset} />
       )}
     </div>
   );
 }
 
-/* ─── Step components ─────────────────────────────────────────── */
+/* ─── Mode (par parfum / message libre) ─────────────────────────── */
+
+function ModeStep({
+  onPickPerfume,
+  onPickFreeform,
+}: {
+  onPickPerfume: () => void;
+  onPickFreeform: () => void;
+}) {
+  return (
+    <section className="flex flex-col gap-3">
+      <p className="text-sm text-on-surface-variant">
+        Choisis le type de campagne :
+      </p>
+      <button
+        type="button"
+        onClick={onPickPerfume}
+        className="w-full text-left px-4 py-4 border border-outline-variant rounded-2xl hover:border-primary transition-colors flex items-start gap-3"
+      >
+        <Icon name="auto_awesome" className="mt-0.5 text-primary" />
+        <div className="flex-1">
+          <p className="text-base font-semibold">Par parfum</p>
+          <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
+            Tu choisis un parfum dans ton stock. L'IA cible automatiquement
+            les clients qui ont le profil olfactif compatible et écrit un
+            message taillé pour chacun.
+          </p>
+        </div>
+        <Icon name="chevron_right" className="text-outline mt-1" />
+      </button>
+      <button
+        type="button"
+        onClick={onPickFreeform}
+        className="w-full text-left px-4 py-4 border border-outline-variant rounded-2xl hover:border-primary transition-colors flex items-start gap-3"
+      >
+        <Icon name="edit_note" className="mt-0.5 text-primary" />
+        <div className="flex-1">
+          <p className="text-base font-semibold">Message libre</p>
+          <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
+            Annonce horaires d'été, soldes, événement… tu rédiges ce que
+            tu veux et tu choisis l'audience (toute ta base ou un nombre
+            précis).
+          </p>
+        </div>
+        <Icon name="chevron_right" className="text-outline mt-1" />
+      </button>
+    </section>
+  );
+}
+
+/* ─── Perfume picker ─────────────────────────────────────────────── */
 
 function PickPerfume({
   perfumes,
   onPick,
+  onBack,
 }: {
   perfumes: ShopPerfume[];
   onPick: (p: ShopPerfume) => void;
+  onBack: () => void;
 }) {
   if (perfumes.length === 0) {
     return (
@@ -201,6 +289,13 @@ function PickPerfume({
         >
           Gérer le stock
         </Link>
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-xs uppercase tracking-widest text-outline mt-2"
+        >
+          Retour
+        </button>
       </div>
     );
   }
@@ -229,33 +324,57 @@ function PickPerfume({
           </li>
         ))}
       </ul>
+      <button
+        type="button"
+        onClick={onBack}
+        className="self-start text-xs uppercase tracking-widest text-outline mt-2"
+      >
+        ← Retour
+      </button>
     </section>
   );
 }
 
-function SizeStep({
+/* ─── Audience config (count + channel) ──────────────────────────── */
+
+function ConfigStep({
   perfume,
   count,
   setCount,
+  channel,
+  setChannel,
   onCancel,
   onConfirm,
 }: {
-  perfume: ShopPerfume;
-  count: number;
-  setCount: (n: number) => void;
+  perfume: ShopPerfume | null;
+  count: Count;
+  setCount: (c: Count) => void;
+  channel: Channel;
+  setChannel: (c: Channel) => void;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const presets = [10, 20, 50, 100];
+  const presets: number[] = [10, 20, 50, 100];
+  const isAll = count === "all";
+
   return (
     <section className="flex flex-col gap-4">
-      <div className="border border-outline-variant rounded-2xl p-4">
-        <p className="font-semibold">{perfume.name}</p>
-        <p className="text-xs text-on-surface-variant">{perfume.brand}</p>
-      </div>
+      {perfume ? (
+        <div className="border border-outline-variant rounded-2xl p-4">
+          <p className="font-semibold">{perfume.name}</p>
+          <p className="text-xs text-on-surface-variant">{perfume.brand}</p>
+        </div>
+      ) : (
+        <div className="border border-outline-variant rounded-2xl p-4 flex items-center gap-2">
+          <Icon name="edit_note" className="text-primary" />
+          <p className="text-sm font-semibold">Message libre</p>
+        </div>
+      )}
+
+      {/* Audience size */}
       <div>
         <p className="text-xs uppercase tracking-widest text-outline mb-2">
-          Nombre de destinataires
+          Audience
         </p>
         <div className="flex flex-wrap gap-2 mb-3">
           {presets.map((n) => (
@@ -272,16 +391,69 @@ function SizeStep({
               {n}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setCount("all")}
+            className={`px-4 py-2 border rounded-full text-sm flex items-center gap-1 ${
+              isAll
+                ? "border-primary bg-primary-container/50 font-semibold"
+                : "border-outline-variant"
+            }`}
+          >
+            <Icon name="groups" size={14} />
+            Toute ma base
+          </button>
         </div>
-        <input
-          type="number"
-          min={1}
-          max={500}
-          value={count}
-          onChange={(e) => setCount(Math.max(1, Math.min(500, Number(e.target.value) || 1)))}
-          className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm"
-        />
+        {!isAll && (
+          <input
+            type="number"
+            min={1}
+            max={500}
+            value={count}
+            onChange={(e) =>
+              setCount(Math.max(1, Math.min(500, Number(e.target.value) || 1)))
+            }
+            className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm"
+          />
+        )}
       </div>
+
+      {/* Channel */}
+      <div>
+        <p className="text-xs uppercase tracking-widest text-outline mb-2">
+          Canal d'envoi
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            { v: "email", label: "Email", icon: "mail" },
+            { v: "sms", label: "SMS", icon: "sms" },
+            { v: "both", label: "Préférence du client", icon: "diversity_3" },
+          ] as { v: Channel; label: string; icon: string }[]).map((opt) => (
+            <button
+              key={opt.v}
+              type="button"
+              onClick={() => setChannel(opt.v)}
+              className={`px-3 py-2 border rounded-xl text-xs flex flex-col items-center gap-1 ${
+                channel === opt.v
+                  ? "border-primary bg-primary-container/50 font-semibold"
+                  : "border-outline-variant"
+              }`}
+            >
+              <Icon name={opt.icon} size={18} />
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-outline mt-1.5 leading-snug">
+          {channel === "email" &&
+            "Email uniquement — les clients sans email seront ignorés."}
+          {channel === "sms" &&
+            "SMS uniquement — les clients sans téléphone seront ignorés."}
+          {channel === "both" &&
+            "Chaque client reçoit selon son canal préféré (email ou SMS)."}
+        </p>
+      </div>
+
       <div className="flex gap-2">
         <button
           type="button"
@@ -295,12 +467,14 @@ function SizeStep({
           onClick={onConfirm}
           className="flex-1 py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest"
         >
-          Calculer le panel
+          {perfume ? "Calculer le panel" : "Voir l'audience"}
         </button>
       </div>
     </section>
   );
 }
+
+/* ─── Preview + send ─────────────────────────────────────────────── */
 
 function PreviewStep({
   preview,
@@ -322,10 +496,16 @@ function PreviewStep({
   return (
     <section className="flex flex-col gap-4">
       <div className="border border-outline-variant rounded-2xl p-4 flex flex-col gap-1">
-        <p className="font-semibold">{preview.perfume.name}</p>
+        <p className="font-semibold">
+          {preview.perfume ? preview.perfume.name : "Message libre"}
+        </p>
         <p className="text-xs text-on-surface-variant">
           {preview.audience.length} destinataires retenus sur {preview.totalClients} clients
-          ({emailCount} email · {smsCount} sms)
+          {(emailCount > 0 || smsCount > 0) && (
+            <>
+              {" "}({emailCount} email · {smsCount} sms)
+            </>
+          )}
         </p>
       </div>
 
@@ -343,7 +523,8 @@ function PreviewStep({
                 <p className="text-sm font-medium">
                   {a.first_name} {a.last_name}
                   <span className="ml-2 text-[9px] uppercase tracking-widest text-outline">
-                    {a.channel} · {a.score}
+                    {a.channel}
+                    {preview.perfume && ` · ${a.score}`}
                   </span>
                 </p>
                 {a.reason && (
@@ -364,42 +545,46 @@ function PreviewStep({
         Reformule avec l'IA
       </button>
 
-      <details className="border border-outline-variant rounded-2xl px-4 py-3" open>
-        <summary className="cursor-pointer text-xs uppercase tracking-widest text-outline">
-          Email
-        </summary>
-        <div className="mt-3 flex flex-col gap-2">
-          <input
-            value={draft.subject}
-            onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
-            placeholder="Objet"
-            className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm"
-          />
-          <textarea
-            value={draft.body}
-            onChange={(e) => setDraft({ ...draft, body: e.target.value })}
-            rows={6}
-            placeholder="Corps (utilise {{firstName}} pour personnaliser)"
-            className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm"
-          />
-        </div>
-      </details>
+      {(preview.channel === "email" || preview.channel === "both") && (
+        <details className="border border-outline-variant rounded-2xl px-4 py-3" open>
+          <summary className="cursor-pointer text-xs uppercase tracking-widest text-outline">
+            Email
+          </summary>
+          <div className="mt-3 flex flex-col gap-2">
+            <input
+              value={draft.subject}
+              onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
+              placeholder="Objet"
+              className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm"
+            />
+            <textarea
+              value={draft.body}
+              onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+              rows={6}
+              placeholder="Corps (utilise {{firstName}} pour personnaliser)"
+              className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm"
+            />
+          </div>
+        </details>
+      )}
 
-      <details className="border border-outline-variant rounded-2xl px-4 py-3">
-        <summary className="cursor-pointer text-xs uppercase tracking-widest text-outline">
-          SMS
-        </summary>
-        <textarea
-          value={draft.sms}
-          onChange={(e) => setDraft({ ...draft, sms: e.target.value })}
-          rows={3}
-          placeholder="SMS court"
-          className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm mt-3"
-        />
-        <p className="text-[10px] text-outline mt-1">
-          {draft.sms.length} caractères {draft.sms.length > 160 && "(deux SMS facturés)"}
-        </p>
-      </details>
+      {(preview.channel === "sms" || preview.channel === "both") && (
+        <details className="border border-outline-variant rounded-2xl px-4 py-3">
+          <summary className="cursor-pointer text-xs uppercase tracking-widest text-outline">
+            SMS
+          </summary>
+          <textarea
+            value={draft.sms}
+            onChange={(e) => setDraft({ ...draft, sms: e.target.value })}
+            rows={3}
+            placeholder="SMS court"
+            className="w-full px-3 py-2 bg-surface-container rounded-xl border border-outline-variant text-sm mt-3"
+          />
+          <p className="text-[10px] text-outline mt-1">
+            {draft.sms.length} caractères {draft.sms.length > 160 && "(deux SMS facturés)"}
+          </p>
+        </details>
+      )}
 
       <div className="flex gap-2">
         <button
@@ -421,7 +606,7 @@ function PreviewStep({
 
       {redraftOpen && (
         <NewsletterRedraftSheet
-          perfumeId={preview.perfume.id}
+          perfumeId={preview.perfume?.id ?? null}
           current={draft}
           onClose={() => setRedraftOpen(false)}
           onApply={(next) => setDraft(next)}

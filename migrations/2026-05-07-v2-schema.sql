@@ -240,7 +240,9 @@ CREATE POLICY "shop_owner_deletes_perfumes"
 CREATE TABLE IF NOT EXISTS public.newsletter_campaigns (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   shop_id       uuid NOT NULL REFERENCES public.shops(id) ON DELETE CASCADE,
-  perfume_id    uuid NOT NULL REFERENCES public.shop_perfumes(id) ON DELETE CASCADE,
+  -- Nullable depuis 2026-05-08 : autorise les campagnes "message libre"
+  -- où le boutiquier écrit ce qu'il veut sans cibler un parfum précis.
+  perfume_id    uuid REFERENCES public.shop_perfumes(id) ON DELETE CASCADE,
   target_count  integer NOT NULL CHECK (target_count > 0),
   status        text NOT NULL DEFAULT 'draft'
                 CHECK (status IN ('draft', 'sending', 'sent', 'failed')),
@@ -250,6 +252,11 @@ CREATE TABLE IF NOT EXISTS public.newsletter_campaigns (
   created_at    timestamptz NOT NULL DEFAULT now(),
   sent_at       timestamptz
 );
+
+-- Pour les bases déjà migrées avec perfume_id NOT NULL : on relâche.
+-- Idempotent — Postgres no-op si déjà nullable.
+ALTER TABLE public.newsletter_campaigns
+  ALTER COLUMN perfume_id DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_campaigns_shop
   ON public.newsletter_campaigns (shop_id, created_at DESC);

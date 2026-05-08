@@ -94,11 +94,20 @@ export function scoreClient(client: ScorableClient, perfume: ShopPerfume): numbe
 }
 
 /**
- * Pick the channel to use for a given client given their preferences and
- * the contact info we actually have. Returns null when we can't reach them
- * at all (no email AND no phone).
+ * Pick the channel to use for a given client.
+ *
+ * `desired` : la boutique a-t-elle imposé un canal pour cette campagne ?
+ *   - "email" : on n'utilise que l'email (les clients sans email sont skip)
+ *   - "sms"   : idem côté SMS
+ *   - "both"  (défaut) : on respecte la préférence du client
  */
-export function pickChannel(c: ScorableClient): "email" | "sms" | null {
+export function pickChannel(
+  c: ScorableClient,
+  desired: "email" | "sms" | "both" = "both",
+): "email" | "sms" | null {
+  if (desired === "email") return c.email ? "email" : null;
+  if (desired === "sms") return c.phone ? "sms" : null;
+
   const wantEmail = c.preferred_channel === "email" || c.preferred_channel === "both";
   const wantSMS = c.preferred_channel === "sms" || c.preferred_channel === "both";
   if (wantEmail && c.email) return "email";
@@ -111,21 +120,33 @@ export function pickChannel(c: ScorableClient): "email" | "sms" | null {
 /**
  * Filter + rank + (optionally) ask the LLM for a one-line reason.
  * Returns at most `n` recipients, sorted by descending score.
+ *
+ * Si `perfume` est null on est en mode "message libre" : on n'élimine
+ * personne sur la base d'un score olfactif (tout le monde a un score
+ * fictif de 1) et on n'appelle pas le LLM pour les justifications.
+ *
+ * Si `n === "all"` on prend toute la base éligible (pas de slice).
  */
 export async function selectAudience(
-  perfume: ShopPerfume,
+  perfume: ShopPerfume | null,
   clients: ScorableClient[],
-  n: number,
-  opts: { withReasons?: boolean } = {},
+  n: number | "all",
+  opts: {
+    withReasons?: boolean;
+    desiredChannel?: "email" | "sms" | "both";
+  } = {},
 ): Promise<Scored[]> {
+  const desiredChannel = opts.desiredChannel ?? "both";
   const ranked: Scored[] = [];
 
   for (const c of clients) {
     if (!c.consent_marketing) continue;
-    const channel = pickChannel(c);
+    const channel = pickChannel(c, desiredChannel);
     if (!channel) continue;
-    const score = scoreClient(c, perfume);
-    if (score <= 0) continue;
+    const score = perfume ? scoreClient(c, perfume) : 1;
+    // En mode "par parfum", on ne garde que ceux qui ont un score > 0.
+    // En mode "message libre", tout le monde garde un score=1.
+    if (perfume && score <= 0) continue;
     ranked.push({
       client_id: c.id,
       first_name: c.first_name,
@@ -137,9 +158,9 @@ export async function selectAudience(
   }
 
   ranked.sort((a, b) => b.score - a.score);
-  const picked = ranked.slice(0, n);
+  const picked = n === "all" ? ranked : ranked.slice(0, n);
 
-  if (opts.withReasons && picked.length > 0) {
+  if (perfume && opts.withReasons && picked.length > 0) {
     try {
       const reasons = await justifyBatch(perfume, picked, clients);
       for (const r of reasons) {

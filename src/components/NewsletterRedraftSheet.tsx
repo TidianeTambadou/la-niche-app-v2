@@ -15,7 +15,8 @@ import { useSpeechRecognition } from "@/lib/speech";
  */
 
 type Props = {
-  perfumeId: string;
+  /** Null en mode message libre — l'IA reformule sans grounder sur un parfum. */
+  perfumeId: string | null;
   current: { subject: string; body: string; sms: string };
   onClose: () => void;
   onApply: (next: { subject: string; body: string; sms: string }) => void;

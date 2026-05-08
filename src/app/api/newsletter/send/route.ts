@@ -34,7 +34,8 @@ type Recipient = {
 };
 
 type Body = {
-  perfumeId: string;
+  /** Null pour les campagnes "message libre" — pas de parfum ciblé. */
+  perfumeId: string | null;
   recipients: Recipient[];
   subject: string;
   body: string;
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
     return jsonError("invalid_json", 400);
   }
 
-  if (!body.perfumeId || !Array.isArray(body.recipients) || body.recipients.length === 0) {
+  if (!Array.isArray(body.recipients) || body.recipients.length === 0) {
     return jsonError("invalid_payload", 400);
   }
 
@@ -60,14 +61,17 @@ export async function POST(req: NextRequest) {
 
   // Re-fetch perfume + each recipient's contact info from the source of
   // truth ; we never trust client-supplied email/phone for actual sending.
-  const { data: perfume, error: pErr } = await admin
-    .from("shop_perfumes")
-    .select("id, name, brand")
-    .eq("id", body.perfumeId)
-    .eq("shop_id", shopId)
-    .maybeSingle();
-  if (pErr) return jsonError("db_error", 500, pErr.message);
-  if (!perfume) return jsonError("perfume_not_found", 404);
+  // Le perfume est facultatif (mode "message libre").
+  if (body.perfumeId) {
+    const { data: perfume, error: pErr } = await admin
+      .from("shop_perfumes")
+      .select("id, name, brand")
+      .eq("id", body.perfumeId)
+      .eq("shop_id", shopId)
+      .maybeSingle();
+    if (pErr) return jsonError("db_error", 500, pErr.message);
+    if (!perfume) return jsonError("perfume_not_found", 404);
+  }
 
   const ids = body.recipients.map((r) => r.client_id);
   const { data: clientRows, error: cErr } = await admin
@@ -79,12 +83,12 @@ export async function POST(req: NextRequest) {
 
   const byId = new Map((clientRows ?? []).map((c) => [c.id, c]));
 
-  // 1. Create the campaign row.
+  // 1. Create the campaign row. perfume_id est nullable (free-form).
   const { data: campaign, error: caErr } = await admin
     .from("newsletter_campaigns")
     .insert({
       shop_id: shopId,
-      perfume_id: body.perfumeId,
+      perfume_id: body.perfumeId ?? null,
       target_count: body.recipients.length,
       status: "sending",
       preview: body.recipients,
