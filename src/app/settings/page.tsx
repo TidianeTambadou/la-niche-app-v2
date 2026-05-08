@@ -54,12 +54,6 @@ export default function SettingsPage() {
             title="Stock parfums"
             description="Gérer le catalogue utilisé par la newsletter."
           />
-          <SettingsLink
-            href="/settings/diagnostic"
-            icon="troubleshoot"
-            title="Diagnostic IA"
-            description="Vérifier la connexion OpenRouter, Resend, Twilio si quelque chose coince."
-          />
         </section>
       )}
 
