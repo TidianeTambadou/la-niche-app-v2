@@ -397,6 +397,37 @@ a {
   animation: celebration-fade-out 0.4s ease-in forwards;
 }
 
+/* Welcome-back step — gros heart qui pop quand on clique sur une fiche
+   existante dans le wizard. Effet « coucou ! ». */
+@keyframes welcome-pop {
+  0%   { opacity: 0; transform: scale(0.4) translateY(24px); }
+  60%  { opacity: 1; transform: scale(1.15) translateY(-4px) rotate(-2deg); }
+  78%  { transform: scale(0.96) rotate(1deg); }
+  100% { opacity: 1; transform: scale(1) translateY(0) rotate(0); }
+}
+.welcome-pop { animation: welcome-pop 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@keyframes welcome-text-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.welcome-text { animation: welcome-text-rise 0.6s 0.25s ease-out both; }
+
+@keyframes welcome-cta-rise {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.welcome-cta { animation: welcome-cta-rise 0.6s 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Sparkles animés autour du heart welcome */
+@keyframes sparkle-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.5); }
+  50%      { opacity: 1; transform: scale(1.1); }
+}
+.sparkle-1 { animation: sparkle-twinkle 1.4s 0.3s ease-in-out infinite; }
+.sparkle-2 { animation: sparkle-twinkle 1.6s 0.6s ease-in-out infinite; }
+.sparkle-3 { animation: sparkle-twinkle 1.8s 0.9s ease-in-out infinite; }
+
 /* react-day-picker — dot indicator for days with clients */
 .rdp-day-has-client > button::after {
   content: "";

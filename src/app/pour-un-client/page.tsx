@@ -22,6 +22,7 @@ type TimeBudget = "express" | "classique" | "complet";
 type WizardStep =
   | { kind: "time-budget" }
   | { kind: "intro" }
+  | { kind: "welcome-back"; client: BoutiqueClient }
   | { kind: "question"; index: number }
   | { kind: "contact" }
   | { kind: "submitting" }
@@ -64,6 +65,10 @@ export default function PourUnClientPage() {
   const [step, setStep] = useState<WizardStep>({ kind: "time-budget" });
   const [addressInput, setAddressInput] = useState("");
   const [resolvedAddress, setResolvedAddress] = useState<ResolvedAddress | null>(null);
+  /** Quand true, on n'affiche plus les suggestions de fiches existantes —
+   *  utile quand la recherche prend trop de temps ou que la boutique veut
+   *  juste créer rapidement. */
+  const [anonymous, setAnonymous] = useState(false);
 
   // Email/phone live in the contact step regardless of where the boutique
   // placed them in the question order. The remaining olfactive questions are
@@ -152,50 +157,74 @@ export default function PourUnClientPage() {
 
   /**
    * Quand le boutiquier tape sur une fiche existante dans l'auto-complétion
-   * du step intro, on charge la fiche complète et on saute directement au
-   * rapport. Pas de re-passage par le wizard ; la boutique peut juste
-   * relire le rapport ou cliquer sur « Refaire le questionnaire » pour
-   * reprendre la session avec les anciennes réponses pré-remplies.
+   * du step intro, on charge la fiche puis on AFFICHE UN ÉCRAN
+   * « heureux de te revoir » avec deux choix :
+   *   - Encore pour [Prénom] (mode reuse) → saute au rapport existant
+   *   - C'est un cadeau               → repart de zéro (fresh)
    */
   async function loadExistingClient(clientId: string) {
     setError(null);
-    setStep({ kind: "submitting" });
     try {
       const json = await authedFetch<{ client: BoutiqueClient }>(
         `/api/clients/${clientId}`,
       );
-      const c = json.client;
-      setFirstName(c.first_name);
-      setLastName(c.last_name);
-      setEmail(c.email ?? "");
-      setPhone(c.phone ?? "");
-      setChannel(c.preferred_channel);
-      setConsent(c.consent_marketing);
-      setAnswers(c.quiz_answers ?? {});
-      if (c.address_line && c.postal_code && c.city) {
-        const label = `${c.address_line} ${c.postal_code} ${c.city}`;
-        setAddressInput(label);
-        setResolvedAddress({
-          label,
-          addressLine: c.address_line,
-          postalCode: c.postal_code,
-          city: c.city,
-          latitude: c.latitude ?? 0,
-          longitude: c.longitude ?? 0,
-        });
-      }
-      setStep({
-        kind: "done",
-        clientId: c.id,
-        olfactiveProfile: c.olfactive_profile,
-        report: c.report,
-        llmError: null,
-        fromExisting: true,
-      });
+      setStep({ kind: "welcome-back", client: json.client });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");
-      setStep({ kind: "intro" });
     }
+  }
+
+  /**
+   * Branche « encore pour la même personne » du welcome-back : on charge
+   * tous les champs depuis la fiche existante et on saute au rapport déjà
+   * généré.
+   */
+  function reuseExistingClient(c: BoutiqueClient) {
+    setFirstName(c.first_name);
+    setLastName(c.last_name);
+    setEmail(c.email ?? "");
+    setPhone(c.phone ?? "");
+    setChannel(c.preferred_channel);
+    setConsent(c.consent_marketing);
+    setAnswers(c.quiz_answers ?? {});
+    if (c.address_line && c.postal_code && c.city) {
+      const label = `${c.address_line} ${c.postal_code} ${c.city}`;
+      setAddressInput(label);
+      setResolvedAddress({
+        label,
+        addressLine: c.address_line,
+        postalCode: c.postal_code,
+        city: c.city,
+        latitude: c.latitude ?? 0,
+        longitude: c.longitude ?? 0,
+      });
+    }
+    setStep({
+      kind: "done",
+      clientId: c.id,
+      olfactiveProfile: c.olfactive_profile,
+      report: c.report,
+      llmError: null,
+      fromExisting: true,
+    });
+  }
+
+  /**
+   * Branche « cadeau » du welcome-back : on remet TOUT à zéro pour partir
+   * sur un nouveau bénéficiaire. Le boutiquier saisira un autre prénom /
+   * nom (le destinataire du cadeau, pas l'acheteur).
+   */
+  function startGiftSession() {
+    setFirstName("");
+    setLastName("");
+    setEmail("");
+    setPhone("");
+    setAddressInput("");
+    setResolvedAddress(null);
+    setChannel("email");
+    setConsent(false);
+    setAnswers({});
+    setStep({ kind: "intro" });
   }
 
   async function submit() {
@@ -363,6 +392,14 @@ export default function PourUnClientPage() {
         />
       )}
 
+      {step.kind === "welcome-back" && (
+        <WelcomeBackStep
+          client={step.client}
+          onReuse={() => reuseExistingClient(step.client)}
+          onGift={() => startGiftSession()}
+        />
+      )}
+
       {step.kind === "intro" && (
         <section className="flex flex-col gap-4">
           <h1 className="text-2xl font-semibold tracking-tight">Pour un client</h1>
@@ -385,11 +422,35 @@ export default function PourUnClientPage() {
               className="w-full px-4 py-3 bg-surface-container rounded-2xl border border-outline-variant text-sm"
             />
           </Field>
-          <ExistingClientSuggestions
-            firstName={firstName}
-            lastName={lastName}
-            onSelect={loadExistingClient}
-          />
+          {anonymous ? (
+            <div className="border border-outline-variant rounded-2xl px-4 py-3 flex items-center justify-between gap-3 bg-surface-container/40">
+              <p className="text-xs text-on-surface-variant leading-snug">
+                Mode anonyme — la recherche de doublons est désactivée.
+              </p>
+              <button
+                type="button"
+                onClick={() => setAnonymous(false)}
+                className="text-[10px] uppercase tracking-widest font-bold text-primary border-b border-primary"
+              >
+                Réactiver
+              </button>
+            </div>
+          ) : (
+            <>
+              <ExistingClientSuggestions
+                firstName={firstName}
+                lastName={lastName}
+                onSelect={loadExistingClient}
+              />
+              <button
+                type="button"
+                onClick={() => setAnonymous(true)}
+                className="self-start text-[11px] uppercase tracking-widest text-outline hover:text-primary"
+              >
+                ⚡ Sauter la recherche (mode anonyme)
+              </button>
+            </>
+          )}
         </section>
       )}
 
@@ -491,7 +552,7 @@ export default function PourUnClientPage() {
         </p>
       )}
 
-      {step.kind !== "submitting" && (
+      {step.kind !== "submitting" && step.kind !== "welcome-back" && (
         <footer className="flex gap-3 mt-2">
           {step.kind !== "time-budget" && (
             <button
@@ -526,7 +587,13 @@ export default function PourUnClientPage() {
 }
 
 function Progress({ step, total }: { step: WizardStep; total: number }) {
-  if (step.kind === "submitting" || step.kind === "done") return null;
+  if (
+    step.kind === "submitting" ||
+    step.kind === "done" ||
+    step.kind === "welcome-back"
+  ) {
+    return null;
+  }
   const done =
     step.kind === "time-budget"
       ? 0
@@ -543,6 +610,66 @@ function Progress({ step, total }: { step: WizardStep; total: number }) {
         style={{ width: `${pct}%` }}
       />
     </div>
+  );
+}
+
+/**
+ * Quand un boutiquier tape sur une fiche existante dans l'auto-complétion
+ * d'intro, on l'amène sur ce step. Heart qui pop, sparkles, deux CTAs :
+ * réutiliser la fiche existante, ou repartir de zéro pour un cadeau.
+ */
+function WelcomeBackStep({
+  client,
+  onReuse,
+  onGift,
+}: {
+  client: BoutiqueClient;
+  onReuse: () => void;
+  onGift: () => void;
+}) {
+  return (
+    <section className="flex flex-col items-center text-center gap-5 py-6">
+      <div className="relative">
+        <div className="welcome-pop w-20 h-20 rounded-full bg-primary-container/40 flex items-center justify-center">
+          <Icon name="favorite" size={36} className="text-primary" filled />
+        </div>
+        <span className="sparkle-1 absolute -top-2 -right-3 text-primary">
+          <Icon name="auto_awesome" size={16} />
+        </span>
+        <span className="sparkle-2 absolute -bottom-1 -left-3 text-primary">
+          <Icon name="auto_awesome" size={12} />
+        </span>
+        <span className="sparkle-3 absolute -top-3 left-1/2 -translate-x-1/2 text-primary">
+          <Icon name="auto_awesome" size={10} />
+        </span>
+      </div>
+
+      <div className="welcome-text flex flex-col gap-1.5">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Coucou, heureux de revoir {client.first_name} !
+        </h1>
+        <p className="text-sm text-on-surface-variant max-w-sm">
+          Cette session, c'est encore pour {client.first_name} — ou c'est un cadeau pour quelqu'un d'autre&nbsp;?
+        </p>
+      </div>
+
+      <div className="welcome-cta flex flex-col gap-2 w-full max-w-sm">
+        <button
+          type="button"
+          onClick={onReuse}
+          className="w-full py-3 bg-primary text-on-primary rounded-full text-sm font-bold uppercase tracking-widest active:scale-95 transition-transform"
+        >
+          Encore pour {client.first_name}
+        </button>
+        <button
+          type="button"
+          onClick={onGift}
+          className="w-full py-3 border border-outline-variant rounded-full text-sm font-medium uppercase tracking-widest active:scale-95 transition-transform"
+        >
+          C'est un cadeau, on repart à zéro
+        </button>
+      </div>
+    </section>
   );
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { NewsletterRedraftSheet } from "@/components/NewsletterRedraftSheet";
 import { useRequireAuth } from "@/lib/auth";
 import { useShopRole } from "@/lib/role";
 import { useGuardOutOfService } from "@/lib/service-mode";
@@ -316,6 +317,7 @@ function PreviewStep({
 }) {
   const emailCount = preview.audience.filter((a) => a.channel === "email").length;
   const smsCount = preview.audience.filter((a) => a.channel === "sms").length;
+  const [redraftOpen, setRedraftOpen] = useState(false);
 
   return (
     <section className="flex flex-col gap-4">
@@ -352,6 +354,15 @@ function PreviewStep({
           ))}
         </ul>
       </details>
+
+      <button
+        type="button"
+        onClick={() => setRedraftOpen(true)}
+        className="self-start flex items-center gap-2 px-3 py-1.5 border border-primary/40 rounded-full text-xs font-bold uppercase tracking-widest text-primary hover:bg-primary-container/30"
+      >
+        <Icon name="auto_awesome" size={14} />
+        Reformule avec l'IA
+      </button>
 
       <details className="border border-outline-variant rounded-2xl px-4 py-3" open>
         <summary className="cursor-pointer text-xs uppercase tracking-widest text-outline">
@@ -407,6 +418,15 @@ function PreviewStep({
           Envoyer à {preview.audience.length}
         </button>
       </div>
+
+      {redraftOpen && (
+        <NewsletterRedraftSheet
+          perfumeId={preview.perfume.id}
+          current={draft}
+          onClose={() => setRedraftOpen(false)}
+          onApply={(next) => setDraft(next)}
+        />
+      )}
     </section>
   );
 }
