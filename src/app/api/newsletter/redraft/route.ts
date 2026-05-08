@@ -1,12 +1,14 @@
 /**
  * /api/newsletter/redraft
  *
- *   POST { perfumeId, instruction, currentSubject?, currentBody?, currentSms? }
+ *   POST { perfumeId, instruction, currentSubject?, currentBody? }
  *
- *   Reformule l'objet / le corps du mail et le SMS d'une newsletter selon
- *   une instruction libre du boutiquier (texte ou retranscription vocale).
+ *   Reformule l'objet et le corps du mail d'une newsletter selon une
+ *   instruction libre du boutiquier (texte ou retranscription vocale).
  *   Le perfume est récupéré côté serveur pour grounder le ton sans devoir
  *   re-balancer toute la fiche dans le prompt côté client.
+ *
+ *   Email-only depuis Gallery La Niche v2.1.
  */
 
 import type { NextRequest } from "next/server";
@@ -23,7 +25,6 @@ type Body = {
   instruction: string;
   currentSubject?: string;
   currentBody?: string;
-  currentSms?: string;
 };
 
 export async function POST(req: NextRequest) {
@@ -69,21 +70,19 @@ Description : ${perfume.description ?? "—"}\n\n`;
     perfumeRule = "- Cite au moins une note ou un accord du parfum dans le corps.\n";
   }
 
-  const systemPrompt = `Tu es la rédactrice de la newsletter d'une boutique de parfumerie de niche. Tu reformules le mail (objet + corps) et le SMS d'envoi selon une consigne du boutiquier.
+  const systemPrompt = `Tu es la rédactrice de la newsletter email de Gallery La Niche, une boutique de parfumerie de niche. Tu reformules l'objet et le corps du mail selon une consigne du boutiquier.
 
 CONTRAINTES :
 - Garde le placeholder \`{{firstName}}\` dans le corps mail (à utiliser au moins une fois pour personnaliser).
-- Le SMS fait moins de 160 caractères.
 - Ton chaleureux, jamais commercial cliché ("ne ratez pas", "exclusivité incroyable" → JAMAIS).
 ${perfumeRule}- Respecte la consigne du boutiquier (ton, longueur, angle).
 
 Réponds UNIQUEMENT en JSON :
-{"subject":"","body":"","sms":""}`;
+{"subject":"","body":""}`;
 
   const userPrompt = `${perfumeBlock}Mail actuel :
 - Objet : ${body.currentSubject ?? "(aucun)"}
 - Corps : ${body.currentBody ?? "(aucun)"}
-SMS actuel : ${body.currentSms ?? "(aucun)"}
 
 Consigne du boutiquier :
 ${instruction}
@@ -91,7 +90,7 @@ ${instruction}
 Reformule.`;
 
   try {
-    const out = await chatJSON<{ subject: string; body: string; sms: string }>(
+    const out = await chatJSON<{ subject: string; body: string }>(
       [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -101,7 +100,6 @@ Reformule.`;
     return jsonOk({
       subject: out.subject ?? body.currentSubject ?? "",
       body: out.body ?? body.currentBody ?? "",
-      sms: out.sms ?? body.currentSms ?? "",
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

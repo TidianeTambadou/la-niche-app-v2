@@ -56,7 +56,7 @@ export async function chat(messages: LLMMessage[], opts: LLMOptions = {}): Promi
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
       "HTTP-Referer": "https://laniche.app",
-      "X-Title": "La Niche v2",
+      "X-Title": "Gallery La Niche v2",
     },
     body: JSON.stringify(body),
   });

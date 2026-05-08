@@ -284,7 +284,7 @@ a {
 .swipe-exit-left { animation: swipe-exit-left 0.38s cubic-bezier(0.4, 0, 1, 1) forwards; }
 .swipe-exit-right { animation: swipe-exit-right 0.38s cubic-bezier(0.4, 0, 1, 1) forwards; }
 
-/* Carte signée La Niche — modal section stagger + accord bar springy fill. */
+/* Carte signée Gallery La Niche — modal section stagger + accord bar springy fill. */
 @keyframes card-section-in {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }

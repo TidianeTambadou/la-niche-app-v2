@@ -311,7 +311,7 @@ function LoginContent() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo-laniche.png"
-              alt="La Niche"
+              alt="Gallery La Niche"
               className="h-10 w-auto object-contain dark:invert"
             />
           </Link>

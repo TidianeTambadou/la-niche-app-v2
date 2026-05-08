@@ -1,13 +1,13 @@
 /**
  * /api/newsletter/send
  *
- *   POST { perfumeId, recipients, subject, body, sms }
+ *   POST { perfumeId, recipients, subject, body }
  *     - recipients = output of /api/newsletter/preview's `audience`
  *     - body uses `{{firstName}}` placeholder for personalisation
  *
- *   Persists a campaign + recipients rows, then fans out :
- *     - email recipients via Resend
- *     - sms recipients via Twilio
+ *   Email-only depuis Gallery La Niche v2.1 — le SMS via Twilio a été retiré.
+ *
+ *   Persists a campaign + recipients rows, then fans out via Resend.
  *   Each per-recipient send updates the row's status independently.
  *
  * Returns the campaign id and an aggregate count. Failures are recorded
@@ -20,7 +20,6 @@ import type { NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase-server";
 import { getOwnerShopId, jsonError, jsonOk } from "@/lib/auth-server";
 import { sendEmail } from "@/lib/email";
-import { sendSMS } from "@/lib/sms";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -28,7 +27,6 @@ export const maxDuration = 300;
 type Recipient = {
   client_id: string;
   first_name: string;
-  channel: "email" | "sms";
   score: number;
   reason: string;
 };
@@ -39,7 +37,6 @@ type Body = {
   recipients: Recipient[];
   subject: string;
   body: string;
-  sms: string;
 };
 
 export async function POST(req: NextRequest) {
@@ -104,13 +101,13 @@ export async function POST(req: NextRequest) {
     campaign_id: campaign.id,
     client_id: r.client_id,
     score: r.score,
-    channel: r.channel,
+    channel: "email" as const,
     status: "pending" as const,
   }));
   await admin.from("newsletter_recipients").insert(pendingRows);
 
-  // 3. Fan out. We send sequentially with a small concurrency cap so we
-  //    don't blow Resend's per-second quota or Twilio's bursting limits.
+  // 3. Fan out via Resend. Sent sequentially with a small concurrency cap
+  //    so we don't blow Resend's per-second quota.
   let sentCount = 0;
   let failedCount = 0;
   for (const r of body.recipients) {
@@ -126,20 +123,14 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      if (r.channel === "email") {
-        if (!client.email) throw new Error("no_email");
-        const personalisedBody = body.body.replaceAll("{{firstName}}", client.first_name);
-        const personalisedSubject = body.subject.replaceAll("{{firstName}}", client.first_name);
-        await sendEmail({
-          to: client.email,
-          subject: personalisedSubject,
-          text: personalisedBody,
-        });
-      } else {
-        if (!client.phone) throw new Error("no_phone");
-        const personalisedSMS = body.sms.replaceAll("{{firstName}}", client.first_name);
-        await sendSMS({ to: client.phone, body: personalisedSMS });
-      }
+      if (!client.email) throw new Error("no_email");
+      const personalisedBody = body.body.replaceAll("{{firstName}}", client.first_name);
+      const personalisedSubject = body.subject.replaceAll("{{firstName}}", client.first_name);
+      await sendEmail({
+        to: client.email,
+        subject: personalisedSubject,
+        text: personalisedBody,
+      });
 
       await admin
         .from("newsletter_recipients")

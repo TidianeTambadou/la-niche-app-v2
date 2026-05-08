@@ -1,9 +1,8 @@
 /**
  * /api/newsletter/preview
  *
- *   POST { perfumeId?, count, channel?, freeform? } — score les clients
- *   éligibles selon le canal choisi et renvoie un panel + un brouillon
- *   éventuel.
+ *   POST { perfumeId?, count } — score les clients éligibles (email
+ *   uniquement) et renvoie un panel + un brouillon éventuel.
  *
  *   - perfumeId fourni       → mode "par parfum" : scoring olfactif +
  *                              draft IA basé sur la fiche parfum.
@@ -12,8 +11,9 @@
  *                              le boutiquier rédige librement.
  *   - count = "all"          → toute la base éligible (pas de slice).
  *   - count = number         → top N (1..500).
- *   - channel = "email"|"sms"→ force le canal pour cette campagne.
- *   - channel = "both" / null→ on respecte la préférence de chaque client.
+ *
+ *   La newsletter Gallery La Niche est email-only — les clients sans
+ *   email sont automatiquement filtrés par selectAudience.
  *
  * Aucune persistance ; la ligne campaign est créée au send.
  */
@@ -31,7 +31,6 @@ export const maxDuration = 60;
 type Body = {
   perfumeId?: string | null;
   count: number | "all";
-  channel?: "email" | "sms" | "both";
 };
 
 export async function POST(req: NextRequest) {
@@ -43,11 +42,6 @@ export async function POST(req: NextRequest) {
     body = (await req.json()) as Body;
   } catch {
     return jsonError("invalid_json", 400);
-  }
-
-  const channel = body.channel ?? "both";
-  if (!["email", "sms", "both"].includes(channel)) {
-    return jsonError("invalid_channel", 400);
   }
 
   // Normalise count : "all" stays as is ; numerics are clamped to [1, 500].
@@ -83,23 +77,21 @@ export async function POST(req: NextRequest) {
     perfume,
     (clients ?? []) as ScorableClient[],
     count,
-    { withReasons: !!perfume, desiredChannel: channel },
+    { withReasons: !!perfume, desiredChannel: "email" },
   );
 
   // Free-form mode → empty draft, the boutique writes it. Perfume mode →
   // we ask the LLM for a sane base they can tweak.
-  let draft: { subject: string; body: string; sms: string };
+  let draft: { subject: string; body: string };
   if (perfume) {
     draft = await draftCopy(perfume).catch(() => ({
       subject: `Découvrez ${perfume!.name}`,
       body: `Bonjour {{firstName}},\n\n${perfume!.name} de ${perfume!.brand} vient de retenir notre attention pour vous. Passez en boutique pour le découvrir.\n\nÀ très vite,\nLa boutique`,
-      sms: `Bonjour {{firstName}}, on a un parfum pour vous : ${perfume!.name} de ${perfume!.brand}. Passez le sentir !`,
     }));
   } else {
     draft = {
       subject: "",
       body: "Bonjour {{firstName}},\n\n",
-      sms: "Bonjour {{firstName}}, ",
     };
   }
 
@@ -109,17 +101,16 @@ export async function POST(req: NextRequest) {
     eligibleCount: audience.length,
     totalClients: clients?.length ?? 0,
     draft,
-    channel,
   });
 }
 
-async function draftCopy(perfume: ShopPerfume): Promise<{ subject: string; body: string; sms: string }> {
+async function draftCopy(perfume: ShopPerfume): Promise<{ subject: string; body: string }> {
   const raw = await chat(
     [
       {
         role: "system",
         content:
-          "Tu rédiges une newsletter boutique de parfumerie de niche. Le ton est chaleureux, personnel, sans cliché commercial. Tu ne fais aucune affirmation marketing exagérée. Réponds UNIQUEMENT en JSON valide : {\"subject\":\"\",\"body\":\"\",\"sms\":\"\"}. Le `body` doit contenir le placeholder `{{firstName}}` au début. Le `sms` fait moins de 160 caractères.",
+          "Tu rédiges une newsletter email pour Gallery La Niche, boutique de parfumerie de niche. Le ton est chaleureux, personnel, sans cliché commercial. Tu ne fais aucune affirmation marketing exagérée. Réponds UNIQUEMENT en JSON valide : {\"subject\":\"\",\"body\":\"\"}. Le `body` doit contenir le placeholder `{{firstName}}` au début.",
       },
       {
         role: "user",

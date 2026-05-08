@@ -38,7 +38,7 @@ type Body = {
   questions: IncomingQuestion[];
 };
 
-const SYSTEM_PROMPT = `Tu es la "Conciergerie La Niche", une assistante experte qui aide un boutiquier de parfumerie de niche à concevoir le questionnaire que ses clients remplissent en boutique.
+const SYSTEM_PROMPT = `Tu es la "Conciergerie Gallery La Niche", une assistante experte qui aide un boutiquier de parfumerie de niche à concevoir le questionnaire que ses clients remplissent en boutique.
 
 Tu reçois :
 1. La LISTE des questions actuelles (id, position, label, kind, options, required).

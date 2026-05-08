@@ -9,7 +9,7 @@ import { DataLabel } from "@/components/brutalist/DataLabel";
 import { BrutalistButton } from "@/components/brutalist/BrutalistButton";
 
 /**
- * Conciergerie La Niche — assistant intégré sur /settings/questions.
+ * Conciergerie Gallery La Niche — assistant intégré sur /settings/questions.
  *
  * Le boutiquier tape ou DICTE (Web Speech API) ce qu'il veut ; l'IA
  * traduit son intention en opérations CRUD applicables (update / create
@@ -173,7 +173,7 @@ export function QuestionsConcierge({ questions, onChange }: Props) {
               <div>
                 <DataLabel>AI · CONCIERGERIE</DataLabel>
                 <h2 className="font-sans font-black text-2xl tracking-tighter uppercase mt-1">
-                  La Niche
+                  Gallery La Niche
                 </h2>
               </div>
               <button

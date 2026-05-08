@@ -26,12 +26,12 @@ const cormorant = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "LA NICHE",
-  description: "Fiches clients, profils olfactifs, newsletter intelligente.",
+  title: "GALLERY LA NICHE",
+  description: "Gallery La Niche — fiches clients, profils olfactifs, newsletter intelligente.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "La Niche",
+    title: "Gallery La Niche",
     statusBarStyle: "default",
   },
   icons: {

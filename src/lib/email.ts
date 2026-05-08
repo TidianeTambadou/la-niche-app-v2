@@ -15,7 +15,7 @@ function client(): Resend {
   return cached;
 }
 
-const DEFAULT_FROM = process.env.RESEND_FROM || "La Niche <newsletter@laniche.app>";
+const DEFAULT_FROM = process.env.RESEND_FROM || "Gallery La Niche <newsletter@laniche.app>";
 
 export type SendEmailInput = {
   to: string;

@@ -1,7 +1,7 @@
 {
-  "name": "La Niche — Mobile",
-  "short_name": "La Niche",
-  "description": "Application mobile des boutiques La Niche",
+  "name": "Gallery La Niche — Mobile",
+  "short_name": "Gallery La Niche",
+  "description": "Application mobile des boutiques Gallery La Niche",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

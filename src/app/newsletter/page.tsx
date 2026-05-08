@@ -13,15 +13,12 @@ import type { ShopPerfume } from "@/lib/types";
 import { DataLabel } from "@/components/brutalist/DataLabel";
 import { BrutalistButton } from "@/components/brutalist/BrutalistButton";
 
-type Mode = "perfume" | "freeform";
-type Channel = "email" | "sms" | "both";
 type Count = number | "all";
 
 type Recipient = {
   client_id: string;
   first_name: string;
   last_name: string;
-  channel: "email" | "sms";
   score: number;
   reason: string;
 };
@@ -31,8 +28,7 @@ type Preview = {
   audience: Recipient[];
   eligibleCount: number;
   totalClients: number;
-  draft: { subject: string; body: string; sms: string };
-  channel: Channel;
+  draft: { subject: string; body: string };
 };
 
 type Step =
@@ -54,8 +50,7 @@ export default function NewsletterPage() {
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<Step>({ kind: "mode" });
   const [count, setCount] = useState<Count>(20);
-  const [channel, setChannel] = useState<Channel>("both");
-  const [draft, setDraft] = useState({ subject: "", body: "", sms: "" });
+  const [draft, setDraft] = useState({ subject: "", body: "" });
 
   useEffect(() => {
     if (!roleLoading && !isBoutique) router.replace("/");
@@ -75,7 +70,7 @@ export default function NewsletterPage() {
     })();
   }, [isBoutique]);
 
-  async function startScoring(perfume: ShopPerfume | null, n: Count, ch: Channel) {
+  async function startScoring(perfume: ShopPerfume | null, n: Count) {
     setError(null);
     setStep({ kind: "scoring", perfume, count: n });
     try {
@@ -84,7 +79,6 @@ export default function NewsletterPage() {
         body: JSON.stringify({
           perfumeId: perfume?.id ?? null,
           count: n,
-          channel: ch,
         }),
       });
       setDraft(json.draft);
@@ -108,7 +102,6 @@ export default function NewsletterPage() {
             recipients: preview.audience,
             subject: draft.subject,
             body: draft.body,
-            sms: draft.sms,
           }),
         },
       );
@@ -122,8 +115,7 @@ export default function NewsletterPage() {
   function reset() {
     setStep({ kind: "mode" });
     setCount(20);
-    setChannel("both");
-    setDraft({ subject: "", body: "", sms: "" });
+    setDraft({ subject: "", body: "" });
   }
 
   if (loading || roleLoading) {
@@ -182,14 +174,12 @@ export default function NewsletterPage() {
           perfume={step.perfume}
           count={count}
           setCount={setCount}
-          channel={channel}
-          setChannel={setChannel}
           onCancel={() =>
             setStep(
               step.perfume ? { kind: "perfume" } : { kind: "mode" },
             )
           }
-          onConfirm={() => startScoring(step.perfume, count, channel)}
+          onConfirm={() => startScoring(step.perfume, count)}
         />
       )}
 
@@ -354,16 +344,12 @@ function ConfigStep({
   perfume,
   count,
   setCount,
-  channel,
-  setChannel,
   onCancel,
   onConfirm,
 }: {
   perfume: ShopPerfume | null;
   count: Count;
   setCount: (c: Count) => void;
-  channel: Channel;
-  setChannel: (c: Channel) => void;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -430,37 +416,10 @@ function ConfigStep({
         )}
       </div>
 
-      {/* Channel */}
-      <div>
-        <DataLabel emphasis="high" className="mb-2 block">CHANNEL</DataLabel>
-        <div className="grid grid-cols-3 gap-2">
-          {([
-            { v: "email", label: "Email", icon: "mail" },
-            { v: "sms", label: "SMS", icon: "sms" },
-            { v: "both", label: "Préf. client", icon: "diversity_3" },
-          ] as { v: Channel; label: string; icon: string }[]).map((opt) => (
-            <button
-              key={opt.v}
-              type="button"
-              onClick={() => setChannel(opt.v)}
-              className={`px-3 py-3 border-2 font-mono text-[11px] uppercase tracking-widest flex flex-col items-center gap-1 transition-colors duration-150 ${
-                channel === opt.v
-                  ? "border-on-background bg-on-background text-background font-bold"
-                  : "border-on-background bg-background hover:bg-on-background/5"
-              }`}
-            >
-              <Icon name={opt.icon} size={18} />
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <p className="font-mono text-[10px] opacity-60 uppercase tracking-wider mt-2 leading-snug">
-          {channel === "email" &&
-            "EMAIL ONLY — CLIENTS SANS EMAIL IGNORÉS."}
-          {channel === "sms" &&
-            "SMS ONLY — CLIENTS SANS TÉLÉPHONE IGNORÉS."}
-          {channel === "both" &&
-            "CHAQUE CLIENT REÇOIT SELON SON CANAL PRÉFÉRÉ."}
+      <div className="border-2 border-on-background bg-background px-3 py-2 flex items-center gap-2">
+        <Icon name="mail" size={16} />
+        <p className="font-mono text-[10px] uppercase tracking-wider">
+          EMAIL ONLY · CLIENTS SANS EMAIL IGNORÉS
         </p>
       </div>
 
@@ -490,13 +449,11 @@ function PreviewStep({
   onSend,
 }: {
   preview: Preview;
-  draft: { subject: string; body: string; sms: string };
-  setDraft: (d: { subject: string; body: string; sms: string }) => void;
+  draft: { subject: string; body: string };
+  setDraft: (d: { subject: string; body: string }) => void;
   onCancel: () => void;
   onSend: () => void;
 }) {
-  const emailCount = preview.audience.filter((a) => a.channel === "email").length;
-  const smsCount = preview.audience.filter((a) => a.channel === "sms").length;
   const [redraftOpen, setRedraftOpen] = useState(false);
 
   return (
@@ -507,10 +464,7 @@ function PreviewStep({
           {preview.perfume ? preview.perfume.name : "Message libre"}
         </p>
         <p className="font-mono text-xs uppercase tracking-wider opacity-60 mt-1">
-          {preview.audience.length}/{preview.totalClients} CLIENTS
-          {(emailCount > 0 || smsCount > 0) && (
-            <> · {emailCount}_EMAIL · {smsCount}_SMS</>
-          )}
+          {preview.audience.length}/{preview.totalClients} CLIENTS · EMAIL
         </p>
       </div>
 
@@ -527,10 +481,11 @@ function PreviewStep({
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold uppercase tracking-tight">
                   {a.first_name} {a.last_name}
-                  <span className="ml-2 font-mono text-[9px] uppercase tracking-widest opacity-60">
-                    {a.channel}
-                    {preview.perfume && ` · ${a.score}`}
-                  </span>
+                  {preview.perfume && (
+                    <span className="ml-2 font-mono text-[9px] uppercase tracking-widest opacity-60">
+                      SCORE:{a.score}
+                    </span>
+                  )}
                 </p>
                 {a.reason && (
                   <p className="font-cormorant italic text-sm opacity-70 mt-0.5">
@@ -552,47 +507,26 @@ function PreviewStep({
         Reformule IA
       </button>
 
-      {(preview.channel === "email" || preview.channel === "both") && (
-        <details className="border-2 border-on-background bg-background px-4 py-3" open>
-          <summary className="cursor-pointer">
-            <DataLabel emphasis="high">EMAIL</DataLabel>
-          </summary>
-          <div className="mt-3 flex flex-col gap-2">
-            <input
-              value={draft.subject}
-              onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
-              placeholder="Objet"
-              className="w-full px-3 py-2.5 bg-background border-2 border-on-background font-mono text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
-            />
-            <textarea
-              value={draft.body}
-              onChange={(e) => setDraft({ ...draft, body: e.target.value })}
-              rows={6}
-              placeholder="Corps (utilise {{firstName}} pour personnaliser)"
-              className="w-full px-3 py-2.5 bg-background border-2 border-on-background text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
-            />
-          </div>
-        </details>
-      )}
-
-      {(preview.channel === "sms" || preview.channel === "both") && (
-        <details className="border-2 border-on-background bg-background px-4 py-3">
-          <summary className="cursor-pointer">
-            <DataLabel emphasis="high">SMS</DataLabel>
-          </summary>
-          <textarea
-            value={draft.sms}
-            onChange={(e) => setDraft({ ...draft, sms: e.target.value })}
-            rows={3}
-            placeholder="SMS court"
-            className="w-full px-3 py-2.5 bg-background border-2 border-on-background text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow mt-3"
+      <details className="border-2 border-on-background bg-background px-4 py-3" open>
+        <summary className="cursor-pointer">
+          <DataLabel emphasis="high">EMAIL</DataLabel>
+        </summary>
+        <div className="mt-3 flex flex-col gap-2">
+          <input
+            value={draft.subject}
+            onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
+            placeholder="Objet"
+            className="w-full px-3 py-2.5 bg-background border-2 border-on-background font-mono text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
           />
-          <p className="font-mono text-[10px] uppercase tracking-widest opacity-60 mt-1">
-            {draft.sms.length} CHARS
-            {draft.sms.length > 160 && " · TWO SMS BILLED"}
-          </p>
-        </details>
-      )}
+          <textarea
+            value={draft.body}
+            onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+            rows={6}
+            placeholder="Corps (utilise {{firstName}} pour personnaliser)"
+            className="w-full px-3 py-2.5 bg-background border-2 border-on-background text-sm focus:outline-none focus:shadow-[4px_4px_0px_0px_currentColor] placeholder:opacity-40 transition-shadow"
+          />
+        </div>
+      </details>
 
       <div className="flex gap-2">
         <button

@@ -35,7 +35,6 @@ export async function GET(req: NextRequest) {
     openrouter_key_prefix: key ? key.slice(0, 12) : null,
     openrouter_key_length: key?.length ?? 0,
     has_resend_key: !!process.env.RESEND_API_KEY,
-    has_twilio_sid: !!process.env.TWILIO_ACCOUNT_SID,
     node_env: process.env.NODE_ENV ?? "unknown",
   };
 
@@ -50,7 +49,7 @@ export async function GET(req: NextRequest) {
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "https://laniche.app",
-        "X-Title": "La Niche v2 — diagnostic",
+        "X-Title": "Gallery La Niche v2 — diagnostic",
       },
       body: JSON.stringify({
         model: "google/gemini-2.0-flash-001",

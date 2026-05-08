@@ -19,9 +19,9 @@ import { BrutalistButton } from "@/components/brutalist/BrutalistButton";
 type Props = {
   /** Null en mode message libre — l'IA reformule sans grounder sur un parfum. */
   perfumeId: string | null;
-  current: { subject: string; body: string; sms: string };
+  current: { subject: string; body: string };
   onClose: () => void;
-  onApply: (next: { subject: string; body: string; sms: string }) => void;
+  onApply: (next: { subject: string; body: string }) => void;
 };
 
 export function NewsletterRedraftSheet({
@@ -42,7 +42,7 @@ export function NewsletterRedraftSheet({
     setBusy(true);
     setError(null);
     try {
-      const res = await authedFetch<{ subject: string; body: string; sms: string }>(
+      const res = await authedFetch<{ subject: string; body: string }>(
         "/api/newsletter/redraft",
         {
           method: "POST",
@@ -51,7 +51,6 @@ export function NewsletterRedraftSheet({
             instruction,
             currentSubject: current.subject,
             currentBody: current.body,
-            currentSms: current.sms,
           }),
         },
       );

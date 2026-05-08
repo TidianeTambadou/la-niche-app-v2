@@ -13,7 +13,6 @@ type Diag = {
   openrouter_key_prefix: string | null;
   openrouter_key_length: number;
   has_resend_key: boolean;
-  has_twilio_sid: boolean;
   node_env: string;
   test_status?: number;
   test_body?: string;
@@ -50,9 +49,8 @@ export default function DiagnosticPage() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Diagnostic IA</h1>
         <p className="text-sm text-on-surface-variant mt-1 leading-relaxed">
-          Vérifie que les clés API (OpenRouter, Resend, Twilio) sont bien
-          configurées sur Vercel et que les requêtes IA partent vers le bon
-          compte.
+          Vérifie que les clés API (OpenRouter, Resend) sont bien configurées
+          sur Vercel et que les requêtes IA partent vers le bon compte.
         </p>
       </header>
 
@@ -126,11 +124,6 @@ export default function DiagnosticPage() {
             label="Resend (email)"
             value={diag.has_resend_key ? "Configuré" : "Manquant"}
             ok={diag.has_resend_key}
-          />
-          <Block
-            label="Twilio (SMS)"
-            value={diag.has_twilio_sid ? "Configuré" : "Manquant"}
-            ok={diag.has_twilio_sid}
           />
         </section>
       )}

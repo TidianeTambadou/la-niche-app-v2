@@ -22,10 +22,10 @@ type Props = {
 /**
  * Friendly error surface for any agent / network / unexpected failure.
  *
- * Shows the La Niche logo, a non-technical message, and a "Faire part du bug
- * au support" button that opens the user's mail client pre-filled with the
- * raw error so the dev team can diagnose. The raw error is never shown to
- * the end user.
+ * Shows the Gallery La Niche logo, a non-technical message, and a "Faire part
+ * du bug au support" button that opens the user's mail client pre-filled with
+ * the raw error so the dev team can diagnose. The raw error is never shown
+ * to the end user.
  */
 export function ErrorBubble({
   detail,
@@ -37,9 +37,9 @@ export function ErrorBubble({
   const [imgFailed, setImgFailed] = useState(false);
 
   function reportBug() {
-    const subject = `[Bug La Niche]${context ? ` ${context}` : ""}`;
+    const subject = `[Bug Gallery La Niche]${context ? ` ${context}` : ""}`;
     const lines = [
-      "Bonjour l'équipe La Niche,",
+      "Bonjour l'équipe Gallery La Niche,",
       "",
       "J'ai rencontré un bug dans l'application :",
       "",
@@ -114,8 +114,8 @@ export function ErrorBubble({
           Oups, on essaye de régler le souci.
         </p>
         <p className="text-xs text-on-surface-variant mt-1 max-w-xs">
-          L&apos;équipe La Niche est sur le coup. Tu peux nous aider en nous
-          envoyant un mot.
+          L&apos;équipe Gallery La Niche est sur le coup. Tu peux nous aider en
+          nous envoyant un mot.
         </p>
       </div>
       <div className="flex flex-col gap-2 w-full max-w-xs">
